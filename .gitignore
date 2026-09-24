@@ -1,0 +1,19 @@
+# 依赖与构建产物
+node_modules/
+dist/
+dist-mock/
+src-tauri/target/
+src-tauri/gen/
+
+# 图标源图（可用 scripts/make_icon.py 重新生成）
+app-icon.png
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+
+# 临时截图（不入库）
+shot.png

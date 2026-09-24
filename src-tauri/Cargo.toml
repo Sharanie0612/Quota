@@ -1,0 +1,55 @@
+[package]
+name = "agentprice"
+version = "0.1.0"
+description = "AgentPrice - 模型账户余额与供应商模型简介桌面管家"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "agentprice_lib"
+# Windows 桌面版只需要 rlib/staticlib；不生成 cdylib，
+# 否则 GNU 工具链会因为 DLL 导出序号过多而链接失败（export ordinal too large）
+crate-type = ["staticlib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "gzip",
+  "charset",
+  "http2",
+  "default-tls",
+] }
+tokio = { version = "1", features = ["time", "rt", "macros"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+# 阿里云 BSS 余额接口需要 HMAC-SHA1 签名（「其他方式获取余额」用）
+hmac = "0.12"
+sha1 = "0.10"
+base64 = "0.22"
+
+# Windows 平台使用系统凭据管理器（Windows Credential Manager）加密保存 API Key
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }
+
+# macOS / Linux 备用（跨平台编译时不至于失败）
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+keyring = { version = "3", features = ["linux-native"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

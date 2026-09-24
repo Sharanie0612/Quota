@@ -1,0 +1,1255 @@
+{
+  "updatedAt": "2026-09-23",
+  "disclaimer": "只收录 DeepSeek / Kimi / 智谱 GLM / 小米 MiMo / GPT 系列。价格来自厂商官网公开定价页，标注「已核实」的条目为对照官网核对过；价格会变动，请以官网为准。可以在界面上编辑任意模型卡片，或用「比价」抓官方定价页交叉核对。",
+  "entries": [
+    {
+      "match": [
+        "mimo-v2.6-pro"
+      ],
+      "name": "小米 MiMo V2.6 Pro",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 旗舰对话模型，1M 上下文、最长输出 128K，按量付费",
+      "context": 1000000,
+      "maxOutput": 131072,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 3,
+        "output": 6,
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.025。海外站为 $0.435 / $0.87"
+      },
+      "abilities": [
+        "工具调用",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.6-flash"
+      ],
+      "name": "小米 MiMo V2.6 Flash",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 高性价比档位，1M 上下文、最长输出 128K，适合大批量任务",
+      "context": 1000000,
+      "maxOutput": 131072,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 1,
+        "output": 2,
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.02。海外站为 $0.14 / $0.28"
+      },
+      "abilities": [
+        "工具调用",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.6-pro-ultraspeed"
+      ],
+      "name": "小米 MiMo V2.6 Pro 极速版",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 的超高吞吐档位，单价明显更高，适合对延迟敏感的场景",
+      "context": 1000000,
+      "maxOutput": 131072,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 30,
+        "output": 60,
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.25。海外站为 $4.35 / $8.70。不支持批量接口"
+      },
+      "abilities": [
+        "高速",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.5-asr"
+      ],
+      "name": "小米 MiMo V2.5 ASR",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 语音识别模型，按输入音频时长计费",
+      "price": {
+        "currency": "CNY",
+        "unit": "每小时音频",
+        "input": 0.5,
+        "output": null,
+        "note": "按输入音频时长计费，不按 tokens 计价"
+      },
+      "abilities": [
+        "语音识别"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.5-tts"
+      ],
+      "name": "小米 MiMo V2.5 TTS",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 语音合成模型，官方限时免费",
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方限时免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "语音合成"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.5-tts-voiceclone"
+      ],
+      "name": "小米 MiMo V2.5 TTS 音色克隆",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 音色克隆能力，基于参考音频合成相似音色，官方限时免费",
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方限时免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "语音合成"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "mimo-v2.5-tts-voicedesign"
+      ],
+      "name": "小米 MiMo V2.5 TTS 音色设计",
+      "vendor": "小米",
+      "providers": [
+        "mimo",
+        "custom"
+      ],
+      "summary": "小米 MiMo 音色设计能力，按参数定制新音色，官方限时免费",
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方限时免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "语音合成"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "match": [
+        "deepseek-flash",
+        "deepseek-v4.1-flash",
+        "deepseek-v4-flash",
+        "deepseek-ai/deepseek-v4.1-flash"
+      ],
+      "name": "DeepSeek V4.1 Flash",
+      "vendor": "DeepSeek",
+      "providers": [
+        "deepseek",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "高性价比通用对话模型，1M 超长上下文，适合大批量日常任务",
+      "context": 1000000,
+      "maxOutput": 384000,
+      "price": {
+        "currency": "USD",
+        "unit": "每 1M tokens",
+        "input": 0.3,
+        "output": 1.2,
+        "note": "标准（高峰）时段价格；低峰时段减半，约 $0.15 / $0.6；缓存命中输入 $0.006"
+      },
+      "abilities": [
+        "工具调用",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "match": [
+        "deepseek-v4-pro",
+        "deepseek-ai/deepseek-v4-pro"
+      ],
+      "name": "DeepSeek V4 Pro",
+      "vendor": "DeepSeek",
+      "providers": [
+        "deepseek",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "旗舰推理与复杂任务模型，1M 上下文，能力最强的一档",
+      "context": 1000000,
+      "maxOutput": 384000,
+      "price": {
+        "currency": "USD",
+        "unit": "每 1M tokens",
+        "input": 1.32,
+        "output": 3.96,
+        "note": "标准（高峰）时段价格；低峰时段减半，约 $0.66 / $1.98；缓存命中输入 $0.044"
+      },
+      "abilities": [
+        "推理",
+        "工具调用",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "match": [
+        "kimi-k3",
+        "kimi-k3-latest"
+      ],
+      "name": "Kimi K3",
+      "vendor": "月之暗面 Kimi",
+      "providers": [
+        "moonshot",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "Kimi 旗舰模型，1M 上下文，面向复杂长任务",
+      "context": 1048576,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 20,
+        "output": 100,
+        "note": "缓存命中输入 ¥2；缓存写入 5 分钟 TTL ¥20、1 小时 TTL ¥40"
+      },
+      "abilities": [
+        "工具调用",
+        "长上下文"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing"
+    },
+    {
+      "match": [
+        "kimi-k2.7-code",
+        "kimi-k2-7-code"
+      ],
+      "name": "Kimi K2.7 Code",
+      "vendor": "月之暗面 Kimi",
+      "providers": [
+        "moonshot",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "面向编码场景的专用模型，256K 上下文",
+      "context": 262144,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 6.5,
+        "output": 27,
+        "note": "缓存命中输入 ¥1.3"
+      },
+      "abilities": [
+        "代码",
+        "工具调用"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing"
+    },
+    {
+      "match": [
+        "kimi-k2.7-code-highspeed"
+      ],
+      "name": "Kimi K2.7 Code 高速版",
+      "vendor": "月之暗面 Kimi",
+      "providers": [
+        "moonshot",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "编码模型的高速版本，吞吐更高、单价更高",
+      "context": 262144,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 13,
+        "output": 54,
+        "note": "缓存命中输入 ¥2.6"
+      },
+      "abilities": [
+        "代码",
+        "高速"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing"
+    },
+    {
+      "match": [
+        "kimi-k2.6",
+        "kimi-k2-6"
+      ],
+      "name": "Kimi K2.6",
+      "vendor": "月之暗面 Kimi",
+      "providers": [
+        "moonshot",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "上一代主力模型，256K 上下文，性价比更高",
+      "context": 262144,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 6.5,
+        "output": 27,
+        "note": "缓存命中输入 ¥1.1"
+      },
+      "abilities": [
+        "工具调用"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing"
+    },
+    {
+      "match": [
+        "glm-5.3"
+      ],
+      "name": "GLM-5.3",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "始终思考的旗舰，编程智能体强",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 8,
+        "output": 28,
+        "note": null
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5.3-flash"
+      ],
+      "name": "GLM-5.3-Flash",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "原生多模态，图视频文件理解",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.8,
+        "output": 2.8,
+        "note": null
+      },
+      "abilities": [
+        "视觉",
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5.3-flashx"
+      ],
+      "name": "GLM-5.3-FlashX",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "多模态高速版，约 200 tok/s",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 2,
+        "output": 7,
+        "note": null
+      },
+      "abilities": [
+        "视觉",
+        "工具调用",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5.2"
+      ],
+      "name": "GLM-5.2",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "工程交付与长程任务见长",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 8,
+        "output": 28,
+        "note": null
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5.1"
+      ],
+      "name": "GLM-5.1",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "编码对标 Opus 4.6，可长程自主",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 6,
+        "output": 24,
+        "note": "输入 ≥32K 档 8/28"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5-turbo"
+      ],
+      "name": "GLM-5-Turbo",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "长任务连续性优化版",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 5,
+        "output": 22,
+        "note": "输出 ≥32K 档 7/26"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5"
+      ],
+      "name": "GLM-5",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "Agentic 长程规划与执行",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 4,
+        "output": 18,
+        "note": "≥32K 档 6/22"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.7"
+      ],
+      "name": "GLM-4.7",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "通用对话推理，智能体升级",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 2,
+        "output": 8,
+        "note": "输出 ≥0.2K 档 3/14；输入 [32K,200K) 档 4/16"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.7-flashx"
+      ],
+      "name": "GLM-4.7-FlashX",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "轻量高速，小尺寸强能力",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.5,
+        "output": 3,
+        "note": null
+      },
+      "abilities": [
+        "推理",
+        "工具调用"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.7-flash"
+      ],
+      "name": "GLM-4.7-Flash",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "免费通用文本模型",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方标注免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "工具调用",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.6"
+      ],
+      "name": "GLM-4.6",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "高级编码，复杂推理与工具调用",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": null,
+        "output": null,
+        "note": "官网 API 定价表未列出价格，以官网为准"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.5-air"
+      ],
+      "name": "GLM-4.5-Air",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "推理编码智能体均衡轻量",
+      "context": 128000,
+      "maxOutput": 96000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.8,
+        "output": 2,
+        "note": "输出 ≥0.2K 档 0.8/6；输入 [32K,128K) 档 1.2/8"
+      },
+      "abilities": [
+        "工具调用",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-5v-turbo"
+      ],
+      "name": "GLM-5V-Turbo",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "多模态 Coding 视觉基座",
+      "context": 200000,
+      "maxOutput": 128000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 5,
+        "output": 22,
+        "note": "输出 ≥32K 档 7/26"
+      },
+      "abilities": [
+        "视觉",
+        "推理",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.6v"
+      ],
+      "name": "GLM-4.6V",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "原生工具调用，前端复刻强",
+      "context": 128000,
+      "maxOutput": 32000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 1,
+        "output": 3,
+        "note": "[32K,128K) 档 2/6"
+      },
+      "abilities": [
+        "视觉",
+        "工具调用",
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.6v-flashx"
+      ],
+      "name": "GLM-4.6V-FlashX",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "高并发视觉推理",
+      "context": 128000,
+      "maxOutput": 32000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.15,
+        "output": 1.5,
+        "note": "[32K,128K) 档 0.3/3"
+      },
+      "abilities": [
+        "视觉",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.6v-flash"
+      ],
+      "name": "GLM-4.6V-Flash",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "免费视觉推理模型",
+      "context": 128000,
+      "maxOutput": 32000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方标注免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "视觉",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.5v"
+      ],
+      "name": "GLM-4.5V",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "视觉理解多模态模型",
+      "context": 64000,
+      "maxOutput": null,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 2,
+        "output": 6,
+        "note": "[32K,64K) 档 4/12"
+      },
+      "abilities": [
+        "视觉",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.1v-thinking-flashx"
+      ],
+      "name": "GLM-4.1V-Thinking-FlashX",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "复杂场景视觉思考",
+      "context": 64000,
+      "maxOutput": 16000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 2,
+        "output": 6,
+        "note": null
+      },
+      "abilities": [
+        "视觉",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4.1v-thinking-flash"
+      ],
+      "name": "GLM-4.1V-Thinking-Flash",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "免费视觉思考模型",
+      "context": 64000,
+      "maxOutput": 16000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方标注免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "视觉",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4v-flash"
+      ],
+      "name": "GLM-4V-Flash",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "免费图像理解模型",
+      "context": 4000,
+      "maxOutput": null,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方标注免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [
+        "视觉"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4-long"
+      ],
+      "name": "GLM-4-Long",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "超长文本与记忆型任务",
+      "context": 1000000,
+      "maxOutput": 4000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 1,
+        "output": 1,
+        "note": null
+      },
+      "abilities": [],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4-flashx-250414"
+      ],
+      "name": "GLM-4-FlashX-250414",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "高并发增强高速版",
+      "context": 128000,
+      "maxOutput": 16000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.1,
+        "output": 0.1,
+        "note": null
+      },
+      "abilities": [
+        "工具调用",
+        "推理"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-4-flash-250414"
+      ],
+      "name": "GLM-4-Flash-250414",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "免费文本模型",
+      "context": 128000,
+      "maxOutput": 16000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0,
+        "output": 0,
+        "note": "官方标注免费，价格随时可能调整，以官网为准"
+      },
+      "abilities": [],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "glm-ocr"
+      ],
+      "name": "GLM-OCR",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "轻量高精图文文档解析",
+      "context": 32000,
+      "maxOutput": null,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.2,
+        "output": 0.2,
+        "note": null
+      },
+      "abilities": [
+        "视觉"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "codegeex-4"
+      ],
+      "name": "CodeGeeX-4",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "代码补全与生成模型",
+      "context": 128000,
+      "maxOutput": 32000,
+      "price": {
+        "currency": "CNY",
+        "unit": "每 1M tokens",
+        "input": 0.1,
+        "output": 0.1,
+        "note": "官网统一单价 0.1，不区分输入/输出"
+      },
+      "abilities": [
+        "代码"
+      ],
+      "verified": true,
+      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
+    },
+    {
+      "match": [
+        "deepseek-v3",
+        "deepseek-v3.1",
+        "deepseek-ai/deepseek-v3",
+        "deepseek-chat"
+      ],
+      "name": "DeepSeek V3 系列（开源权重）",
+      "vendor": "DeepSeek",
+      "providers": [],
+      "summary": "DeepSeek 开源权重通用模型，多个云平台提供托管，价格差异较大",
+      "price": null,
+      "abilities": [
+        "工具调用"
+      ],
+      "verified": false,
+      "source": "https://api-docs.deepseek.com",
+      "hidden": true
+    },
+    {
+      "match": [
+        "deepseek-r1",
+        "deepseek-reasoner",
+        "deepseek-ai/deepseek-r1"
+      ],
+      "name": "DeepSeek R1 系列（开源权重）",
+      "vendor": "DeepSeek",
+      "providers": [],
+      "summary": "DeepSeek 开源推理模型，擅长数学与逻辑推理",
+      "price": null,
+      "abilities": [
+        "推理"
+      ],
+      "verified": false,
+      "source": "https://api-docs.deepseek.com",
+      "hidden": true
+    },
+    {
+      "match": [
+        "glm-4.6",
+        "glm-4.5",
+        "glm-4.5-air",
+        "glm-4-plus",
+        "glm-4-air"
+      ],
+      "name": "智谱 GLM-4 系列",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "智谱 GLM 通用对话模型家族，含轻量版与旗舰版",
+      "price": null,
+      "abilities": [
+        "工具调用"
+      ],
+      "verified": false,
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "hidden": true
+    },
+    {
+      "match": [
+        "glm-z1",
+        "glm-4.5-flash",
+        "glm-4-flash"
+      ],
+      "name": "智谱 GLM 免费/推理档位",
+      "vendor": "智谱 AI",
+      "providers": [
+        "zhipu",
+        "siliconflow",
+        "custom"
+      ],
+      "summary": "智谱的免费或低成本档位模型，适合轻量任务",
+      "price": null,
+      "abilities": [
+        "推理"
+      ],
+      "verified": false,
+      "source": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "hidden": true
+    },
+    {
+      "match": [
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "o3",
+        "o4-mini"
+      ],
+      "name": "OpenAI GPT / o 系列",
+      "vendor": "OpenAI",
+      "providers": [
+        "openai",
+        "custom"
+      ],
+      "summary": "OpenAI 通用与推理模型家族，价格与版本请以官网定价页为准",
+      "price": null,
+      "abilities": [
+        "工具调用",
+        "视觉",
+        "推理"
+      ],
+      "verified": false,
+      "source": "https://openai.com/api/pricing/",
+      "hidden": true
+    },
+    {
+      "match": [
+        "kimi-latest",
+        "moonshot-v1-8k",
+        "moonshot-v1-32k",
+        "moonshot-v1-128k",
+        "moonshot-v1-auto",
+        "kimi-k2.5",
+        "kimi-k2-0905-preview",
+        "kimi-k2-0711-preview",
+        "kimi-k2-turbo-preview",
+        "kimi-k2-thinking",
+        "kimi-k2-thinking-turbo",
+        "kimi-thinking-preview",
+        "deepseek-v1",
+        "deepseek-v2",
+        "deepseek-v2.5",
+        "deepseek-coder",
+        "mimo-v2.5",
+        "mimo-v2.5-pro",
+        "glm-3",
+        "qwen2",
+        "qwen2.5",
+        "gpt-3.5-turbo",
+        "gpt-4",
+        "o1",
+        "claude-instant",
+        "claude-2",
+        "claude-2.0",
+        "claude-2.1",
+        "claude-3",
+        "gemini-1.0",
+        "gemini-1.5",
+        "gemini-2.0",
+        "gemini-2.5"
+      ],
+      "name": "已下线/过时模型（历史 ID，不展示）",
+      "vendor": "多厂商",
+      "providers": [],
+      "summary": "官方已下线或已被新代际取代的历史模型 ID；命中的模型不进模型库列表（详见 docs/model-catalog.md 各节备注）。",
+      "context": null,
+      "maxOutput": null,
+      "price": null,
+      "abilities": [],
+      "verified": false,
+      "source": "docs/model-catalog.md",
+      "hidden": true
+    }
+  ]
+}

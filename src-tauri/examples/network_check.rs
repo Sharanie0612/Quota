@@ -4,7 +4,7 @@
 //!
 //! 说明：这台机器直连被墙域名时 DNS 已污染，请求会异常，所以国外站点只测代理路径。
 
-use agentprice_lib::system_proxy_url;
+use quota_lib::system_proxy_url;
 use std::time::Duration;
 
 fn main() {

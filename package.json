@@ -1,9 +1,9 @@
 {
-  "name": "agentprice",
+  "name": "quota",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "AgentPrice - 模型账户余额与供应商模型简介桌面管家",
+  "description": "A lightweight local-first dashboard for AI provider balances and quotas.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

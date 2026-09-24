@@ -660,7 +660,7 @@
         case "app_info":
           return {
             version: "0.1.0",
-            configDir: "C:\\Users\\demo\\AppData\\Roaming\\AgentPrice",
+            configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen":
           return 1;

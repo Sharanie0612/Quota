@@ -2,7 +2,7 @@
 //! 打印返回的模型 id（不打印任何密钥），核对模型列表的实际内容与资料库的差异。
 //! 运行：cargo run --release --example mimo_models（账户 id 见下方 ACCOUNTS）
 
-use agentprice_lib::get_secrets;
+use quota_lib::get_secrets;
 use std::time::Duration;
 
 const ACCOUNTS: [(&str, &str, &str); 2] = [

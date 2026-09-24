@@ -3,7 +3,7 @@
 //!
 //! 样例 JSON 的字段名与真实接口一致，数字为合成值（真实返回已在接入时人工核对过）。
 
-use agentprice_lib::parse_zhipu_report;
+use quota_lib::parse_zhipu_report;
 
 const REPORT_OK: &str = r#"{"code":200,"msg":"操作成功","data":{"balance":11.596398650,
     "rechargeAmount":40.000000,"giveAmount":3.500000,"totalSpendAmount":28.403601350,

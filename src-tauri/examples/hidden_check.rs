@@ -2,7 +2,7 @@
 //! 代码路径真正执行「过时模型隐藏」逻辑，作为可运行的验证。
 //! 运行：cargo run --release --example hidden_check
 
-use agentprice_lib::{
+use quota_lib::{
     cards_for_account, embedded_file, hidden_keys, is_hidden, merge_cards, normalize,
     CatalogEntry, RemoteModel,
 };

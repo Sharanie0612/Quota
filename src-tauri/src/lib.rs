@@ -85,5 +85,5 @@ pub fn run() {
             commands::hide_popup,
         ])
         .run(tauri::generate_context!())
-        .expect("AgentPrice 启动失败");
+        .expect("Quota 启动失败");
 }

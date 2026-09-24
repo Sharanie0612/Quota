@@ -391,19 +391,19 @@ export function AccountSheet({
           </div>
           <Field
             label="请求头"
-            hint="每行一个，例如：Authorization: Bearer sk-xxxx 或 Cookie: session=…"
+            hint="每行一个。当前请求头保存在本机配置文件，请勿在此填写 API Key、Cookie 等秘密。"
           >
             <textarea
               className="input"
               rows={2}
               value={customHeaders}
-              placeholder="Authorization: Bearer sk-xxxx"
+              placeholder="Accept: application/json"
               onChange={(e) => setCustomHeaders(e.target.value)}
               spellCheck={false}
             />
           </Field>
           {customMethod === "POST" ? (
-            <Field label="请求体" hint="POST 时发送的内容，通常是 JSON">
+            <Field label="请求体" hint="POST 时发送的内容，通常是 JSON；当前保存在本机配置文件，请勿填写秘密。">
               <textarea
                 className="input"
                 rows={2}
@@ -593,7 +593,7 @@ export function AccountSheet({
         </Field>
 
         <div className="hint" style={{ marginBottom: 8 }}>
-          API Key 保存在 Windows 凭据管理器（服务名 AgentPrice），配置文件里只记录账户信息，不含密钥。
+          API Key 保存在 Windows 凭据管理器（服务名 Quota），配置文件里只记录账户信息，不含密钥。
         </div>
       </details>
     </Modal>

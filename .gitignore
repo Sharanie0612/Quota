@@ -4,8 +4,10 @@ dist/
 dist-mock/
 src-tauri/target/
 src-tauri/gen/
+.toolchain/
+.cargo/
 
-# 图标源图（可用 scripts/make_icon.py 重新生成）
+# 旧的临时图标源图；正式原图位于 assets/quota-logo-original.png
 app-icon.png
 
 # 编辑器 / 系统

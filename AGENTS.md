@@ -1,4 +1,4 @@
-# AGENTS.md · AgentPrice 编码代理指南
+# AGENTS.md · Quota 编码代理指南
 
 给在这个仓库里工作的 AI 编码代理（也适用于人类）。目标：改完代码能通过验证、不破坏打包、不写错价格。
 
@@ -6,7 +6,7 @@
 
 ## 1. 这是什么项目
 
-Windows 桌面小工具「AgentPrice · 模型账户管家」：管理大模型平台的账户余额、模型简介与一键充值入口。
+Windows 桌面应用 Quota：本地优先地查看 AI 服务商余额、额度与用量，并保留模型资料与官方充值入口。
 
 - 技术栈：Tauri 2（Rust）+ React 18 + TypeScript + Vite，界面为苹果简约风格。
 - 三个页面：账户总览 / 模型库 / 设置；外加系统托盘悬浮卡（窗口 label `tray`，主窗口 label `main`）。
@@ -15,7 +15,8 @@ Windows 桌面小工具「AgentPrice · 模型账户管家」：管理大模型�
   - **配三步中文教程**：表单顶部要有三步流程说明和「API Key 在哪拿？」入口。
 - 供应商范围：**只显示 6 个**——DeepSeek、Kimi、智谱 GLM、小米 MiMo（按量）、小米 MiMo 订阅、ChatGPT 订阅。
   隐藏名单硬编码在 `src-tauri/src/providers.rs` 的 `HIDDEN` 数组（约第 393 行），加回供应商 = 从数组里删掉对应 id。
-- 安全红线：API Key / AccessKey 只进 Windows 凭据管理器（服务名 `AgentPrice`），**不写明文、不进日志、不上传**；软件不接入支付，充值只跳官方页面。
+- 安全红线：API Key / AccessKey / 管理密钥 / Cookie 只进 Windows 凭据管理器（新服务名 `Quota`），**不写明文、不进日志、不上传**；软件不接入支付，充值只跳官方页面。旧服务名仅用于兼容迁移。
+- 当前自定义余额接口的请求头/请求体会写入 `config.json`；不要在这些字段填写密钥。改造该路径前，文档不能宣称任意自定义请求中的秘密都受凭据管理器保护。
 
 ---
 
@@ -41,7 +42,7 @@ export PATH="$HOME/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/x
 HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 npm run tauri build
 ```
 
-打包前先退出正在运行的 agentprice.exe。产物：`src-tauri/target/release/agentprice.exe`（便携版）与 `src-tauri/target/release/bundle/nsis/*-setup.exe`（安装包）。
+打包前先退出正在运行的 quota.exe。产物：`src-tauri/target/release/quota.exe`（便携版）与 `src-tauri/target/release/bundle/nsis/*-setup.exe`（安装包）。
 
 UI 样式自检（不开桌面程序，浏览器里看真实界面）：
 
@@ -76,7 +77,7 @@ node scripts/preview-server.cjs 4174
 
 - 只有从官方定价页核实过的条目才标「已核实」，必须带来源链接与核实时间（字段在 `src-tauri/data/model_catalog.json`）。
 - 官网查不到一律写 `unknown`，卡片显示「待核实」，绝不编数字。
-- 定价页抓取是启发式的：抓到的数值只是候选，界面里必须人工点「采用」才写入本机资料库（`%APPDATA%\AgentPrice\catalog_overrides.json`），采用时刷新核实日期。
+- 定价页抓取是启发式的：抓到的数值只是候选，界面里必须人工点「采用」才写入本机资料库（`%APPDATA%\Quota\catalog_overrides.json`），采用时刷新核实日期。
 - 同一模型多档价格（缓存命中/闲时/批量折扣）时，只取**标准档、非缓存命中**。
 - 「比价」面板的可信度结论（高/中/低/无）由来源数量与一致性打分，逻辑在 `src-tauri/src/pricing.rs`。
 - 模型取数的人工台账在 `docs/model-catalog.md`；改资料库前先看它的取数规则一节。
@@ -92,7 +93,8 @@ node scripts/preview-server.cjs 4174
 - 供应商接口挂了怎么办：查询失败要显示可读错误 + 三个动作（重试 / 打开官网 / 改手动余额）。任何供应商都要能退化到「手动余额」参与低余额通知。
 - 前端窗口分流在 `src/main.tsx`：label `tray` → `TrayPopup`，否则 → `App`。
 - 设计系统全在 `src/styles.css`（浅色中性底/毛玻璃/大圆角/系统蓝，跟随系统深色模式），新组件复用其中的 CSS 变量，不要引入新色值。
-- 数据文件：`%APPDATA%\AgentPrice\config.json`（账户+设置）、`catalog_overrides.json`（资料本地覆盖）、`hidden_models.json`（用户手动隐藏的模型）。
+- 数据文件：`%APPDATA%\Quota\config.json`（账户+设置）、`catalog_overrides.json`（资料本地覆盖）、`hidden_models.json`（用户手动隐藏的模型）。首次启动逐个复制旧目录中缺失的文件；旧目录不删除。
+- 为延续旧安装的升级关系，Tauri identifier `com.agentprice.desktop` 暂时保留（legacy compatibility）。更改它必须先验证安装器升级与卸载行为。
 
 ---
 

@@ -45,14 +45,14 @@ impl AppState {
         let http = {
             let mut builder = reqwest::Client::builder()
                 .timeout(Duration::from_secs(25))
-                .user_agent(concat!("AgentPrice/", env!("CARGO_PKG_VERSION")));
+                .user_agent(concat!("Quota/", env!("CARGO_PKG_VERSION")));
             if let Some(url) = proxy::system_proxy_url() {
                 match reqwest::Proxy::all(&url) {
                     Ok(p) => {
-                        eprintln!("[AgentPrice] 跟随系统代理：{url}");
+                        eprintln!("[Quota] 跟随系统代理：{url}");
                         builder = builder.proxy(p);
                     }
-                    Err(e) => eprintln!("[AgentPrice] 系统代理地址无效 {url}：{e}"),
+                    Err(e) => eprintln!("[Quota] 系统代理地址无效 {url}：{e}"),
                 }
             }
             builder.build().unwrap_or_default()
@@ -567,7 +567,7 @@ pub async fn save_account(
         secrets::set_api_key(&id, key)?;
     } else if is_new && !secrets::has_api_key(&id) {
         // 允许先保存账户、稍后补 Key；查询时会在卡片上提示缺少 Key
-        eprintln!("[AgentPrice] 新增账户 {id} 未填写 API Key");
+        eprintln!("[Quota] 新增账户 {id} 未填写 API Key");
     }
 
     if let Some(admin_key) = input

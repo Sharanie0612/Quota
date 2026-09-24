@@ -191,7 +191,7 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>API Key 存放位置</b>
-            <span>Windows 凭据管理器（服务名 AgentPrice）。密钥不写入配置文件、不上传任何服务器。</span>
+            <span>Windows 凭据管理器（服务名 Quota）。密钥不写入配置文件、不上传任何服务器。</span>
           </div>
         </div>
         <div className="setting-row">
@@ -218,7 +218,7 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>版本</b>
-            <span>AgentPrice {info?.version ?? "—"}</span>
+            <span>Quota {info?.version ?? "—"}</span>
           </div>
         </div>
         <Notice tone="info">

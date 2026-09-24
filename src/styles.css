@@ -1,5 +1,5 @@
 /* =========================================================================
-   AgentPrice · 苹果简约风格设计系统
+   Quota · 苹果简约风格设计系统
    浅色中性底 + 毛玻璃 + 大圆角 + 柔和阴影 + 克制的系统蓝点缀
    ========================================================================= */
 
@@ -163,15 +163,8 @@ textarea {
 .brand-mark {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  background: linear-gradient(160deg, #4aa3ff 0%, #0071e3 55%, #0056b3 100%);
-  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.32);
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  letter-spacing: 0;
+  flex: 0 0 30px;
+  object-fit: contain;
 }
 
 .brand-text {

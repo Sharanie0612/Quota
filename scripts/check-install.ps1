@@ -1,22 +1,18 @@
-$ErrorActionPreference = 'Continue'
-$exe = Join-Path $env:LOCALAPPDATA 'AgentPrice\agentprice.exe'
+param(
+  [string]$ExePath = (Join-Path $env:LOCALAPPDATA 'Quota\quota.exe')
+)
+
+$ErrorActionPreference = 'Stop'
+$exe = $ExePath
 Write-Output ("target: " + $exe)
-Write-Output ("exists: " + (Test-Path $exe))
+if (-not (Test-Path -LiteralPath $exe)) { throw "Installed Quota executable not found: $exe" }
 
-$p = Start-Process -FilePath $exe -PassThru
+$process = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 8
+$process.Refresh()
+if ($process.HasExited) { throw "Quota exited during startup with code $($process.ExitCode)" }
+Write-Output ("RUNNING pid=" + $process.Id + " path=" + $process.Path)
 
-$alive = Get-Process -Name agentprice -ErrorAction SilentlyContinue
-if ($alive) {
-  foreach ($a in $alive) {
-    Write-Output ("RUNNING pid=" + $a.Id + " path=" + $a.Path + " start=" + $a.StartTime.ToString('HH:mm:ss'))
-  }
-} else {
-  Write-Output "NOT RUNNING after 8s"
-  if ($p) { Write-Output ("launcher reported ExitCode=" + $p.ExitCode + " HasExited=" + $p.HasExited) }
-}
-
-# 收尾：结束测试启动的实例
-Get-Process -Name agentprice -ErrorAction SilentlyContinue | Stop-Process -Force
-Start-Sleep -Seconds 1
-if (Get-Process -Name agentprice -ErrorAction SilentlyContinue) { Write-Output "still running after cleanup" } else { Write-Output "cleaned up" }
+# End only the instance started by this smoke check.
+Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+Write-Output "startup check passed"

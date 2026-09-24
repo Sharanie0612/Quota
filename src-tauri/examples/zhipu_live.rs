@@ -2,15 +2,15 @@
 //! （读凭据管理器 → 调账户报表接口 → 解析），只打印余额、不打印密钥。
 //!
 //! 用法：cargo run --release --example zhipu_live -- <账户id>
-//! 账户 id 看 %APPDATA%\AgentPrice\config.json。
+//! 账户 id 看 %APPDATA%\Quota\config.json。
 
-use agentprice_lib::{fetch_balance, find, get_secrets};
+use quota_lib::{fetch_balance, find, get_secrets};
 
 fn main() {
     let account_id = match std::env::args().nth(1) {
         Some(id) => id,
         None => {
-            eprintln!("用法：zhipu_live <账户id>（账户 id 见 %APPDATA%\\AgentPrice\\config.json）");
+            eprintln!("用法：zhipu_live <账户id>（账户 id 见 %APPDATA%\\Quota\\config.json）");
             std::process::exit(2);
         }
     };

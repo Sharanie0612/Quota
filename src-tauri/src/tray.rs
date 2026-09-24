@@ -17,15 +17,15 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let show_item = MenuItem::with_id(app, "show", "打开主面板", true, None::<&str>)?;
     let refresh_item = MenuItem::with_id(app, "refresh", "立即刷新余额", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let quit_item = MenuItem::with_id(app, "quit", "退出 AgentPrice", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "退出 Quota", true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
         &[&popup_item, &show_item, &refresh_item, &separator, &quit_item],
     )?;
 
-    let mut builder = TrayIconBuilder::with_id("agentprice-tray")
-        .tooltip("AgentPrice · 模型账户管家")
+    let mut builder = TrayIconBuilder::with_id("quota-tray")
+        .tooltip("Quota · 余额与额度看板")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -99,7 +99,7 @@ pub fn toggle_popup(app: &AppHandle) {
     }
 
     let built = WebviewWindowBuilder::new(app, "tray", WebviewUrl::App("index.html".into()))
-        .title("AgentPrice")
+        .title("Quota")
         .inner_size(POPUP_W, POPUP_DEFAULT_H)
         .resizable(false)
         .decorations(false)
@@ -116,7 +116,7 @@ pub fn toggle_popup(app: &AppHandle) {
             let _ = window.show();
             let _ = window.set_focus();
         }
-        Err(e) => eprintln!("[AgentPrice] 创建悬浮卡窗口失败：{e}"),
+        Err(e) => eprintln!("[Quota] 创建悬浮卡窗口失败：{e}"),
     }
 }
 

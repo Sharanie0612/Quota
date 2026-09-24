@@ -8,6 +8,7 @@ import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
 import { ModelsView } from "./views/ModelsView";
 import { SettingsView } from "./views/SettingsView";
+import appIcon from "../src-tauri/icons/128x128.png";
 
 type View = "accounts" | "models" | "settings";
 
@@ -69,10 +70,10 @@ export default function App() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">¥</div>
+          <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
-            <span className="brand-title">AgentPrice</span>
-            <span className="brand-sub">模型账户管家</span>
+            <span className="brand-title">Quota</span>
+            <span className="brand-sub">余额与额度看板</span>
           </div>
         </div>
 

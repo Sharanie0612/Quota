@@ -3,6 +3,7 @@
 //! API Key 不在这里，见 secrets.rs（系统凭据管理器）。
 
 use crate::model::{AppConfig, CatalogEntry};
+use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,10 +13,15 @@ pub struct Store {
 
 impl Store {
     pub fn new() -> Result<Self, String> {
-        let base = dirs::config_dir()
-            .ok_or_else(|| "无法定位系统配置目录".to_string())?
-            .join("AgentPrice");
+        let config_root = dirs::config_dir().ok_or_else(|| "无法定位系统配置目录".to_string())?;
+        let base = config_root.join("Quota");
         fs::create_dir_all(&base).map_err(|e| format!("创建配置目录失败：{e}"))?;
+        // legacy compatibility: copy each missing file separately, so a partial migration
+        // never overwrites data already written by Quota. Keep the old directory intact.
+        let legacy = config_root.join("AgentPrice");
+        migrate_file::<AppConfig>(&legacy, &base, "config.json")?;
+        migrate_file::<Vec<CatalogEntry>>(&legacy, &base, "catalog_overrides.json")?;
+        migrate_file::<Vec<String>>(&legacy, &base, "hidden_models.json")?;
         Ok(Self { dir: base })
     }
 
@@ -30,7 +36,7 @@ impl Store {
     pub fn load_config(&self) -> AppConfig {
         match fs::read_to_string(self.path("config.json")) {
             Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-                eprintln!("[AgentPrice] config.json 解析失败，使用默认配置：{e}");
+                eprintln!("[Quota] config.json 解析失败，使用默认配置：{e}");
                 AppConfig::default()
             }),
             Err(_) => AppConfig::default(),
@@ -67,6 +73,25 @@ impl Store {
             serde_json::to_string_pretty(ids).map_err(|e| format!("序列化隐藏列表失败：{e}"))?;
         write_atomic(&self.path("hidden_models.json"), &text)
     }
+}
+
+fn migrate_file<T: DeserializeOwned>(
+    legacy: &Path,
+    current: &Path,
+    name: &str,
+) -> Result<(), String> {
+    let source = legacy.join(name);
+    let destination = current.join(name);
+    if destination.exists() || !source.exists() {
+        return Ok(());
+    }
+    let content = fs::read(&source).map_err(|e| format!("读取旧配置 {name} 失败：{e}"))?;
+    serde_json::from_slice::<T>(&content)
+        .map_err(|e| format!("旧配置 {name} 无法解析，已保留原文件：{e}"))?;
+    let temporary = current.join(format!("{name}.migrate.tmp"));
+    fs::write(&temporary, content).map_err(|e| format!("迁移 {name} 失败：{e}"))?;
+    fs::rename(&temporary, &destination).map_err(|e| format!("完成 {name} 迁移失败：{e}"))?;
+    Ok(())
 }
 
 fn write_atomic(path: &Path, content: &str) -> Result<(), String> {

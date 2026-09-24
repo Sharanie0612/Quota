@@ -1,12 +1,12 @@
 [package]
-name = "agentprice"
+name = "quota"
 version = "0.1.0"
-description = "AgentPrice - 模型账户余额与供应商模型简介桌面管家"
+description = "A lightweight local-first dashboard for AI provider balances and quotas."
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "agentprice_lib"
+name = "quota_lib"
 # Windows 桌面版只需要 rlib/staticlib；不生成 cdylib，
 # 否则 GNU 工具链会因为 DLL 导出序号过多而链接失败（export ordinal too large）
 crate-type = ["staticlib", "rlib"]

@@ -6,7 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
-const SERVICE: &str = "AgentPrice";
+const SERVICE: &str = "Quota";
+// legacy compatibility: existing Windows Credential Manager entries use this service.
+const LEGACY_SERVICE: &str = "AgentPrice";
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
@@ -27,26 +29,30 @@ pub struct SecretBlob {
     pub console_cookie: Option<String>,
 }
 
-impl SecretBlob {
-    pub fn is_empty(&self) -> bool {
-        self.api_key.is_none()
-            && self.admin_key.is_none()
-            && self.access_key_id.is_none()
-            && self.access_key_secret.is_none()
-            && self.console_cookie.is_none()
-    }
+fn entry(service: &str, account_id: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(service, account_id).map_err(|e| format!("无法访问系统凭据管理器：{e}"))
 }
 
-fn entry(account_id: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(SERVICE, account_id).map_err(|e| format!("无法访问系统凭据管理器：{e}"))
-}
-
-fn read_raw(account_id: &str) -> Result<Option<String>, String> {
-    match entry(account_id)?.get_password() {
+fn read_service(service: &str, account_id: &str) -> Result<Option<String>, String> {
+    match entry(service, account_id)?.get_password() {
         Ok(v) => Ok(Some(v)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => Err(format!("读取系统凭据管理器失败：{e}")),
     }
+}
+
+fn read_raw(account_id: &str) -> Result<Option<String>, String> {
+    if let Some(value) = read_service(SERVICE, account_id)? {
+        return Ok(Some(value));
+    }
+    let Some(legacy) = read_service(LEGACY_SERVICE, account_id)? else {
+        return Ok(None);
+    };
+    // Copy the exact stored value, including the old bare API-key format. Never delete it.
+    entry(SERVICE, account_id)?
+        .set_password(&legacy)
+        .map_err(|e| format!("迁移系统凭据失败，旧凭据仍保留：{e}"))?;
+    Ok(Some(legacy))
 }
 
 /// 读取账户的全部凭据；不存在时返回空的 blob（不报错）
@@ -65,11 +71,8 @@ pub fn get_secrets(account_id: &str) -> Result<SecretBlob, String> {
 }
 
 fn write(account_id: &str, blob: &SecretBlob) -> Result<(), String> {
-    if blob.is_empty() {
-        return delete(account_id);
-    }
     let text = serde_json::to_string(blob).map_err(|e| format!("序列化凭据失败：{e}"))?;
-    entry(account_id)?
+    entry(SERVICE, account_id)?
         .set_password(&text)
         .map_err(|e| format!("写入系统凭据管理器失败：{e}"))
 }
@@ -185,9 +188,7 @@ pub fn set_admin_key(account_id: &str, value: &str) -> Result<(), String> {
 }
 
 pub fn delete(account_id: &str) -> Result<(), String> {
-    match entry(account_id)?.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("删除凭据失败：{e}")),
-    }
+    // An empty new-service entry prevents a deleted account's legacy key from reappearing.
+    // The legacy entry is deliberately preserved for rollback.
+    write(account_id, &SecretBlob::default())
 }

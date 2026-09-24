@@ -7,7 +7,7 @@ const EMBEDDED: &str = include_str!("../data/model_catalog.json");
 
 pub fn embedded_file() -> CatalogFile {
     serde_json::from_str(EMBEDDED).unwrap_or_else(|e| {
-        eprintln!("[AgentPrice] 内置模型资料库解析失败：{e}");
+        eprintln!("[Quota] 内置模型资料库解析失败：{e}");
         CatalogFile::default()
     })
 }

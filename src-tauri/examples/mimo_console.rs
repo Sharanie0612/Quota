@@ -3,7 +3,7 @@
 //! 样例结构全部取自**实测返回**（2026-09-23 用真实 Cookie 调 platform.xiaomimimo.com），
 //! 其中余额是负数（欠费）的情况也覆盖到了。
 
-use agentprice_lib::{parse_balance, parse_plan_detail, parse_token_plan_usage};
+use quota_lib::{parse_balance, parse_plan_detail, parse_token_plan_usage};
 
 /// 实测 /api/v1/balance（金额是字符串，含负数）
 const BALANCE: &str = r#"{"code":0,"message":"","data":{"balance":"-0.15","frozenBalance":"0.00","currency":"CNY","overdraftLimit":"0.00","remainingOverdraftLimit":"0.00","giftBalance":"0.00","cashBalance":"0.00"}}"#;

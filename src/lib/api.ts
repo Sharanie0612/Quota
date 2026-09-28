@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
   AccountInput,
+  AccountTrend,
   AccountView,
   AppInfo,
   CatalogEntry,
@@ -9,6 +10,7 @@ import type {
   ModelCard,
   PriceComparison,
   ProviderView,
+  RechargeEvent,
   Settings,
 } from "./types";
 
@@ -21,6 +23,14 @@ export const api = {
   refreshAll: () => invoke<AccountView[]>("refresh_all"),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
+  /** 全部账户的余额历史与趋势（本地记录，用于折线与耗尽预测） */
+  getBalanceHistory: () => invoke<Record<string, AccountTrend>>("get_balance_history"),
+  /** 导出加密备份（配置 + 模型资料 + 全部密钥）；path 来自 dialog 插件 */
+  exportBackup: (password: string, path: string) =>
+    invoke<void>("export_backup", { password, path }),
+  /** 从加密备份恢复，返回统计摘要 */
+  importBackup: (password: string, path: string) =>
+    invoke<string>("import_backup", { password, path }),
   modelCards: (provider?: string) =>
     invoke<ModelCard[]>("model_cards", { provider: provider ?? null }),
   saveCatalogEntry: (entry: CatalogEntry) => invoke<void>("save_catalog_entry", { entry }),
@@ -65,6 +75,9 @@ export const api = {
 
 export const events = {
   onAccountsUpdated: (cb: () => void) => listen("accounts-updated", cb),
+  /** 刷新时检测到余额明显上涨（疑似充值） */
+  onRechargeDetected: (cb: (e: RechargeEvent) => void) =>
+    listen<RechargeEvent>("recharge-detected", (e) => cb(e.payload)),
   /** 从悬浮卡点某个账户进入主面板时触发，带回账户 id */
   onFocusAccount: (cb: (id: string) => void) => listen<string>("focus-account", (e) => cb(e.payload)),
 };

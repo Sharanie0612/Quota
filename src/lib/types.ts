@@ -250,3 +250,28 @@ export interface AppInfo {
   version: string;
   configDir: string;
 }
+
+/** 余额历史采样点（t = Unix 秒，v = 余额） */
+export interface HistoryPoint {
+  t: number;
+  v: number;
+}
+
+/** 单账户的余额趋势（Rust 端 history.rs 计算） */
+export interface AccountTrend {
+  points: HistoryPoint[];
+  /** 最近 7 天拟合的日均消耗（正数 = 在消耗；null = 样本不足） */
+  dailyBurn: number | null;
+  /** 按当前速度估算的可用天数 */
+  daysLeft: number | null;
+}
+
+/** 刷新时检测到的疑似充值事件（Rust 端通过 recharge-detected 事件广播） */
+export type RechargeEvent = {
+  accountId: string;
+  label: string;
+  currency: string;
+  /** 相对上一条记录的涨幅 */
+  amount: number;
+  total: number;
+};

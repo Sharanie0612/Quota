@@ -455,11 +455,11 @@
       maxOutput: 384000,
       price: price("USD", 1.32, 3.96),
       abilities: [],
-      verified: true,
-      verifiedAt: "2026-09-23T00:00:00+08:00",
-      source: "https://api-docs.deepseek.com/quick_start/pricing",
+      verified: false,
+      verifiedAt: null,
+      source: null,
       edited: false,
-      priceConfidence: "high",
+      priceConfidence: "medium",
       matchQuality: "exact",
       ownedBy: "deepseek",
       created: null,
@@ -475,7 +475,7 @@
       price: price("CNY", 20, 100),
       abilities: [],
       verified: true,
-      verifiedAt: "2026-09-23T00:00:00+08:00",
+      verifiedAt: "2026-03-01T00:00:00+08:00",
       source: "https://platform.kimi.com/docs/pricing",
       edited: false,
       priceConfidence: "high",
@@ -595,6 +595,27 @@
     defaultLowThreshold: 20,
   };
 
+  /** 余额历史演示数据：一个月的缓降曲线 + 一次充值反弹（t = Unix 秒） */
+  const historyPoint = (daysAgo, v) => ({
+    t: Math.floor(Date.now() / 1000) - Math.round(daysAgo * 86400),
+    v,
+  });
+  const downTrend = (from, to) => {
+    const points = [];
+    for (let i = 0; i <= 24; i++) {
+      const day = 28 - i * (28 / 24);
+      let v = from + ((to - from) * i) / 24;
+      if (i === 18) v += 60; // 中途充了一次值
+      points.push(historyPoint(Math.max(day, 0.05), v));
+    }
+    return points;
+  };
+  const BALANCE_HISTORY = {
+    a1: { points: downTrend(220, 88.4), dailyBurn: 6.4, daysLeft: 13.8 },
+    a2: { points: downTrend(140, 22.7), dailyBurn: 4.1, daysLeft: 5.5 },
+    a3: { points: downTrend(300, 260.2), dailyBurn: 1.4, daysLeft: 186 },
+  };
+
   window.__TAURI_INTERNALS__ = {
     metadata: {
       currentWindow: { label: WINDOW_LABEL },
@@ -624,6 +645,11 @@
         case "get_settings":
         case "save_settings":
           return SETTINGS;
+        case "get_balance_history":
+          return BALANCE_HISTORY;
+        case "export_backup":
+        case "import_backup":
+          return null;
         case "model_cards":
           return CARDS;
         case "compare_prices":

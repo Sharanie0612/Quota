@@ -3,12 +3,26 @@ import { ModelEditModal } from "../components/ModelEditModal";
 import { ModelRow } from "../components/ModelRow";
 import { PriceCompareModal } from "../components/PriceCompareModal";
 import { IconLayers, IconRefresh, IconSearch } from "../components/icons";
-import { Button, EmptyState, Seg } from "../components/ui";
+import { Button, EmptyState, Notice, Seg } from "../components/ui";
 import { api, copyText, errText } from "../lib/api";
 import { toast } from "../lib/store";
 import type { AccountView, ModelCard as ModelCardType, ProviderView } from "../lib/types";
 
 type Mode = "list" | "compare";
+
+/** 已核实价格的保质期：超过这么多天就在顶部提醒重新比价 */
+const STALE_DAYS = 90;
+
+/** 有价格但资料需要复核：从未核实过，或已核实但超过保质期 */
+function needsRecheck(c: ModelCardType): boolean {
+  const hasPrice =
+    !!c.price && (c.price.input !== null || c.price.output !== null);
+  if (!hasPrice || c.hidden) return false;
+  if (!c.verified) return c.priceConfidence === "medium";
+  if (!c.verifiedAt) return true;
+  const age = Date.now() - Date.parse(c.verifiedAt);
+  return Number.isFinite(age) && age > STALE_DAYS * 86400_000;
+}
 
 /** 输入 + 输出的合计价格；没有价格的返回 Infinity（价格对比时排到最后） */
 function costOf(c: ModelCardType): number {
@@ -47,6 +61,7 @@ export function ModelsView({
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<Mode>("list");
   const [showHidden, setShowHidden] = useState(false);
+  const [staleOnly, setStaleOnly] = useState(false);
   const [copyingId, setCopyingId] = useState<string | null>(null);
   const [editCard, setEditCard] = useState<ModelCardType | null>(null);
   const [compareCard, setCompareCard] = useState<ModelCardType | null>(null);
@@ -108,6 +123,12 @@ export function ModelsView({
   const hiddenCount = useMemo(() => cards.filter((c) => c.hidden).length, [cards]);
   const visibleCount = cards.length - hiddenCount;
 
+  /** 价格资料待复核的模型（横幅与「只看待复核」过滤共用） */
+  const staleCards = useMemo(
+    () => cards.filter((c) => !c.hidden && needsRecheck(c)),
+    [cards],
+  );
+
   /** 手动隐藏 / 恢复某个模型（记在本机，刷新、重启后仍生效） */
   const toggleHide = async (card: ModelCardType) => {
     try {
@@ -132,12 +153,15 @@ export function ModelsView({
         [c.id, c.name, c.vendor, ...c.abilities].join(" ").toLowerCase().includes(q),
       );
     }
+    if (staleOnly && mode === "list") {
+      list = list.filter((c) => needsRecheck(c));
+    }
     if (mode === "compare") {
       // 没有价格的模型排到最后，不要被当成「最便宜」
       list = [...list].sort((a, b) => costOf(a) - costOf(b));
     }
     return list;
-  }, [cards, search, mode, showHidden]);
+  }, [cards, search, mode, showHidden, staleOnly]);
 
   const maxCost = useMemo(() => {
     const costs = filtered.map(costOf).filter((c) => Number.isFinite(c));
@@ -173,6 +197,16 @@ export function ModelsView({
             {showHidden ? "收起已隐藏 ✕" : `显示已隐藏（${hiddenCount}）`}
           </button>
         ) : null}
+        {staleOnly ? (
+          <button
+            type="button"
+            className="chip chip-active"
+            title="点一下回到全部模型"
+            onClick={() => setStaleOnly(false)}
+          >
+            只看待复核（{staleCards.length}）✕
+          </button>
+        ) : null}
         {filterVendor ? (
           <button
             type="button"
@@ -198,6 +232,40 @@ export function ModelsView({
           按「输入 + 输出」合计价格从便宜到贵排列（各平台计价单位都是每 1M tokens），
           条形长度表示相对价格高低。
         </div>
+      ) : null}
+
+      {mode === "list" && !loading && staleCards.length > 0 ? (
+        <Notice
+          tone="warn"
+          actions={
+            <Button
+              size="sm"
+              variant="quiet"
+              onClick={() => {
+                setStaleOnly(true);
+                setSearch("");
+              }}
+            >
+              查看这些模型
+            </Button>
+          }
+        >
+          {(() => {
+            const expired = staleCards.filter(
+              (c) => c.verified && c.verifiedAt && Date.now() - Date.parse(c.verifiedAt) > STALE_DAYS * 86400_000,
+            ).length;
+            const fresh = staleCards.length - expired;
+            const parts: string[] = [];
+            if (expired > 0) parts.push(`${expired} 个已核实超过 ${STALE_DAYS} 天`);
+            if (fresh > 0) parts.push(`${fresh} 个还没有核实过`);
+            return (
+              <>
+                有 {staleCards.length} 个模型的价格资料需要复核（{parts.join("、")}）。
+                价格随时会变，建议点每行的「比价」对照官方定价页重新核实。
+              </>
+            );
+          })()}
+        </Notice>
       ) : null}
 
       {accounts.length === 0 ? (

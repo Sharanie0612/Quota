@@ -1,13 +1,22 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, errText } from "../lib/api";
 import {
   balanceSourceLabel,
   money,
+  symbol,
   timeAgo,
 } from "../lib/format";
 import { useAccounts, useToasts } from "../lib/store";
 import type { AccountView } from "../lib/types";
-import { IconAlert, IconCoins, IconExternal, IconRefresh, IconX } from "./icons";
+import {
+  IconAlert,
+  IconCoins,
+  IconExternal,
+  IconEye,
+  IconEyeOff,
+  IconRefresh,
+  IconX,
+} from "./icons";
 import { ProviderLogo } from "./logos";
 import { Badge, Button, IconButton } from "./ui";
 
@@ -18,11 +27,29 @@ const ITEM_H = 86;
 /** 超过这么多账户就让列表滚动，窗口不再变高 */
 const MAX_VISIBLE_ITEMS = 5;
 
+const MASK_KEY = "quota.tray.masked";
+
+/** 隐私模式下金额的显示（保留币种符号，数值打码） */
+function maskMoney(currency: string): string {
+  const c = currency?.toUpperCase();
+  if (c.startsWith("CREDIT")) return "•••";
+  return `${symbol(c) ?? ""}•••`;
+}
+
 /** 托盘悬浮卡：点托盘图标弹出的紧凑余额面板 */
 export default function TrayPopup() {
   const { accounts, reload, refreshAll, refreshing } = useAccounts();
   const toasts = useToasts();
   const resizeTimer = useRef<number | null>(null);
+  // 隐私模式：金额打码（本地记住，点眼睛切换）
+  const [masked, setMasked] = useState(() => localStorage.getItem(MASK_KEY) === "1");
+
+  const toggleMasked = () => {
+    setMasked((m) => {
+      localStorage.setItem(MASK_KEY, m ? "0" : "1");
+      return !m;
+    });
+  };
 
   const low = useMemo(() => accounts.filter((a) => a.low), [accounts]);
   const pending = useMemo(
@@ -91,12 +118,21 @@ export default function TrayPopup() {
             <span>
               {accounts.length === 0
                 ? "还没有账户"
-                : totals.length > 0
-                  ? `合计 ${totals.map(([c, v]) => money(v, c)).join(" + ")}`
-                  : `${accounts.length} 个账户`}
+                : masked
+                  ? `${accounts.length} 个账户 · 已隐藏`
+                  : totals.length > 0
+                    ? `合计 ${totals.map(([c, v]) => money(v, c)).join(" + ")}`
+                    : `${accounts.length} 个账户`}
             </span>
           </div>
           <div className="spacer" />
+          <IconButton
+            title={masked ? "显示金额" : "隐藏金额（隐私模式）"}
+            className="btn-sm"
+            onClick={toggleMasked}
+          >
+            {masked ? <IconEye size={14} /> : <IconEyeOff size={14} />}
+          </IconButton>
           <IconButton
             title="刷新余额"
             className="btn-sm"
@@ -148,6 +184,7 @@ export default function TrayPopup() {
             <PopupItem
               key={a.id}
               account={a}
+              masked={masked}
               onOpen={() => void openMain(a.id)}
               onRecharge={() => void recharge(a.effectiveRechargeUrl)}
             />
@@ -172,10 +209,12 @@ export default function TrayPopup() {
 
 function PopupItem({
   account,
+  masked,
   onOpen,
   onRecharge,
 }: {
   account: AccountView;
+  masked: boolean;
   onOpen: () => void;
   onRecharge: () => void;
 }) {
@@ -217,13 +256,17 @@ function PopupItem({
       <div className="popup-body">
         <div className={`val${account.low ? " low" : ""}${b && b.total !== null ? "" : " muted"}`}>
           {b && b.total !== null ? (
-            money(b.total, b.currency)
+            masked ? (
+              <span className="popup-masked">{maskMoney(b.currency)}</span>
+            ) : (
+              money(b.total, b.currency)
+            )
           ) : (
             <span className="placeholder">{placeholder}</span>
           )}
         </div>
         <div className="popup-side">
-          {b && b.amounts.length > 0 ? (
+          {!masked && b && b.amounts.length > 0 ? (
             <span className="popup-amounts" title={b.amounts.map((x) => `${x.label} ${x.value}`).join(" / ")}>
               {b.amounts
                 .slice(0, 2)

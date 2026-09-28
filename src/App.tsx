@@ -3,7 +3,8 @@ import { AccountSheet } from "./components/AccountSheet";
 import { IconGear, IconLayers, IconPlus, IconRefresh, IconWallet } from "./components/icons";
 import { Button, EmptyState } from "./components/ui";
 import { api, events } from "./lib/api";
-import { useAccounts, useSettings, useToasts } from "./lib/store";
+import { money } from "./lib/format";
+import { toast, useAccounts, useSettings, useToasts } from "./lib/store";
 import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
 import { ModelsView } from "./views/ModelsView";
@@ -32,8 +33,15 @@ export default function App() {
       setView("accounts");
       setPendingFocus(id);
     });
+    // 刷新时余额明显上涨：提示一次，不打断操作
+    const unRecharge = events.onRechargeDetected((e) => {
+      toast(
+        `检测到「${e.label}」余额增加了约 ${money(e.amount, e.currency)}，可能是刚充值`,
+      );
+    });
     return () => {
       void un.then((f) => f());
+      void unRecharge.then((f) => f());
     };
   }, []);
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Notice, Seg, Switch } from "../components/ui";
-import { api, copyText } from "../lib/api";
+import { api, copyText, errText } from "../lib/api";
 import { toast } from "../lib/store";
 import type { AppInfo, Settings } from "../lib/types";
 
@@ -11,6 +12,15 @@ const INTERVALS = [
   { value: "60", label: "1 小时" },
   { value: "180", label: "3 小时" },
 ];
+
+type BackupPanel = null | "export" | "import";
+
+/** 备份文件的默认名（带日期，避免覆盖上一次的备份） */
+function backupFileName(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `Quota备份-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}.json`;
+}
 
 export function SettingsView({
   settings,
@@ -22,6 +32,10 @@ export function SettingsView({
   info: AppInfo | null;
 }) {
   const [customInterval, setCustomInterval] = useState("");
+  const [backupPanel, setBackupPanel] = useState<BackupPanel>(null);
+  const [backupPw, setBackupPw] = useState("");
+  const [backupPw2, setBackupPw2] = useState("");
+  const [backupBusy, setBackupBusy] = useState(false);
 
   if (!settings) {
     return (
@@ -34,6 +48,66 @@ export function SettingsView({
   }
 
   const set = (patch: Partial<Settings>) => onUpdate({ ...settings, ...patch });
+
+  const closeBackupPanel = () => {
+    setBackupPanel(null);
+    setBackupPw("");
+    setBackupPw2("");
+  };
+
+  /** 导出加密备份：选保存位置 → Rust 端打包 config + 资料 + 凭据并加密写入 */
+  const doExport = async () => {
+    if (!backupPw) {
+      toast("先输入备份密码", "error");
+      return;
+    }
+    if (backupPw !== backupPw2) {
+      toast("两次输入的密码不一致", "error");
+      return;
+    }
+    const path = await save({
+      title: "导出加密备份",
+      defaultPath: backupFileName(),
+      filters: [{ name: "Quota 加密备份", extensions: ["json"] }],
+    });
+    if (!path) return;
+    setBackupBusy(true);
+    try {
+      await api.exportBackup(backupPw, path);
+      toast("备份已导出，请妥善保管文件与密码");
+      closeBackupPanel();
+    } catch (e) {
+      toast(errText(e), "error");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  /** 从备份恢复：选文件 + 密码 → 覆盖当前配置/资料/凭据 → 整页刷新 */
+  const doImport = async () => {
+    if (!backupPw) {
+      toast("先输入备份密码", "error");
+      return;
+    }
+    const picked = await open({
+      title: "选择 Quota 备份文件",
+      multiple: false,
+      filters: [{ name: "Quota 加密备份", extensions: ["json"] }],
+    });
+    if (!picked) return;
+    const path = typeof picked === "string" ? picked : picked[0];
+    if (!path) return;
+    setBackupBusy(true);
+    try {
+      const msg = await api.importBackup(backupPw, path);
+      toast(`${msg}，正在重新加载…`);
+      // 恢复会替换全部账户与设置，直接刷新让所有页面数据重新加载
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      toast(errText(e), "error");
+      setBackupBusy(false);
+    }
+  };
 
   const isPreset = INTERVALS.some((i) => Number(i.value) === settings.refreshIntervalMinutes);
 
@@ -182,6 +256,82 @@ export function SettingsView({
             恢复
           </Button>
         </div>
+      </div>
+
+      <div className="card section">
+        <h2>
+          <IconGear size={14} /> 备份与迁移
+        </h2>
+        <p>
+          换电脑或重装系统时，把账户配置、模型资料和所有密钥打包成一个加密文件带走。
+          文件用你设置的密码 AES-256-GCM 加密，密码不落盘——忘了密码就没有任何办法恢复。
+        </p>
+        <div className="setting-row">
+          <div className="txt">
+            <b>导出加密备份</b>
+            <span>包含全部账户、设置、模型资料与 API Key，保存为一个加密文件</span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setBackupPanel(backupPanel === "export" ? null : "export")}
+          >
+            导出
+          </Button>
+        </div>
+        <div className="setting-row">
+          <div className="txt">
+            <b>从备份恢复</b>
+            <span>选择备份文件并输入密码。会覆盖当前的账户、设置与全部密钥</span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setBackupPanel(backupPanel === "import" ? null : "import")}
+          >
+            恢复
+          </Button>
+        </div>
+        {backupPanel ? (
+          <div className="backup-panel">
+            {backupPanel === "import" ? (
+              <Notice tone="warn">
+                恢复会覆盖当前所有的账户、设置与密钥，且无法撤销。确认要继续吗？
+              </Notice>
+            ) : null}
+            <div className="backup-fields">
+              <input
+                className="input"
+                type="password"
+                placeholder="备份密码"
+                autoComplete="new-password"
+                value={backupPw}
+                onChange={(e) => setBackupPw(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !backupBusy && void (backupPanel === "export" ? doExport() : doImport())}
+              />
+              {backupPanel === "export" ? (
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="再输入一次确认"
+                  autoComplete="new-password"
+                  value={backupPw2}
+                  onChange={(e) => setBackupPw2(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !backupBusy && void doExport()}
+                />
+              ) : null}
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={backupBusy}
+                onClick={() => void (backupPanel === "export" ? doExport() : doImport())}
+              >
+                {backupBusy ? "处理中…" : backupPanel === "export" ? "导出备份" : "开始恢复"}
+              </Button>
+              <Button size="sm" variant="quiet" onClick={closeBackupPanel}>
+                取消
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="card section">

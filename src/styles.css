@@ -1536,3 +1536,87 @@ textarea.input:focus {
     background-position: 0 50%;
   }
 }
+
+/* =========================================================================
+   余额趋势与汇总（账户总览 / 悬浮卡 / 备份）
+   ========================================================================= */
+
+/* 账户卡片里的余额迷你折线 */
+.sparkline {
+  flex: none;
+  opacity: 0.9;
+}
+
+/* 「日均消耗约 ¥x · 约 N 天后用完」的小字提示 */
+.trend-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 总览顶部的汇总条：总余额 / 本月消耗 / 余额预警 */
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-bar .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.summary-bar .stat-label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.summary-bar .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-bar .stat-value.is-alert {
+  color: var(--red);
+}
+
+/* 设置页备份面板 */
+.backup-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.backup-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.backup-fields .input {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* 悬浮卡隐私模式：金额打码 */
+.popup-masked {
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+}

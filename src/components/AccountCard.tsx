@@ -2,11 +2,12 @@ import { useState } from "react";
 import { api, errText } from "../lib/api";
 import {
   balanceSourceLabel,
+  daysLeftText,
   money,
   timeAgo,
 } from "../lib/format";
 import { toast } from "../lib/store";
-import type { AccountView } from "../lib/types";
+import type { AccountTrend, AccountView, HistoryPoint } from "../lib/types";
 import { ProviderLogo } from "./logos";
 import {
   IconAlert,
@@ -19,15 +20,57 @@ import {
 } from "./icons";
 import { Badge, Button, IconButton, Notice } from "./ui";
 
+/** 余额迷你折线：最近 30 天的本地历史记录，不足两个点不画 */
+function Sparkline({ points, low }: { points: HistoryPoint[]; low?: boolean }) {
+  if (points.length < 2) return null;
+  const w = 84;
+  const h = 26;
+  const pad = 2;
+  const values = points.map((p) => p.v);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const x = (i: number) => pad + (i / (points.length - 1)) * (w - pad * 2);
+  const y = (v: number) => h - pad - ((v - min) / span) * (h - pad * 2);
+  const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const color = low ? "var(--red)" : "var(--blue)";
+  return (
+    <svg
+      className="sparkline"
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      aria-hidden="true"
+    >
+      <polyline
+        points={line}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={x(points.length - 1)}
+        cy={y(values[values.length - 1])}
+        r="2.4"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
 export function AccountCard({
   account,
   busy,
+  trend,
   onRefresh,
   onEdit,
   onShowModels,
 }: {
   account: AccountView;
   busy: boolean;
+  trend?: AccountTrend;
   onRefresh: () => void;
   onEdit: () => void;
   onShowModels: () => void;
@@ -78,6 +121,7 @@ export function AccountCard({
           <>
             <div className="balance-row">
               <span className="balance-value">{money(balance.total, balance.currency)}</span>
+              <Sparkline points={trend?.points ?? []} low={account.low} />
               {(() => {
                 const label = balanceSourceLabel(balance.source);
                 if (!label) return null;
@@ -87,6 +131,12 @@ export function AccountCard({
               })()}
               {balance.usable === false ? <Badge tone="red">不可调用</Badge> : null}
             </div>
+            {trend?.dailyBurn != null && trend.dailyBurn > 0 ? (
+              <div className="trend-hint">
+                日均消耗约 {money(trend.dailyBurn, balance.currency)}
+                {trend.daysLeft != null ? ` · ${daysLeftText(trend.daysLeft)}` : ""}
+              </div>
+            ) : null}
             {balance.source !== "api" && balance.note ? (
               <div className="price-note" style={{ marginTop: 6 }}>
                 {balance.note}
@@ -262,9 +312,18 @@ export function EmptyAccounts({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-export function LowBalanceBanner({ accounts }: { accounts: AccountView[] }) {
+export function LowBalanceBanner({
+  accounts,
+  trends,
+}: {
+  accounts: AccountView[];
+  trends?: Record<string, AccountTrend>;
+}) {
   const low = accounts.filter((a) => a.low);
   if (low.length === 0) return null;
+  const urgent = low
+    .map((a) => ({ label: a.label, days: trends?.[a.id]?.daysLeft ?? null }))
+    .filter((x) => x.days != null && x.days < 7);
   return (
     <div className="notice notice-warn" style={{ marginBottom: 16 }}>
       <IconAlert size={14} />
@@ -275,6 +334,12 @@ export function LowBalanceBanner({ accounts }: { accounts: AccountView[] }) {
           return ` ${a.label}（${b && b.total !== null ? money(b.total, b.currency) : "—"}）`;
         })}
         。点击卡片上的「充值」可直接跳转官方充值页。
+        {urgent.length > 0 ? (
+          <div style={{ marginTop: 4 }}>
+            {urgent.map((x) => `${x.label} ${daysLeftText(x.days as number)}`).join("；")}
+            ，建议尽快充值。
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -112,6 +112,14 @@ export function balanceSourceLabel(source: string): string | null {
   return null;
 }
 
+/** 可用天数 → 人话。不满 1 天、1-30 天、超过一个月分别措辞 */
+export function daysLeftText(days: number): string {
+  if (days < 1) return "今天内就会用完";
+  if (days < 2) return "约 1 天后用完";
+  if (days < 30) return `约 ${Math.round(days)} 天后用完`;
+  return `约 ${(days / 30).toFixed(0)} 个月后用完`;
+}
+
 /** 价格可信度 → 文案、色调与说明 */
 export function confidenceMeta(level: string): {
   label: string;

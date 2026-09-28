@@ -94,7 +94,7 @@ fn migrate_file<T: DeserializeOwned>(
     Ok(())
 }
 
-fn write_atomic(path: &Path, content: &str) -> Result<(), String> {
+pub(crate) fn write_atomic(path: &Path, content: &str) -> Result<(), String> {
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, content).map_err(|e| format!("写入 {} 失败：{e}", tmp.display()))?;
     fs::rename(&tmp, path).map_err(|e| format!("保存 {} 失败：{e}", path.display()))?;

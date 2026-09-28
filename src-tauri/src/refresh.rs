@@ -36,10 +36,11 @@ pub fn spawn(app: AppHandle) {
 pub async fn run_cycle(app: &AppHandle) {
     let views = {
         let state = app.state::<AppState>();
-        commands::refresh_all_inner(&state).await
+        commands::refresh_all_inner(&state, app).await
     };
 
     let _ = app.emit("accounts-updated", ());
+    commands::update_tray_alert(app);
 
     // 注意：这里不复用 State 局部变量持有 MutexGuard，避免守卫比 State 活得更久
     let notify_enabled = app
@@ -81,13 +82,35 @@ pub async fn run_cycle(app: &AppHandle) {
             Some("manual") => "（手动余额）",
             _ => "",
         };
+        // 有足够历史样本时，把「还能用几天」的预测附加到通知里
+        let days_hint = app
+            .state::<AppState>()
+            .history
+            .lock()
+            .ok()
+            .and_then(|h| h.trend(&view.id))
+            .and_then(|t| t.days_left)
+            .filter(|d| *d < 30.0)
+            .map(|d| {
+                if d < 1.0 {
+                    "按当前消耗速度今天内就会用完，".to_string()
+                } else {
+                    format!("按当前消耗速度约 {:.0} 天后用完，", d)
+                }
+            })
+            .unwrap_or_default();
         let _ = app
             .notification()
             .builder()
             .title(format!("{} 余额不足", view.label))
             .body(format!(
-                "{} 当前余额 {:.2} {}{}，已低于提醒阈值 {:.2}。打开主面板即可一键跳转充值。",
-                view.provider_name, total, currency, source_hint, view.low_balance_threshold
+                "{} 当前余额 {:.2} {}{}，已低于提醒阈值 {:.2}。{}打开主面板即可一键跳转充值。",
+                view.provider_name,
+                total,
+                currency,
+                source_hint,
+                view.low_balance_threshold,
+                days_hint
             ))
             .show();
     }

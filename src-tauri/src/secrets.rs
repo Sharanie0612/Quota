@@ -77,6 +77,11 @@ fn write(account_id: &str, blob: &SecretBlob) -> Result<(), String> {
         .map_err(|e| format!("写入系统凭据管理器失败：{e}"))
 }
 
+/// 从备份恢复时原样写回一个凭据 blob
+pub fn restore(account_id: &str, blob: &SecretBlob) -> Result<(), String> {
+    write(account_id, blob)
+}
+
 pub fn get_api_key(account_id: &str) -> Result<String, String> {
     get_secrets(account_id)?
         .api_key

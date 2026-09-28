@@ -1,7 +1,9 @@
 mod aliyun;
+mod backup;
 mod catalog;
 mod commands;
 mod custom;
+mod history;
 mod mimo;
 mod model;
 mod pricing;
@@ -26,6 +28,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let store = storage::Store::new().map_err(|e| -> Box<dyn std::error::Error> {
                 e.into()
@@ -71,6 +74,9 @@ pub fn run() {
             commands::refresh_all,
             commands::get_settings,
             commands::save_settings,
+            commands::get_balance_history,
+            commands::export_backup,
+            commands::import_backup,
             commands::model_cards,
             commands::save_catalog_entry,
             commands::reset_catalog_overrides,

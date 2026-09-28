@@ -1,8 +1,10 @@
 //! Tauri 命令层：前端通过 invoke 调用的所有接口。
 
 use crate::aliyun;
+use crate::backup;
 use crate::catalog;
 use crate::custom;
+use crate::history::{self, HistoryStore};
 use crate::mimo;
 use crate::model::*;
 use crate::pricing;
@@ -22,6 +24,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub config: Mutex<AppConfig>,
     pub statuses: Mutex<HashMap<String, AccountStatus>>,
+    /// 余额历史（画趋势、估算可用天数、识别充值）
+    pub history: Mutex<HistoryStore>,
     /// 内置模型资料库
     pub catalog: Vec<CatalogEntry>,
     /// 本地编辑过的资料库条目
@@ -40,6 +44,7 @@ const REFERENCE_TTL_SECONDS: i64 = 6 * 3600;
 impl AppState {
     pub fn new(store: Store, config: AppConfig, overrides: Vec<CatalogEntry>) -> Self {
         let hidden_models = store.load_hidden_models();
+        let history = HistoryStore::load(store.dir());
         // 跟随系统代理：reqwest 默认只认环境变量，不读 Windows 系统代理，
         // 否则 Clash 开了系统代理、应用仍然直连，chatgpt.com 这类站点就连不上。
         let http = {
@@ -62,6 +67,7 @@ impl AppState {
             http,
             config: Mutex::new(config),
             statuses: Mutex::new(HashMap::new()),
+            history: Mutex::new(history),
             catalog: catalog::embedded_file().entries,
             overrides: Mutex::new(overrides),
             hidden_models: Mutex::new(hidden_models),
@@ -380,7 +386,51 @@ pub async fn refresh_one(state: &AppState, account: &Account) -> AccountStatus {
     status
 }
 
-pub async fn refresh_account_inner(state: &AppState, id: &str) -> Result<AccountView, String> {
+/// 刷新拿到余额后追加一条历史记录；余额明显上涨时向前端广播疑似充值事件
+fn record_history(state: &AppState, account: &Account, app: &AppHandle) {
+    let Some(balance) = state
+        .statuses
+        .lock()
+        .ok()
+        .and_then(|m| m.get(&account.id).cloned())
+        .and_then(|s| s.balance)
+    else {
+        return;
+    };
+    let Some(total) = balance.total else {
+        return;
+    };
+    let recharged = state
+        .history
+        .lock()
+        .ok()
+        .and_then(|mut h| h.record(&account.id, total));
+    if let Some(delta) = recharged {
+        let _ = app.emit(
+            "recharge-detected",
+            serde_json::json!({
+                "accountId": account.id,
+                "label": account.label,
+                "currency": balance.currency,
+                "amount": delta,
+                "total": total,
+            }),
+        );
+    }
+}
+
+/// 依据当前账户状态刷新托盘图标：有余额不足的账户时给图标加红点角标
+pub fn update_tray_alert(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let low = lock_config(&state)
+        .accounts
+        .iter()
+        .filter(|a| account_view(&state, a).low)
+        .count();
+    crate::tray::update_alert(app, low);
+}
+
+pub async fn refresh_account_inner(state: &AppState, app: &AppHandle, id: &str) -> Result<AccountView, String> {
     let account = lock_config(state)
         .accounts
         .into_iter()
@@ -390,10 +440,11 @@ pub async fn refresh_account_inner(state: &AppState, id: &str) -> Result<Account
     if let Ok(mut map) = state.statuses.lock() {
         map.insert(account.id.clone(), status);
     }
+    record_history(state, &account, app);
     Ok(account_view(state, &account))
 }
 
-pub async fn refresh_all_inner(state: &AppState) -> Vec<AccountView> {
+pub async fn refresh_all_inner(state: &AppState, app: &AppHandle) -> Vec<AccountView> {
     let accounts = lock_config(state).accounts;
     let mut views = Vec::with_capacity(accounts.len());
     for account in accounts.iter() {
@@ -401,6 +452,7 @@ pub async fn refresh_all_inner(state: &AppState) -> Vec<AccountView> {
         if let Ok(mut map) = state.statuses.lock() {
             map.insert(account.id.clone(), status);
         }
+        record_history(state, account, app);
         views.push(account_view(state, account));
     }
     views
@@ -604,8 +656,9 @@ pub async fn save_account(
         secrets::set_console_cookie(&id, cookie)?;
     }
 
-    let view = refresh_account_inner(&state, &id).await?;
+    let view = refresh_account_inner(&state, &app, &id).await?;
     emit_updated(&app);
+    update_tray_alert(&app);
     Ok(view)
 }
 
@@ -626,7 +679,11 @@ pub async fn delete_account(
     if let Ok(mut map) = state.statuses.lock() {
         map.remove(&id);
     }
+    if let Ok(mut h) = state.history.lock() {
+        h.remove(&id);
+    }
     emit_updated(&app);
+    update_tray_alert(&app);
     Ok(())
 }
 
@@ -636,8 +693,9 @@ pub async fn refresh_account(
     app: AppHandle,
     id: String,
 ) -> Result<AccountView, String> {
-    let view = refresh_account_inner(&state, &id).await?;
+    let view = refresh_account_inner(&state, &app, &id).await?;
     emit_updated(&app);
+    update_tray_alert(&app);
     Ok(view)
 }
 
@@ -646,8 +704,9 @@ pub async fn refresh_all(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<Vec<AccountView>, String> {
-    let views = refresh_all_inner(&state).await;
+    let views = refresh_all_inner(&state, &app).await;
     emit_updated(&app);
+    update_tray_alert(&app);
     Ok(views)
 }
 
@@ -672,6 +731,158 @@ pub fn save_settings(
     drop(cfg);
     state.store.save_config(&snapshot)?;
     Ok(next)
+}
+
+// ---------------------------------------------------------------- 余额历史
+
+#[tauri::command]
+pub fn get_balance_history(state: State<'_, AppState>) -> HashMap<String, history::AccountTrend> {
+    state
+        .history
+        .lock()
+        .map(|h| h.all_trends())
+        .unwrap_or_default()
+}
+
+// ---------------------------------------------------------------- 备份与迁移
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupPayload<'a> {
+    version: u32,
+    exported_at: String,
+    config: &'a AppConfig,
+    catalog_overrides: Vec<CatalogEntry>,
+    hidden_models: Vec<String>,
+    /// (账户 id, 凭据 blob)：解密后原样写回凭据管理器
+    credentials: Vec<CredentialEntry>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CredentialEntry {
+    account_id: String,
+    blob: secrets::SecretBlob,
+}
+
+/// 导出加密备份：配置 + 资料库覆盖 + 隐藏列表 + 凭据，全部打进一个密码加密的文件。
+/// 文件本身 AES-256-GCM 加密，密码不落盘。
+#[tauri::command]
+pub fn export_backup(
+    state: State<'_, AppState>,
+    password: String,
+    path: String,
+) -> Result<(), String> {
+    let config = lock_config(&state);
+    let overrides = state.overrides.lock().map_err(|_| "资料库锁定失败".to_string())?.clone();
+    let hidden_models = state
+        .hidden_models
+        .lock()
+        .map_err(|_| "隐藏列表锁定失败".to_string())?
+        .clone();
+    let mut credentials = Vec::new();
+    for account in &config.accounts {
+        match secrets::get_secrets(&account.id) {
+            Ok(blob) => credentials.push(CredentialEntry {
+                account_id: account.id.clone(),
+                blob,
+            }),
+            Err(e) => return Err(format!("读取「{}」的凭据失败：{e}", account.label)),
+        }
+    }
+    let payload = BackupPayload {
+        version: 1,
+        exported_at: Local::now().to_rfc3339(),
+        config: &config,
+        catalog_overrides: overrides,
+        hidden_models,
+        credentials,
+    };
+    let plaintext = serde_json::to_vec(&payload).map_err(|e| format!("打包备份失败：{e}"))?;
+    let sealed = backup::seal(&password, &plaintext)?;
+    std::fs::write(&path, sealed).map_err(|e| format!("写入备份文件失败：{e}"))
+}
+
+/// 从加密备份恢复：覆盖当前配置、资料库、隐藏列表与凭据。
+/// 返回统计摘要文本（前端展示后整页刷新）。
+#[tauri::command]
+pub fn import_backup(
+    state: State<'_, AppState>,
+    password: String,
+    path: String,
+) -> Result<String, String> {
+    let bytes =
+        std::fs::read(&path).map_err(|e| format!("读取备份文件失败：{e}"))?;
+    let plaintext = backup::open(&password, &bytes)?;
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Payload {
+        version: u32,
+        #[serde(default)]
+        config: Option<AppConfig>,
+        #[serde(default)]
+        catalog_overrides: Vec<CatalogEntry>,
+        #[serde(default)]
+        hidden_models: Vec<String>,
+        #[serde(default)]
+        credentials: Vec<CredentialEntry>,
+    }
+    let payload: Payload =
+        serde_json::from_slice(&plaintext).map_err(|e| format!("备份内容无法解析：{e}"))?;
+    if payload.version != 1 {
+        return Err(format!("不支持的备份版本：{}", payload.version));
+    }
+    let config = payload
+        .config
+        .ok_or_else(|| "备份里没有账户配置，已中止恢复".to_string())?;
+
+    // 写回凭据管理器（先写凭据再落配置，中途失败不至于留下指向空凭据的配置）
+    let mut restored_keys = 0usize;
+    for entry in &payload.credentials {
+        secrets::restore(&entry.account_id, &entry.blob)?;
+        if serde_json::to_string(&entry.blob)
+            .map(|s| s.len() > 2)
+            .unwrap_or(false)
+        {
+            restored_keys += 1;
+        }
+    }
+
+    {
+        let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
+        *cfg = config;
+        let snapshot = cfg.clone();
+        drop(cfg);
+        state.store.save_config(&snapshot)?;
+    }
+    {
+        let mut overrides = state
+            .overrides
+            .lock()
+            .map_err(|_| "资料库锁定失败".to_string())?;
+        *overrides = payload.catalog_overrides.clone();
+        drop(overrides);
+        state.store.save_overrides(&payload.catalog_overrides)?;
+    }
+    {
+        let mut hidden = state
+            .hidden_models
+            .lock()
+            .map_err(|_| "隐藏列表锁定失败".to_string())?;
+        *hidden = payload.hidden_models.clone();
+        drop(hidden);
+        state.store.save_hidden_models(&payload.hidden_models)?;
+    }
+    if let Ok(mut map) = state.statuses.lock() {
+        map.clear();
+    }
+    if let Ok(mut map) = state.low_notified.lock() {
+        map.clear();
+    }
+    let account_count = lock_config(&state).accounts.len();
+    Ok(format!(
+        "已恢复 {account_count} 个账户、{restored_keys} 组密钥，设置与模型资料也已还原"
+    ))
 }
 
 // ---------------------------------------------------------------- 模型资料库

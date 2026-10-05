@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { api, errText } from "../lib/api";
 import {
-  balanceSourceLabel,
   daysLeftText,
   money,
   timeAgo,
 } from "../lib/format";
 import { toast } from "../lib/store";
+import { balanceBreakdown, isSubscriptionAccount } from "../lib/accountOverview";
 import type { AccountTrend, AccountView, HistoryPoint } from "../lib/types";
 import { ProviderLogo } from "./logos";
 import {
@@ -18,7 +17,8 @@ import {
   IconRefresh,
   IconWallet,
 } from "./icons";
-import { Badge, Button, IconButton, Notice } from "./ui";
+import { Badge, Button, Notice } from "./ui";
+import "./account-cards.css";
 
 /** 余额迷你折线：最近 30 天的本地历史记录，不足两个点不画 */
 function Sparkline({ points, low }: { points: HistoryPoint[]; low?: boolean }) {
@@ -66,6 +66,7 @@ export function AccountCard({
   trend,
   onRefresh,
   onEdit,
+  onUseManual,
   onShowModels,
 }: {
   account: AccountView;
@@ -73,10 +74,26 @@ export function AccountCard({
   trend?: AccountTrend;
   onRefresh: () => void;
   onEdit: () => void;
+  onUseManual: () => void;
   onShowModels: () => void;
 }) {
   const balance = account.status.balance;
-  const [showDetail, setShowDetail] = useState(false);
+  const subscription = account.status.subscription;
+  const isPlan = isSubscriptionAccount(account);
+  const breakdown = balanceBreakdown(balance, account);
+  const amount = (kind: string) => balance?.amounts.find((a) => a.kind === kind)?.value;
+  const mimoWindows = account.provider === "mimo-plan" && balance ? [
+    { label: "套餐额度", used: amount("used"), limit: amount("total") },
+    { label: "本月额度", used: amount("month_used"), limit: amount("month_limit") },
+  ].filter((w) => w.used != null && w.limit != null && Number.isFinite(w.used) && Number.isFinite(w.limit) && w.limit >= 0) : [];
+  const planExtras = (balance?.amounts ?? []).filter((item) => Number.isFinite(item.value) && !(
+    mimoWindows.some((window) => window.label === "套餐额度") && ["used", "total"].includes(item.kind)
+    || mimoWindows.some((window) => window.label === "本月额度") && ["month_used", "month_limit"].includes(item.kind)
+  ));
+  const extraAmounts = isPlan ? planExtras : breakdown.extra;
+  const hasSubscriptionWindows = !!subscription?.windows.length;
+  const meaningfulBalanceNote = balance?.note && (balance.source === "costs" || balance.note.includes("未读到")) ? balance.note : null;
+
 
   const openUrl = async (url: string, label: string) => {
     if (!url) {
@@ -90,16 +107,18 @@ export function AccountCard({
     }
   };
 
-  const statusBadge = account.low ? (
-    <Badge tone="red">余额不足</Badge>
-  ) : balance ? (
+  const statusBadge = account.status.balanceError && account.balanceMode !== "manual" ? <Badge tone="amber">同步异常</Badge> : account.low || balance?.usable === false ? (
+    <Badge tone="red">{isPlan ? "额度不足" : "余额不足"}</Badge>
+  ) : balance?.source === "manual" && !hasSubscriptionWindows ? (
+    <Badge>{account.balanceMode !== "manual" && !account.status.lastChecked ? "待同步" : "手动记录"}</Badge>
+  ) : balance || subscription ? (
     <Badge tone="green">正常</Badge>
   ) : (
     <Badge>待查询</Badge>
   );
 
   return (
-    <div className="card account-card">
+    <div className={`card account-card ${isPlan ? "account-subscription" : "account-balance"}`}>
       <div className="acct-head">
         <ProviderLogo provider={account.provider} size={34} />
         <div className="acct-title">
@@ -117,96 +136,91 @@ export function AccountCard({
       </div>
 
       <div>
-        {balance && balance.total !== null ? (
-          <>
-            <div className="balance-row">
-              <span className="balance-value">{money(balance.total, balance.currency)}</span>
-              <Sparkline points={trend?.points ?? []} low={account.low} />
-              {(() => {
-                const label = balanceSourceLabel(balance.source);
-                if (!label) return null;
-                return (
-                  <Badge tone={balance.source === "manual" ? "amber" : "blue"}>{label}</Badge>
-                );
-              })()}
-              {balance.usable === false ? <Badge tone="red">不可调用</Badge> : null}
+        {isPlan && !hasSubscriptionWindows && balance?.source === "manual" && balance.total != null ? (
+          <div className="subscription-windows">
+            <div className="subscription-caption"><Badge>手动记录</Badge><span>剩余额度</span></div>
+            <div className="usage-window">
+              <div className="usage-label"><span>当前剩余</span><b>{money(balance.total, balance.currency)}</b></div>
+              {balance.currency === "%" ? <progress value={Math.max(0, Math.min(100, balance.total))} max={100} aria-label="手动剩余额度" className={account.low ? "is-low" : ""} /> : null}
+              <span className="hint">更新手动记录后参与额度提醒。</span>
             </div>
-            {trend?.dailyBurn != null && trend.dailyBurn > 0 ? (
-              <div className="trend-hint">
-                日均消耗约 {money(trend.dailyBurn, balance.currency)}
-                {trend.daysLeft != null ? ` · ${daysLeftText(trend.daysLeft)}` : ""}
-              </div>
-            ) : null}
-            {balance.source !== "api" && balance.note ? (
-              <div className="price-note" style={{ marginTop: 6 }}>
-                {balance.note}
-              </div>
-            ) : null}
-            {balance.amounts.length > 0 ? (
-              <div className="sub-amounts" style={{ marginTop: 6 }}>
-                {balance.amounts.map((a) => (
-                  <span key={a.kind + a.label}>
-                    {a.label} <b>{money(a.value, balance.currency)}</b>
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div className="balance-row">
-            <span className="balance-unknown">
-              {account.balanceSupported ||
-              account.balanceMode === "aliyun" ||
-              account.balanceMode === "console" ||
-              account.balanceMode === "custom"
-                ? "暂无数据"
-                : "不支持自动查询"}
-            </span>
           </div>
+        ) : account.provider === "mimo-plan" && mimoWindows.length ? (
+          <div className="subscription-windows">
+            <div className="subscription-caption"><Badge tone="blue">MiMo Token Plan</Badge><span>{balance?.total != null ? `${money(balance.total, balance.currency)} 剩余` : "Credits"}</span></div>
+            {balance?.note && <p className="subscription-detail">{balance.note.split(" · 余额")[0]}</p>}
+            {mimoWindows.map((w) => {
+              const remaining = w.limit! > 0 ? Math.max(0, Math.min(100, (1 - w.used! / w.limit!) * 100)) : null;
+              return <div key={w.label} className="usage-window">
+                <div className="usage-label"><span>{w.label}</span><b>{remaining == null ? money(Math.max(0, w.limit! - w.used!), "CREDITS") : `${remaining.toFixed(0)}%`}<small> 剩余</small></b></div>
+                {remaining != null ? <progress value={remaining} max={100} aria-label={w.label} className={account.low ? "is-low" : ""} /> : null}
+                <span className="hint">已用 {money(w.used!, "CREDITS")} / {money(w.limit!, "CREDITS")}</span>
+              </div>;
+            })}
+          </div>
+        ) : subscription && hasSubscriptionWindows ? (
+          <div className="subscription-windows">
+            <div className="subscription-caption"><Badge tone="blue">{subscription.plan.toUpperCase()}</Badge><span>Codex 订阅额度</span></div>
+            {subscription.windows.map((w) => <div key={w.label} className="usage-window">
+              <div className="usage-label"><span>{w.label}</span><b>{w.remaining.toFixed(0)}<small>% 剩余</small></b></div>
+              <progress value={w.remaining} max={100} aria-label={w.label} className={w.remaining < account.lowBalanceThreshold ? "is-low" : ""} />
+              {w.resetAt ? <span className="hint">{new Date(w.resetAt * 1000).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 重置</span> : null}
+            </div>)}
+          </div>
+        ) : !isPlan ? (
+          <div className="balance-content">
+            <div className="balance-row"><div><span className="hint">{balance?.currency === "CREDITS" ? "剩余额度" : "总余额"}</span><div className="balance-value">{balance?.total == null ? "—" : money(balance.total, balance.currency)}</div></div><Sparkline points={trend?.points ?? []} low={account.low}/></div>
+            <div className="balance-details">{breakdown.fields.map(({label,item}) => <div key={label} title={item?.label ?? "尚未取得该项数据"}><span>{label}{item?.kind === "manual_cumulative_recharge" ? " · 手动" : ""}</span><b>{item == null ? "—" : money(item.value,item.currency ?? balance?.currency ?? "CNY")}</b></div>)}</div>
+            <div className="balance-spend" title={breakdown.spend?.label ?? "官方接口未提供，可在高级设置手动补全；不根据余额推算"}><span>累计消费{breakdown.spend?.kind === "manual_cumulative_spend" ? " · 手动" : ""}</span><b>{breakdown.spend == null ? "—" : money(breakdown.spend.value, breakdown.spend.currency ?? balance?.currency ?? "CNY")}</b></div>
+            {trend?.dailyBurn != null && trend.dailyBurn > 0 && balance ? <div className="trend-hint">日均消耗约 {money(trend.dailyBurn,balance.currency)}{trend.daysLeft != null ? " · " + daysLeftText(trend.daysLeft) : ""}</div> : null}
+          </div>
+        ) : balance?.total != null || (balance?.amounts.length ?? 0) > 0 ? (
+          <div className="subscription-windows">
+            <div className="subscription-caption"><Badge>已同步额度</Badge><span>{subscription?.plan.toUpperCase() ?? "剩余额度"}</span></div>
+            <div className="usage-window"><div className="usage-label"><span>当前剩余</span><b>{balance?.total == null ? "—" : money(balance.total, balance.currency)}</b></div><span className="hint">当前接口未提供完整的额度周期。</span></div>
+          </div>
+        ) : (
+          <div className="subscription-empty"><b>{busy ? "正在读取订阅额度" : account.status.balanceError ? "订阅额度同步失败" : "暂无订阅额度"}</b><span>{account.status.balanceError ? "可重试查询，或手动记录剩余额度。" : "连接账户后查看套餐与剩余额度"}</span>{!account.status.balanceError && !busy ? <Button size="sm" onClick={onEdit}>连接账户</Button> : null}</div>
         )}
       </div>
 
-      {!account.hasKey && account.needsApiKey ? (
+      {extraAmounts.length || meaningfulBalanceNote || account.note?.trim() ? <details className="account-more-details">
+        <summary>更多明细{extraAmounts.length > 0 ? ` · ${extraAmounts.length} 项` : ""}</summary>
+        {extraAmounts.length > 0 ? <div className="account-extra-amounts" aria-label="其他账户明细">{extraAmounts.map((item, index) => <div key={`${item.kind}-${index}`}><span>{item.label}</span><b>{money(item.value, balance?.currency ?? "CNY")}</b></div>)}</div> : null}
+        {meaningfulBalanceNote ? <p className="account-data-note">{meaningfulBalanceNote}</p> : null}
+        {account.note?.trim() ? <p className="account-user-note"><span>备注</span>{account.note}</p> : null}
+      </details> : null}
+
+      {!account.hasKey && account.needsApiKey && !account.provider.startsWith("mimo") ? (
         <Notice tone="warn" actions={<Button size="sm" onClick={onEdit}>填写 API Key</Button>}>
-          还没有保存 API Key，无法查询余额与模型。
+          填写 API Key 后可同步模型。
         </Notice>
       ) : null}
 
-      {account.balanceMode !== "manual" &&
-      (account.balanceSupported ||
-        account.balanceMode === "custom" ||
-        account.balanceMode === "aliyun" ||
-        account.balanceMode === "console" ||
-        (!!account.accessKeyHint && account.balanceMode === "auto")) &&
-      account.status.balanceError ? (
+      {account.balanceMode !== "manual" && account.status.balanceError ? (
         <Notice
           tone="error"
           actions={
             <>
-              <Button size="sm" onClick={onRefresh}>
+              <Button size="sm" disabled={busy} onClick={onRefresh}>
                 重试
               </Button>
-              <Button size="sm" onClick={onEdit}>
-                改用手动余额
+              <Button size="sm" onClick={onUseManual}>
+                {isPlan ? "改用手动额度" : "改用手动余额"}
               </Button>
-              <Button size="sm" onClick={() => openUrl(account.billingUrl, "账单")}>
+              <Button size="sm" onClick={() => openUrl(account.billingUrl || account.effectiveRechargeUrl || account.docsUrl, "官网")}>
                 打开官网
               </Button>
-              {account.status.balanceError.length > 60 ? (
-                <Button size="sm" variant="quiet" onClick={() => setShowDetail((v) => !v)}>
-                  {showDetail ? "收起详情" : "查看详情"}
-                </Button>
-              ) : null}
+
             </>
           }
         >
-          {showDetail || account.status.balanceError.length <= 60
-            ? account.status.balanceError
-            : `${account.status.balanceError.slice(0, 60)}…`}
+          {account.status.balanceError}
+          {balance || hasSubscriptionWindows ? <span className="account-stale-note">{balance?.source === "manual" && !hasSubscriptionWindows ? "当前展示手动记录。" : "当前展示上次成功同步的数据。"}</span> : null}
         </Notice>
       ) : null}
 
-      {!account.balanceSupported &&
+      {!isPlan && !account.balanceSupported &&
       !account.status.balance &&
       !account.status.balanceError &&
       (account.balanceMode === "auto" || account.balanceMode === "manual") ? (
@@ -227,66 +241,25 @@ export function AccountCard({
             </>
           }
         >
-          {account.balanceNote ?? "该平台不提供余额查询接口。"}
-          {account.balanceAlternatives.length > 0 ? (
-            <div style={{ marginTop: 4 }}>
-              可用方式：{account.balanceAlternatives.join("；")}
-            </div>
-          ) : null}
+          暂无数据，请连接账户或手动记录。
+
         </Notice>
       ) : null}
 
-      {account.status.modelsError ? (
+      {account.status.modelsError && !account.provider.startsWith("mimo") && account.provider !== "custom" ? (
         <Notice tone="info" actions={<Button size="sm" variant="quiet" onClick={onShowModels}>查看模型说明</Button>}>
-          模型列表拉取失败：{account.status.modelsError.slice(0, 80)}
+          模型列表暂未同步
         </Notice>
-      ) : null}
-
-      {account.actionLinks.length > 0 ? (
-        <div className="tag-row" title="只做跳转，充值与订阅都在官方页面完成">
-          {account.actionLinks.map((l) => (
-            <button
-              key={l.label}
-              type="button"
-              className="chip"
-              onClick={() => void openUrl(l.url, l.label)}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
       ) : null}
 
       <div className="card-foot">
-        <span className="meta">
-          更新于 {timeAgo(account.status.lastChecked)}
-          {account.status.models.length > 0 ? ` · ${account.status.models.length} 个模型` : ""}
-        </span>
-        <div className="spacer" />
-        <Button size="sm" variant="quiet" onClick={onShowModels} title="查看该账户可用模型">
-          <IconLayers size={13} />
-          模型
-        </Button>
-        <IconButton
-          title="刷新该账户"
-          onClick={onRefresh}
-          busy={busy}
-          className="btn-sm"
-          disabled={busy}
-        >
-          <IconRefresh size={14} />
-        </IconButton>
-        <IconButton title="编辑账户" onClick={onEdit} className="btn-sm">
-          <IconPencil size={14} />
-        </IconButton>
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={() => openUrl(account.effectiveRechargeUrl, "充值")}
-        >
-          <IconExternal size={13} />
-          充值
-        </Button>
+        <span className="meta">更新于 {timeAgo(account.status.lastChecked)}{balance?.source === "manual" ? isPlan ? " · 手动额度" : " · 手动余额" : ""}</span>
+        <div className="account-actions">
+          {!isPlan && account.provider !== "mimo" && <Button size="sm" onClick={onShowModels}><IconLayers size={13}/>模型</Button>}
+          <Button size="sm" disabled={busy} onClick={onRefresh}><IconRefresh size={13} className={busy ? "spin" : ""}/>{busy ? "刷新中" : "刷新"}</Button>
+          <Button size="sm" onClick={onEdit}><IconPencil size={13}/>编辑</Button>
+          <Button size="sm" variant="primary" disabled={!account.effectiveRechargeUrl} onClick={() => void openUrl(account.effectiveRechargeUrl,isPlan ? "订阅" : "充值")}><IconExternal size={13}/>{isPlan ? "管理订阅" : "充值"}</Button>
+        </div>
       </div>
     </div>
   );
@@ -299,11 +272,7 @@ export function EmptyAccounts({ onAdd }: { onAdd: () => void }) {
         <IconWallet size={26} />
       </div>
       <h3>还没有添加模型账户</h3>
-      <p>
-        添加 DeepSeek、Kimi、智谱 GLM、小米 MiMo、MiMo 订阅或 GPT 订阅站的 API Key 后，
-        这里会显示每个账户的余额、可用模型和官方充值入口。API Key
-        保存在 Windows 凭据管理器里，不会上传到任何服务器。
-      </p>
+      <p>连接账户，集中查看余额与订阅额度。</p>
       <Button variant="primary" onClick={onAdd}>
         <IconPlus size={14} />
         添加第一个账户
@@ -319,7 +288,7 @@ export function LowBalanceBanner({
   accounts: AccountView[];
   trends?: Record<string, AccountTrend>;
 }) {
-  const low = accounts.filter((a) => a.low);
+  const low = accounts.filter((a) => a.low || a.status.balance?.usable === false);
   if (low.length === 0) return null;
   const urgent = low
     .map((a) => ({ label: a.label, days: trends?.[a.id]?.daysLeft ?? null }))
@@ -328,12 +297,12 @@ export function LowBalanceBanner({
     <div className="notice notice-warn" style={{ marginBottom: 16 }}>
       <IconAlert size={14} />
       <div className="notice-text">
-        有 {low.length} 个账户余额低于提醒阈值：
+        {low.length} 个账户额度不足：
         {low.map((a) => {
           const b = a.status.balance;
-          return ` ${a.label}（${b && b.total !== null ? money(b.total, b.currency) : "—"}）`;
+          return ` ${a.label}（${a.status.subscription ? "订阅额度不足" : b && b.total !== null ? money(b.total, b.currency) : "—"}）`;
         })}
-        。点击卡片上的「充值」可直接跳转官方充值页。
+        。
         {urgent.length > 0 ? (
           <div style={{ marginTop: 4 }}>
             {urgent.map((x) => `${x.label} ${daysLeftText(x.days as number)}`).join("；")}

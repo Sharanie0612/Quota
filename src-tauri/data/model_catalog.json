@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-23",
+  "updatedAt": "2026-10-04",
   "disclaimer": "只收录 DeepSeek / Kimi / 智谱 GLM / 小米 MiMo / GPT 系列。价格来自厂商官网公开定价页，标注「已核实」的条目为对照官网核对过；价格会变动，请以官网为准。可以在界面上编辑任意模型卡片，或用「比价」抓官方定价页交叉核对。",
   "entries": [
     {
@@ -20,14 +20,16 @@
         "unit": "每 1M tokens",
         "input": 3,
         "output": 6,
-        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.025。海外站为 $0.435 / $0.87"
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.025。海外站为 $0.435 / $0.87",
+        "cachedInput": 0.025,
+        "cacheWrite": 0
       },
       "abilities": [
         "工具调用",
         "长上下文"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
       "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
     },
     {
@@ -48,14 +50,16 @@
         "unit": "每 1M tokens",
         "input": 1,
         "output": 2,
-        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.02。海外站为 $0.14 / $0.28"
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.02。海外站为 $0.14 / $0.28",
+        "cachedInput": 0.02,
+        "cacheWrite": 0
       },
       "abilities": [
         "工具调用",
         "长上下文"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
       "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
     },
     {
@@ -76,14 +80,16 @@
         "unit": "每 1M tokens",
         "input": 30,
         "output": 60,
-        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.25。海外站为 $4.35 / $8.70。不支持批量接口"
+        "note": "国内按量付费（人民币）；缓存命中输入 ¥0.25。海外站为 $4.35 / $8.70。不支持批量接口",
+        "cachedInput": 0.25,
+        "cacheWrite": 0
       },
       "abilities": [
         "高速",
         "长上下文"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
       "source": "https://mimo.mi.com/docs/price/pay-as-you-go"
     },
     {
@@ -204,19 +210,23 @@
       "context": 1000000,
       "maxOutput": 384000,
       "price": {
-        "currency": "USD",
+        "currency": "CNY",
         "unit": "每 1M tokens",
-        "input": 0.3,
-        "output": 1.2,
-        "note": "标准（高峰）时段价格；低峰时段减半，约 $0.15 / $0.6；缓存命中输入 $0.006"
+        "input": 2,
+        "output": 8,
+        "note": "标准高峰价；空闲时段（含周末及中国法定节假日）五折，实际计费以官网为准",
+        "cachedInput": 0.04,
+        "cacheWrite": null
       },
       "abilities": [
         "工具调用",
-        "长上下文"
+        "长上下文",
+        "视觉",
+        "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+      "verifiedAt": "2026-10-04T05:37:52.574+08:00",
+      "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
     },
     {
       "match": [
@@ -230,15 +240,17 @@
         "siliconflow",
         "custom"
       ],
-      "summary": "旗舰推理与复杂任务模型，1M 上下文，能力最强的一档",
+      "summary": "DeepSeek V4 Pro 0813，长上下文推理与编程",
       "context": 1000000,
       "maxOutput": 384000,
       "price": {
-        "currency": "USD",
+        "currency": "CNY",
         "unit": "每 1M tokens",
-        "input": 1.32,
-        "output": 3.96,
-        "note": "标准（高峰）时段价格；低峰时段减半，约 $0.66 / $1.98；缓存命中输入 $0.044"
+        "input": 9,
+        "output": 27,
+        "note": "标准高峰价；空闲时段（含周末及中国法定节假日）五折，实际计费以官网为准",
+        "cachedInput": 0.3,
+        "cacheWrite": null
       },
       "abilities": [
         "推理",
@@ -246,8 +258,8 @@
         "长上下文"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+      "verifiedAt": "2026-10-04T05:37:52.574+08:00",
+      "source": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing"
     },
     {
       "match": [
@@ -268,15 +280,18 @@
         "unit": "每 1M tokens",
         "input": 20,
         "output": 100,
-        "note": "缓存命中输入 ¥2；缓存写入 5 分钟 TTL ¥20、1 小时 TTL ¥40"
+        "note": "缓存命中输入 ¥2；缓存写入 5 分钟 TTL ¥20、1 小时 TTL ¥40",
+        "cachedInput": 2,
+        "cacheWrite": 20,
+        "cacheWriteLong": 40
       },
       "abilities": [
         "工具调用",
         "长上下文"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://platform.kimi.com/docs/pricing"
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing/chat"
     },
     {
       "match": [
@@ -297,15 +312,16 @@
         "unit": "每 1M tokens",
         "input": 6.5,
         "output": 27,
-        "note": "缓存命中输入 ¥1.3"
+        "note": "缓存命中输入 ¥1.3",
+        "cachedInput": 1.3
       },
       "abilities": [
         "代码",
         "工具调用"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://platform.kimi.com/docs/pricing"
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing/chat"
     },
     {
       "match": [
@@ -325,15 +341,16 @@
         "unit": "每 1M tokens",
         "input": 13,
         "output": 54,
-        "note": "缓存命中输入 ¥2.6"
+        "note": "缓存命中输入 ¥2.6",
+        "cachedInput": 2.6
       },
       "abilities": [
         "代码",
         "高速"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://platform.kimi.com/docs/pricing"
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing/chat"
     },
     {
       "match": [
@@ -354,14 +371,15 @@
         "unit": "每 1M tokens",
         "input": 6.5,
         "output": 27,
-        "note": "缓存命中输入 ¥1.1"
+        "note": "缓存命中输入 ¥1.1",
+        "cachedInput": 1.1
       },
       "abilities": [
         "工具调用"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
-      "source": "https://platform.kimi.com/docs/pricing"
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "source": "https://platform.kimi.com/docs/pricing/chat"
     },
     {
       "match": [
@@ -382,7 +400,10 @@
         "unit": "每 1M tokens",
         "input": 8,
         "output": 28,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 2,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -390,7 +411,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -412,7 +433,10 @@
         "unit": "每 1M tokens",
         "input": 0.8,
         "output": 2.8,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.23,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
@@ -421,7 +445,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -443,7 +467,10 @@
         "unit": "每 1M tokens",
         "input": 2,
         "output": 7,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.57,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
@@ -451,7 +478,7 @@
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -473,7 +500,10 @@
         "unit": "每 1M tokens",
         "input": 8,
         "output": 28,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 2,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -481,7 +511,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -503,7 +533,10 @@
         "unit": "每 1M tokens",
         "input": 6,
         "output": 24,
-        "note": "输入 ≥32K 档 8/28"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 ≥32K（未命中/命中/输出 8/2/28）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 1.3,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -511,7 +544,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -533,7 +566,10 @@
         "unit": "每 1M tokens",
         "input": 5,
         "output": 22,
-        "note": "输出 ≥32K 档 7/26"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 ≥32K（未命中/命中/输出 7/1.8/26）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 1.2,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -541,7 +577,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -563,7 +599,10 @@
         "unit": "每 1M tokens",
         "input": 4,
         "output": 18,
-        "note": "≥32K 档 6/22"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 ≥32K（未命中/命中/输出 6/1.5/22）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 1,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -571,7 +610,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -593,7 +632,10 @@
         "unit": "每 1M tokens",
         "input": 2,
         "output": 8,
-        "note": "输出 ≥0.2K 档 3/14；输入 [32K,200K) 档 4/16"
+        "note": "标准首档：输入 [0, 32K)，输出 [0, 0.2K)；其他档位：输入 [0, 32K)，输出 ≥0.2K（未命中/命中/输出 3/0.6/14）；输入 [32K, 200K)（未命中/命中/输出 4/0.8/16）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.4,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -601,7 +643,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -623,14 +665,17 @@
         "unit": "每 1M tokens",
         "input": 0.5,
         "output": 3,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.1,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "推理",
         "工具调用"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -652,14 +697,17 @@
         "unit": "每 1M tokens",
         "input": 0,
         "output": 0,
-        "note": "官方标注免费，价格随时可能调整，以官网为准"
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -681,15 +729,18 @@
         "unit": "每 1M tokens",
         "input": null,
         "output": null,
-        "note": "官网 API 定价表未列出价格，以官网为准"
+        "note": "当前官方 API 定价表未列出此模型价格，待核实。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
         "推理",
         "代码"
       ],
-      "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verified": false,
+      "verifiedAt": null,
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -711,7 +762,10 @@
         "unit": "每 1M tokens",
         "input": 0.8,
         "output": 2,
-        "note": "输出 ≥0.2K 档 0.8/6；输入 [32K,128K) 档 1.2/8"
+        "note": "标准首档：输入 [0, 32K)，输出 [0, 0.2K)；其他档位：输入 [0, 32K)，输出 ≥0.2K（未命中/命中/输出 0.8/0.16/6）；输入 [32K, 128K)（未命中/命中/输出 1.2/0.24/8）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.16,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
@@ -719,7 +773,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -741,7 +795,10 @@
         "unit": "每 1M tokens",
         "input": 5,
         "output": 22,
-        "note": "输出 ≥32K 档 7/26"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 ≥32K（未命中/命中/输出 7/1.8/26）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 1.2,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
@@ -749,7 +806,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -771,7 +828,10 @@
         "unit": "每 1M tokens",
         "input": 1,
         "output": 3,
-        "note": "[32K,128K) 档 2/6"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 [32K, 128K)（未命中/命中/输出 2/0.4/6）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.2,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
@@ -779,7 +839,7 @@
         "代码"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -801,14 +861,17 @@
         "unit": "每 1M tokens",
         "input": 0.15,
         "output": 1.5,
-        "note": "[32K,128K) 档 0.3/3"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 [32K, 128K)（未命中/命中/输出 0.3/0.03/3）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.03,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -830,14 +893,17 @@
         "unit": "每 1M tokens",
         "input": 0,
         "output": 0,
-        "note": "官方标注免费，价格随时可能调整，以官网为准"
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -859,14 +925,17 @@
         "unit": "每 1M tokens",
         "input": 2,
         "output": 6,
-        "note": "[32K,64K) 档 4/12"
+        "note": "标准首档：输入长度 [0, 32K)；其他档位：输入长度 [32K, 64K)（未命中/命中/输出 4/0.8/12）；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.4,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -887,15 +956,18 @@
         "currency": "CNY",
         "unit": "每 1M tokens",
         "input": 2,
-        "output": 6,
-        "note": null
+        "output": 2,
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。此模型不支持缓存。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -917,14 +989,17 @@
         "unit": "每 1M tokens",
         "input": 0,
         "output": 0,
-        "note": "官方标注免费，价格随时可能调整，以官网为准"
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。此模型不支持缓存。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -946,13 +1021,16 @@
         "unit": "每 1M tokens",
         "input": 0,
         "output": 0,
-        "note": "官方标注免费，价格随时可能调整，以官网为准"
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。此模型不支持缓存。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -974,11 +1052,14 @@
         "unit": "每 1M tokens",
         "input": 1,
         "output": 1,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.5,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -1000,14 +1081,17 @@
         "unit": "每 1M tokens",
         "input": 0.1,
         "output": 0.1,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。",
+        "cachedInput": 0.05,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "工具调用",
         "推理"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -1029,11 +1113,14 @@
         "unit": "每 1M tokens",
         "input": 0,
         "output": 0,
-        "note": "官方标注免费，价格随时可能调整，以官网为准"
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。此模型不支持缓存。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {
@@ -1055,13 +1142,16 @@
         "unit": "每 1M tokens",
         "input": 0.2,
         "output": 0.2,
-        "note": null
+        "note": "官方标准档；缓存存储限时免费，按百万 Token/小时计费，不作为缓存写入价。此模型不支持缓存。",
+        "cachedInput": null,
+        "cacheWrite": null,
+        "cacheWriteLong": null
       },
       "abilities": [
         "视觉"
       ],
       "verified": true,
-      "verifiedAt": "2026-09-23T00:00:00+08:00",
+      "verifiedAt": "2026-10-04T06:01:18+08:00",
       "source": "https://docs.bigmodel.cn/cn/guide/start/pricing"
     },
     {

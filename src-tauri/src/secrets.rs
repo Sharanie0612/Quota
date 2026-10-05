@@ -14,6 +14,8 @@ const LEGACY_SERVICE: &str = "AgentPrice";
 #[serde(rename_all = "camelCase")]
 pub struct SecretBlob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subscription_account: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
     /// 管理员/控制台密钥，用于用量、成本等需要更高权限的接口
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -80,6 +82,12 @@ fn write(account_id: &str, blob: &SecretBlob) -> Result<(), String> {
 /// 从备份恢复时原样写回一个凭据 blob
 pub fn restore(account_id: &str, blob: &SecretBlob) -> Result<(), String> {
     write(account_id, blob)
+}
+
+pub fn set_subscription_account(id: &str, account: &str) -> Result<(), String> {
+    let mut blob = get_secrets(id)?;
+    blob.subscription_account = Some(account.into());
+    write(id, &blob)
 }
 
 pub fn get_api_key(account_id: &str) -> Result<String, String> {

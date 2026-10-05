@@ -126,6 +126,85 @@ pub fn best_match<'a>(
     })
 }
 
+/// 只有归一化后相等的显式别名才可用于资料与定价。
+/// 名称相似不是同一计费模型，尤其不能让本地模糊条目覆盖内置精确条目。
+pub fn exact_match<'a>(entries: &'a [CatalogEntry], provider: &str, model_id: &str) -> Option<&'a CatalogEntry> {
+    best_match(entries, provider, model_id)
+        .filter(|(_, quality)| quality == "exact")
+        .map(|(entry, _)| entry)
+}
+
+/// 当前资料与可供用户重新核对的内置资料分开返回，绝不混合核实日期和来源。
+pub fn comparison_entries(catalog: &[CatalogEntry], overrides: &[CatalogEntry], provider: &str, model_id: &str) -> (CatalogEntry, Option<CatalogEntry>) {
+    let local = exact_match(overrides, provider, model_id).cloned();
+    let builtin = exact_match(catalog, provider, model_id).cloned();
+    match local {
+        Some(entry) => (entry, builtin),
+        None => (builtin.unwrap_or_else(|| CatalogEntry { r#match: vec![model_id.into()], name: model_id.into(), ..Default::default() }), None),
+    }
+}
+
+pub fn verified_record(verified: bool, source: Option<&str>, at: Option<&str>) -> bool {
+    verified && source.and_then(|source| reqwest::Url::parse(source.trim()).ok())
+        .is_some_and(|source| matches!(source.scheme(), "http" | "https") && source.host_str().is_some())
+        && at.is_some_and(|at| chrono::DateTime::parse_from_rfc3339(at).is_ok())
+}
+
+pub fn validate_entry(entry: &CatalogEntry) -> Result<(), String> {
+    if entry.r#match.is_empty() || entry.r#match.iter().any(|id| normalize(id).is_empty()) {
+        return Err("请填写有效的模型 ID".into());
+    }
+    if [entry.context, entry.max_output].into_iter().flatten().any(|value| value <= 0) {
+        return Err("上下文和最大输出须为正整数；未知请留空".into());
+    }
+    if let Some(price) = &entry.price {
+        let fields = [price.input, price.output, price.cached_input, price.cache_write, price.cache_write_long];
+        if fields.into_iter().flatten().any(|value| !value.is_finite() || value < 0.0) {
+            return Err("价格须为有限的非负数；未知请留空".into());
+        }
+        if fields.into_iter().any(|value| value.is_some()) && (price.currency.trim().is_empty() || price.unit.trim().is_empty()) {
+            return Err("填写价格时还须填写币种与计价单位".into());
+        }
+    }
+    if entry.verified && !entry.source.as_deref().and_then(|source| reqwest::Url::parse(source.trim()).ok())
+        .is_some_and(|source| matches!(source.scheme(), "http" | "https") && source.host_str().is_some()) {
+        return Err("标记已核实前，请填写有效的官方来源链接".into());
+    }
+    if entry.verified && entry.verified_at.as_deref().is_some_and(|at| chrono::DateTime::parse_from_rfc3339(at).is_err()) {
+        return Err("核实日期格式无效，请重新核实后保存".into());
+    }
+    Ok(())
+}
+
+/// 先持久化再替换内存；更新一个别名时保留旧条目的其他别名。
+pub fn save_entry<F>(overrides: &mut Vec<CatalogEntry>, mut entry: CatalogEntry, persist: F) -> Result<(), String>
+where F: FnOnce(&[CatalogEntry]) -> Result<(), String> {
+    validate_entry(&entry)?;
+    for id in &mut entry.r#match { *id = id.trim().into(); }
+    entry.source = entry.source.map(|source| source.trim().to_string()).filter(|source| !source.is_empty());
+    if let Some(price) = &mut entry.price {
+        price.currency = price.currency.trim().to_ascii_uppercase();
+        price.unit = price.unit.trim().into();
+    }
+    entry.edited = true;
+    if entry.verified && entry.verified_at.is_none() { entry.verified_at = Some(chrono::Local::now().to_rfc3339()); }
+    if !entry.verified { entry.verified_at = None; }
+    let keys: HashSet<_> = entry.r#match.iter().map(|id| normalize(id)).collect();
+    let mut next = overrides.clone();
+    next.retain_mut(|existing| {
+        let scope_overlaps = entry.providers.is_empty() || existing.providers.is_empty()
+            || existing.providers.iter().any(|provider| entry.providers.contains(provider));
+        if !scope_overlaps { return true; }
+        if existing.r#match.is_empty() { return !keys.contains(&normalize(&existing.name)); }
+        existing.r#match.retain(|id| !keys.contains(&normalize(id)));
+        !existing.r#match.is_empty()
+    });
+    next.push(entry);
+    persist(&next)?;
+    *overrides = next;
+    Ok(())
+}
+
 /// 该条资料的价格可信度：已核实 high / 有价未核实 medium / 无价格 none
 fn price_confidence(price: &Option<crate::model::ModelPrice>, verified: bool) -> String {
     let has_price = price
@@ -158,18 +237,20 @@ pub fn cards_for_account(
     models
         .iter()
         .filter_map(|m| {
-            let over_hit = best_match(overrides, provider, &m.id);
-            let cat_hit = best_match(catalog, provider, &m.id);
+            let over_hit = exact_match(overrides, provider, &m.id);
+            let cat_hit = exact_match(catalog, provider, &m.id);
             // 隐藏只在拿不到「精确」资料兜底时生效：`mimo-v2.5` 这种泛前缀键
             // 不能顺手带走有精确条目的 mimo-v2.5-asr / -tts；
             // 反过来，kimi-latest 这种只与可见条目模糊擦边的历史 id 也不能被放出来。
-            let exact_over = over_hit.as_ref().is_some_and(|(_, q)| q == "exact");
-            let exact_cat = cat_hit.as_ref().is_some_and(|(_, q)| q == "exact");
+            let exact_over = over_hit.is_some();
+            let exact_cat = cat_hit.is_some();
             if !exact_over && !exact_cat && is_hidden(&hidden, &m.id) {
                 return None;
             }
-            Some(match over_hit.or(cat_hit) {
-                Some((entry, quality)) => ModelCard {
+            let entry_hit = over_hit.or(cat_hit);
+            let verified = entry_hit.is_some_and(|entry| verified_record(entry.verified, entry.source.as_deref(), entry.verified_at.as_deref()));
+            Some(match entry_hit {
+                Some(entry) => ModelCard {
                     id: m.id.clone(),
                     name: if entry.name.is_empty() {
                         m.id.clone()
@@ -182,12 +263,12 @@ pub fn cards_for_account(
                     max_output: entry.max_output.or(m.output_limit),
                     price: entry.price.clone(),
                     abilities: entry.abilities.clone(),
-                    verified: entry.verified,
+                    verified,
                     verified_at: entry.verified_at.clone(),
                     source: entry.source.clone(),
                     edited: entry.edited,
-                    price_confidence: price_confidence(&entry.price, entry.verified),
-                    match_quality: quality,
+                    price_confidence: price_confidence(&entry.price, verified),
+                    match_quality: "exact".into(),
                     owned_by: m.owned_by.clone(),
                     created: m.created,
                     account_ids: vec![account_id.to_string()],

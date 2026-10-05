@@ -1,9 +1,27 @@
 /* 浏览器内预览用的 Tauri API 桩：让前端在普通浏览器里渲染出真实界面，便于校验结构、样式与交互。
    仅用于开发期自检，不参与打包产物。
-   预览悬浮卡：在 URL 上加 ?window=tray（例如 http://127.0.0.1:4174/?window=tray）。 */
+   数据仅用于界面自检。 */
 (function () {
   let seq = 1;
   const callbacks = {};
+  const activityCase = new URLSearchParams(location.search).get("activityCase");
+  const catalogCase = new URLSearchParams(location.search).get("catalogCase");
+  const modelsCase = new URLSearchParams(location.search).get("modelsCase");
+  const accountCase = new URLSearchParams(location.search).get("accountCase");
+  let activityReads = 0;
+  let modelReads = 0;
+  // 仅在预览中强制应用现有深色 CSS；不修改系统设置，也不参与产品构建。
+  if (new URLSearchParams(location.search).get("theme") === "dark") {
+    document.addEventListener("DOMContentLoaded", () => {
+      const css = Array.from(document.styleSheets).flatMap(sheet => Array.from(sheet.cssRules))
+        .filter(rule => rule.media?.mediaText === "(prefers-color-scheme: dark)")
+        .flatMap(rule => Array.from(rule.cssRules).map(child => child.cssText)).join("\n");
+      const style = document.createElement("style");
+      style.textContent = css;
+      document.head.appendChild(style);
+      document.documentElement.dataset.previewTheme = "dark";
+    }, { once: true });
+  }
   const WINDOW_LABEL =
     new URLSearchParams(location.search).get("window") ||
     (location.hash.replace("#", "") === "tray" ? "tray" : "main");
@@ -22,7 +40,7 @@
   const CONSOLE_MODES = [
     mode(
       "console",
-      "控制台 Cookie",
+      "登录同步",
       "粘贴浏览器里的小米账号 Cookie，自动查余额、本月用量与套餐余量（官方没有查询 API，这是唯一能自动查的办法）。",
     ),
     ...NOAPI_MODES,
@@ -313,13 +331,13 @@
       billingUrl: "https://platform.xiaomimimo.com/#/console/balance",
       pricingUrl: "https://mimo.mi.com/docs/price/pay-as-you-go",
       docsUrl: "https://mimo.mi.com/docs",
-      low: false,
+      low: true,
       status: {
         balance: {
           currency: "CNY",
           total: -0.15,
           source: "console",
-          amounts: [{ label: "现金余额", value: 0, kind: "cash" }],
+          amounts: [{ label: "充值余额", value: 0, kind: "cash" }, { label: "赠送余额", value: 0, kind: "granted" }],
           usable: false,
           note: "本月已用 5.30 亿 / 41 亿 Credits（12.9%） · Lite 套餐 · 当前期至 2026-10-23 · 自动续费已开 · 来自 MiMo 控制台接口",
           raw: null,
@@ -587,7 +605,29 @@
     warnings: [],
   };
 
+  // 使用真实内置价格检查缓存字段，避免演示数据掩盖资料库缺失。
+  let catalogPromise;
+  let legacyCatalogSeeded = false;
+  const catalogOverrides = new Map();
+  async function modelCards() {
+    catalogPromise ||= fetch("/model_catalog.json").then(r => r.json());
+    const catalog = (await catalogPromise).entries;
+    if (catalogCase === "legacy" && !legacyCatalogSeeded) {
+      const entry = catalog.find(e => e.match.includes("kimi-k3"));
+      catalogOverrides.set("kimi-k3", {...entry,name:"Kimi K3（本机资料）",summary:"本机保留的简介",edited:true,verifiedAt:"2026-03-01T00:00:00+08:00",price:{...entry.price,cachedInput:null,cacheWrite:null,cacheWriteLong:null}});
+      legacyCatalogSeeded = true;
+    }
+    const ids = ["kimi-k2.7-code", "kimi-k2.7-code-highspeed", "kimi-k2.6", "mimo-v2.6-pro-ultraspeed"];
+    if (modelsCase === "glm-prices") ids.push("glm-5.3-flash", "glm-5.3-flashx", "glm-5-turbo", "glm-4.7", "glm-4.6", "glm-ocr");
+    const cards = [...CARDS, ...ids.map(id => ({...CARDS.find(c => c.id === "kimi-k3"), id, accountIds: [id.startsWith("glm") ? "a3" : id.startsWith("kimi") ? "a2" : "a4"]}))];
+    return cards.map(card => {
+      const entry = catalogOverrides.get(card.id) || catalog.find(e => e.match.includes(card.id));
+      return entry ? {...card, ...Object.fromEntries(["name","vendor","summary","context","maxOutput","price","abilities","verified","verifiedAt","source","edited"].map(k => [k, entry[k]]))} : card;
+    });
+  }
+
   const SETTINGS = {
+    notifyRecharge: true, trayAlert: true, ladderAutoUpdate: true,
     autoRefresh: true,
     refreshIntervalMinutes: 30,
     notifyLowBalance: true,
@@ -616,6 +656,20 @@
     a3: { points: downTrend(300, 260.2), dailyBurn: 1.4, daysLeft: 186 },
   };
 
+  for (const p of PROVIDERS) {
+    if (p.id === "custom") p.balanceModes = [mode("codex", "自动同步", "连接本机登录"), mode("manual", "手动记录", "")];
+  }
+  ACCOUNTS.push({ ...ACCOUNTS[0], id: "demo-chatgpt", provider: "custom", providerName: "ChatGPT 订阅", label: "ChatGPT Plus", providerVendor: "ChatGPT", needsApiKey: false, hasKey: false, balanceMode: "codex", low: false,
+    actionLinks: [{label:"管理订阅",url:"https://chatgpt.com/#/settings/subscription"}],
+    effectiveRechargeUrl: "https://chatgpt.com/#/settings/subscription", billingUrl: "https://chatgpt.com", status: { balance: null, subscription: { plan: "plus", windows: [{label:"5 小时额度",remaining:65,resetAt:Math.floor(Date.now()/1000)+7200},{label:"每周额度",remaining:82,resetAt:Math.floor(Date.now()/1000)+172800}] }, models: [], lastChecked: new Date().toISOString(), balanceError: null, modelsError: null }
+  });
+  let ladder;
+  if (["balance-error", "retry-error", "save-error"].includes(accountCase)) {
+    for (const a of ACCOUNTS.filter(a => ["a1", "a5", "demo-chatgpt"].includes(a.id))) {
+      a.status.balanceError = "演示：余额接口暂时不可用，请重试或使用手动记录。";
+    }
+  }
+
   window.__TAURI_INTERNALS__ = {
     metadata: {
       currentWindow: { label: WINDOW_LABEL },
@@ -635,25 +689,137 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case "get_activity": {
+          const read = ++activityReads;
+          if (activityCase === "loading" || (activityCase === "race" && args.source === "codex")) {
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            document.documentElement.dataset.activityDelayedRead = "done";
+          }
+          if (activityCase === "error" && read === 1) throw new Error("演示：统计文件暂时不可读，请重试。");
+          const tokens={input:2400000,cached:1700000,cacheWrite:50000,output:320000,reasoning:90000,total:2720000};
+          const sourceFactor = ({codex:.55,zcode:.3,harness:.15})[args.source] ?? 1;
+          const deviceFactor = args.device === "demo-a" ? .6 : args.device === "demo-b" ? .4 : 1;
+          const factor = sourceFactor * deviceFactor * (activityCase === "empty" ? 0 : 1);
+          const row=(key,f=1)=>({key,tokens:Object.fromEntries(Object.entries(tokens).map(([k,v])=>[k,Math.round(v*f*factor)])),calls:Math.round(326*f*factor),sessions:Math.round(38*f*factor)});
+          const availableModels = args.source ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.55),row("GLM-5.3",.3),row("deepseek-flash",.15)];
+          const models = args.model ? availableModels.filter(model => model.key === args.model) : availableModels;
+          const selectedFactor = !args.model ? 1 : models.length ? (args.source ? 1 : ({"gpt-6.1-sol":.55,"GLM-5.3":.3,"deepseek-flash":.15})[args.model]) : 0;
+          const selectedRow=(key,f=1)=>row(key,f*selectedFactor);
+          let totals=selectedRow("全部");
+          const count=args.days===7?7:30;
+          const weights=Array.from({length:count},(_,i)=>i%6===0?0:((i*7)%13+1));
+          const weightTotal=weights.reduce((a,b)=>a+b,0); const used={};
+          const daily=weights.map((weight,i)=>{
+            const date=new Date();date.setDate(date.getDate()-(count-1-i));
+            const key=date.toLocaleDateString("sv-SE");
+            const values=Object.fromEntries(Object.entries(totals.tokens).map(([name,value])=>{const amount=i===count-1?value-(used[name]||0):Math.floor(value*weight/weightTotal);used[name]=(used[name]||0)+amount;return [name,amount];}));
+            return {...selectedRow(key,weight/weightTotal),tokens:values};
+          });
+          const selectedDays = daily.filter(row => (!args.from || row.key >= args.from) && (!args.to || row.key <= args.to));
+          const rangeFactor = totals.tokens.total ? selectedDays.reduce((sum,row)=>sum+row.tokens.total,0)/totals.tokens.total : 0;
+          if(args.from || args.to) { totals = selectedRow("全部",rangeFactor); for(const key of Object.keys(tokens))totals.tokens[key]=selectedDays.reduce((sum,row)=>sum+row.tokens[key],0); }
+          document.documentElement.dataset.activityRead = String(read);
+          return {options:window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,codexHome:"C:\\Users\\demo\\.codex",zcodeHome:"C:\\Users\\demo\\.zcode",harnessHome:"",syncDir:""},devices:[{id:"demo-a",name:"工作电脑"},{id:"demo-b",name:"笔记本"}],totals,models:(args.from||args.to)?models.map(row=>({...row,tokens:Object.fromEntries(Object.entries(row.tokens).map(([k,v])=>[k,Math.round(v*rangeFactor)]))})):models,availableModels,tools:[selectedRow("exec_command",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("read",.4*((args.from||args.to)?rangeFactor:1))],agents:[selectedRow("主 Agent",.7*((args.from||args.to)?rangeFactor:1)),selectedRow("build",.3*((args.from||args.to)?rangeFactor:1))],byDevice:args.device?[selectedRow(args.device,(args.from||args.to)?rangeFactor:1)]:[selectedRow("demo-a",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("demo-b",.4*((args.from||args.to)?rangeFactor:1))],sources:args.source?[selectedRow(args.source,(args.from||args.to)?rangeFactor:1)]:[selectedRow("codex",.55*((args.from||args.to)?rangeFactor:1)),selectedRow("zcode",.3*((args.from||args.to)?rangeFactor:1)),selectedRow("harness",.15*((args.from||args.to)?rangeFactor:1))],daily:selectedDays,updatedAt:Date.now(),errors:activityCase==="partial"?["演示：ZCode 数据库被其他程序占用。","演示：共享目录暂时离线。"]:[]};
+        }
+        case "refresh_activity":
+          if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
+          return 0;
+        case "save_activity_options": window.demoActivityOptions=args.input;return null;
+        case "get_exchange_rate": return { cnyPerUsd: 7, date: "2026-10-02", checkedAt: new Date().toISOString(), source: "synthetic UI demo", error: "演示汇率，非实际行情" };
+        case "get_ladder":
+        case "refresh_ladder":
+          ladder = ladder || await fetch("/ladder.json").then(r => r.json());
+          return ladder;
+        case "check_ladder_price": return { prices: [], excerpts: ["示例：请打开官网核对标准档价格"], checkedAt: new Date().toISOString(), error: null };
+        case "adopt_ladder_price": {
+          const e = ladder.entries.find(e => e.id === args.id);
+          Object.assign(e.price, {input:args.input,output:args.output,currency:args.currency,cachedInput:args.cachedInput,cacheWrite:args.cacheWrite,cacheWriteLong:args.cacheWriteLong});e.verifiedAt=new Date().toISOString();return null;
+        }
+        case "start_mimo_login": case "cancel_mimo_login": case "discard_connection": return null;
+        case "list_mimo_connections": return ACCOUNTS.filter(a => ["mimo", "mimo-plan"].includes(a.provider)).map(a => ({id:a.id,label:a.label}));
+        case "reuse_mimo_connection": return "demo-connection";
+        case "finish_mimo_login": case "connect_chatgpt": return "demo-connection";
+        case "save_account": {
+          if (accountCase === "save-error") throw new Error("演示：配置保存失败，原账户保留。");
+          const p=PROVIDERS.find(p=>p.id===args.input.provider);
+          const existing=ACCOUNTS.find(a=>a.id===args.input.id);
+          const fields=Object.fromEntries(Object.entries(args.input).filter(([k])=>!["apiKey","consoleCookie","adminKey","accessKeyId","accessKeySecret","connectionId"].includes(k)));
+          const v={...(existing||ACCOUNTS[0]),...fields,id:args.input.id||"demo-added",providerName:p.name,providerRegion:p.region,providerVendor:p.vendor,needsApiKey:p.needsApiKey,status:structuredClone(existing?.status||{balance:null,subscription:null,models:[],balanceError:null,modelsError:null})};
+          if(v.balanceMode==="manual") {
+            v.status.subscription=null;v.status.balanceError=null;
+            v.status.balance=v.manualBalance==null?null:{total:v.manualBalance,currency:v.manualCurrency||"CNY",source:"manual",amounts:[],usable:v.manualBalance>0,note:"手动记录"};
+            v.low=v.lowBalanceThreshold>0&&v.manualBalance!=null&&v.manualBalance<v.lowBalanceThreshold;
+          }
+          v.status.lastChecked=new Date().toISOString();
+          if(existing) ACCOUNTS.splice(ACCOUNTS.indexOf(existing),1,v); else ACCOUNTS.push(v);
+          return structuredClone(v);
+        }
         case "list_providers":
           return PROVIDERS;
         case "list_accounts":
+          return structuredClone(ACCOUNTS);
         case "refresh_all":
+          if (modelsCase === "refresh-error") throw new Error("演示：账户刷新失败，保留原有数据。");
           return ACCOUNTS;
-        case "refresh_account":
-          return ACCOUNTS.find((a) => a.id === (args && args.id)) || ACCOUNTS[0];
-        case "get_settings":
-        case "save_settings":
-          return SETTINGS;
+        case "refresh_account": {
+          if (accountCase === "retry-error") throw new Error("演示：重试失败，保留上次余额。");
+          const a=ACCOUNTS.find(a=>a.id===args.id)||ACCOUNTS[0]; a.status.balanceError=null;
+          return structuredClone(a);
+        }
+        case "get_settings": return {...SETTINGS};
+        case "save_settings": Object.assign(SETTINGS,args.settings); return {...SETTINGS};
         case "get_balance_history":
-          return BALANCE_HISTORY;
+          return Object.fromEntries(Object.entries(BALANCE_HISTORY).map(([id,t])=>{
+            const total=ACCOUNTS.find(a=>a.id===id)?.status.balance?.total;
+            return [id,{...t,daysLeft:total!=null&&t.dailyBurn>0?Math.max(0,total/t.dailyBurn):null}];
+          }));
+        case "export_data":
+        case "export_activity_sync":
+        case "import_activity_sync":
+            throw new Error("浏览器演示无法写入本机导出文件，请在 Quota 桌面应用中导出。");
+        case "preview_import": return {fingerprint:"synthetic",encrypted:!!args.password,accounts:ACCOUNTS.slice(0,3).map(a=>({id:a.id,label:a.label,provider:a.provider,hasCredentials:!!args.password})),credentials:!!args.password,settings:true,catalog:true,catalogCount:2,balanceHistory:true,historyCount:12,activity:true,activityCount:42};
+        case "import_data": return "演示：已导入所选内容，未选内容保留";
+        case "get_feishu_sync":
+          return {enabled:false,folderToken:"",lastSynced:null,error:null};
+        case "sync_feishu":
+          throw new Error("请在 Quota 桌面应用中连接飞书。");
         case "export_backup":
-        case "import_backup":
+            return null;
+        case "model_cards": {
+          const read = ++modelReads;
+          if ((modelsCase === "race" || modelsCase === "race-error") && args.provider === "moonshot") {
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            document.documentElement.dataset.modelsDelayedRead = "done";
+            if (modelsCase === "race-error") throw new Error("演示：上一次 Kimi 列表读取失败。");
+          }
+          document.documentElement.dataset.modelsRead = String(read);
+          if ((modelsCase === "error" && read === 1) || (modelsCase === "background-error" && read > 1)) throw new Error("演示：模型资料暂时不可读，请重试。");
+          let cards = await modelCards();
+          if (modelsCase === "compare-groups") cards = cards.map((card, index) => index < 2 ? {
+            ...card, name: index ? "美元计价样本（仅验收）" : "每千 Token 计价样本（仅验收）",
+            price: {...card.price, currency: index ? "USD" : "CNY", unit: index ? "每 1M tokens" : "每 1K tokens"},
+            verified:false, verifiedAt:null, source:null,
+          } : card);
+          return modelsCase === "empty" ? [] : args.provider ? cards.filter(card => card.accountIds.some(id => ACCOUNTS.find(a => a.id === id)?.provider === args.provider)) : cards;
+        }
+        case "compare_prices": {
+          const card = (await modelCards()).find(c => c.id === args.modelId);
+          if (!card?.price) return COMPARISON;
+          const source = {name:card.verified?"当前价格（已核实）":"当前价格（待核实）",kind:"catalog",url:card.source,...card.price,fetchedAt:card.verifiedAt,trusted:card.verified};
+          const entry = catalogOverrides.has(card.id) ? (await catalogPromise).entries.find(e => e.match.includes(card.id)) : null;
+          const builtin = entry ? {name:"内置官方资料（已核实）",kind:"builtin",url:entry.source,...entry.price,fetchedAt:entry.verifiedAt,trusted:entry.verified} : null;
+          const sources = builtin ? [source,builtin] : [source];
+          const priceFields = ["input","output","cachedInput","cacheWrite","cacheWriteLong"];
+          const hasPrice = value => priceFields.some(key => value[key] != null);
+          const suggestedSource = sources.filter(value => value.trusted && hasPrice(value)).sort((a,b) =>
+            Date.parse(b.fetchedAt) - Date.parse(a.fetchedAt) || priceFields.filter(key => b[key] != null).length - priceFields.filter(key => a[key] != null).length)[0]
+            || sources.find(hasPrice) || null;
+          return {...COMPARISON,modelId:card.id,modelName:card.name,sources,suggested:suggestedSource,suggestedSource,excerpts:[],confidence:suggestedSource?.trusted?"medium":suggestedSource?"low":"none",confidenceReason:!suggestedSource?"当前资料没有价格字段，请打开官网核对。":!suggestedSource.trusted?"只有未核实的参考价格，请对照官网确认。":builtin?"已有官网核实记录；当前记录来自同一出处，不能算独立的交叉验证。":"只有 1 份已对照官网核实的价格记录，请注意核实日期。"};
+        }
+        case "save_catalog_entry":
+          if (catalogCase === "write-error") throw new Error("演示：本机资料写入失败，原有资料保留。");
+          for (const id of args.entry.match) catalogOverrides.set(id, {...args.entry,verifiedAt:new Date().toISOString()});
           return null;
-        case "model_cards":
-          return CARDS;
-        case "compare_prices":
-          return COMPARISON;
         case "api_snippet":
           return (
             "curl https://api.deepseek.com/chat/completions \\\n" +
@@ -674,22 +840,19 @@
             rawPreview: '{\n  "code": 200,\n  "data": { "available_balance": 88.5 }\n}',
             error: null,
           };
-        case "save_catalog_entry":
         case "reset_catalog_overrides":
         case "open_external":
         case "show_main_window":
-        case "hide_popup":
-          return null;
-        case "resize_popup":
-          (window.__resizeCalls = window.__resizeCalls || []).push(args && args.height);
           return null;
         case "app_info":
           return {
-            version: "0.1.0",
+            version: "1.0.0900",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen":
           return 1;
+        case "plugin:dialog|open":
+          return new URLSearchParams(location.search).has("migrationCase") ? "D:\\demo\\Quota-migration.json" : null;
         case "plugin:event|unlisten":
           return null;
         default:

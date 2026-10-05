@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
+  ActivityReport, ActivityOptions,
   AccountInput,
   AccountTrend,
   AccountView,
@@ -12,9 +13,33 @@ import type {
   ProviderView,
   RechargeEvent,
   Settings,
+  ImportPreview, ImportSelection,
+  LadderSnapshot,
+  LadderPriceCheck,
 } from "./types";
 
 export const api = {
+  getFeishuSync: () => invoke<{enabled:boolean; folderToken:string; lastSynced:string|null; error:string|null}>("get_feishu_sync"),
+  exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
+  importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
+  syncFeishu: (enable = true) => invoke<string>("sync_feishu", { enable }),
+  exportData: (path: string) => invoke<string>("export_data", { path }),
+  getExchangeRate: () => invoke<{ cnyPerUsd: number; date: string; checkedAt: string; source: string; error: string | null }>("get_exchange_rate"),
+  getActivity: (device = "", source = "", days = 0, model = "", from = "", to = "") => invoke<ActivityReport>("get_activity", { device, source, days, model, from, to }),
+  refreshActivity: () => invoke<number>("refresh_activity"),
+  saveActivityOptions: (input: ActivityOptions) => invoke<void>("save_activity_options", { input }),
+  getLadder: () => invoke<LadderSnapshot>("get_ladder"),
+  refreshLadder: (force = false) => invoke<LadderSnapshot>("refresh_ladder", { force }),
+  checkLadderPrice: (id: string) => invoke<LadderPriceCheck>("check_ladder_price", { id }),
+  adoptLadderPrice: (id: string, input: number, output: number, currency: string, cachedInput: number | null = null, cacheWrite: number | null = null, cacheWriteLong: number | null = null) =>
+    invoke<void>("adopt_ladder_price", { id, input, output, currency, cachedInput, cacheWrite, cacheWriteLong }),
+  startMimoLogin: () => invoke<void>("start_mimo_login"),
+  listMimoConnections: () => invoke<{id: string; label: string}[]>("list_mimo_connections"),
+  reuseMimoConnection: (accountId: string, provider: string) => invoke<string>("reuse_mimo_connection", {accountId, provider}),
+  finishMimoLogin: (provider: string) => invoke<string>("finish_mimo_login", { provider }),
+  cancelMimoLogin: () => invoke<void>("cancel_mimo_login"),
+  connectChatgpt: () => invoke<string>("connect_chatgpt"),
+  discardConnection: (id: string) => invoke<void>("discard_connection", { id }),
   listProviders: () => invoke<ProviderView[]>("list_providers"),
   listAccounts: () => invoke<AccountView[]>("list_accounts"),
   saveAccount: (input: AccountInput) => invoke<AccountView>("save_account", { input }),
@@ -28,9 +53,9 @@ export const api = {
   /** 导出加密备份（配置 + 模型资料 + 全部密钥）；path 来自 dialog 插件 */
   exportBackup: (password: string, path: string) =>
     invoke<void>("export_backup", { password, path }),
-  /** 从加密备份恢复，返回统计摘要 */
-  importBackup: (password: string, path: string) =>
-    invoke<string>("import_backup", { password, path }),
+  previewImport: (path: string, password: string) => invoke<ImportPreview>("preview_import", {path, password}),
+  importData: (path: string, password: string, fingerprint: string, selection: ImportSelection) =>
+    invoke<string>("import_data", {path, password, fingerprint, selection}),
   modelCards: (provider?: string) =>
     invoke<ModelCard[]>("model_cards", { provider: provider ?? null }),
   saveCatalogEntry: (entry: CatalogEntry) => invoke<void>("save_catalog_entry", { entry }),
@@ -68,9 +93,6 @@ export const api = {
   /** 打开主面板；传 accountId 时主面板会直接定位到该账户 */
   showMain: (account?: string | null) =>
     invoke<void>("show_main_window", { account: account ?? null }),
-  /** 悬浮卡按内容自适应高度 */
-  resizePopup: (height: number) => invoke<void>("resize_popup", { height }),
-  hidePopup: () => invoke<void>("hide_popup"),
 };
 
 export const events = {

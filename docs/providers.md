@@ -7,9 +7,9 @@
 | DeepSeek | ✓ | API Key 余额 | ✓ | 充值、赠送余额分项 |
 | Kimi (Moonshot) | ✓ | API Key 余额 | ✓ | 现金与代金券分项 |
 | 智谱 GLM | ✓ | 账户报表余额 | ✓ | 报表接口未见官方文档收录，可能变化 |
-| 小米 MiMo 按量 | ✓ | 控制台 Cookie 余额和本月用量 | ✓ | Cookie 到期后需更新 |
-| 小米 MiMo Token Plan | ✓ | 控制台 Cookie 套餐余量和本月用量 | ✓ | API Key 与按量账户不同 |
-| ChatGPT 订阅 | ✓ | 无 | 无 | 当前仅提供订阅设置等页面入口，不显示实时 5h/weekly 额度 |
+| 小米 MiMo 按量 | ✓ | 官方登录窗口连接，控制台余额和本月用量 | ✓ | 登录到期后重新连接 |
+| 小米 MiMo Token Plan | ✓ | 官方登录窗口连接，套餐余量和本月用量 | ✓ | API Key 与按量账户不同 |
+| ChatGPT 订阅 | ✓ | Codex 短期/每周额度 | 无 | 连接本机 Codex 登录；不代表网页聊天额度 |
 | 阿里云百炼 | 隐藏 | 阿里云 AccessKey + BSS 账单余额 | ✓ | 查询的是阿里云账户余额 |
 | 硅基流动 | 隐藏 | API Key 余额 | ✓ | 保留代码路径 |
 | OpenAI Platform | 隐藏 | 普通 API Key 无余额；管理员成本接口可辅助估算 | ✓ | 成本并非账户余额 |

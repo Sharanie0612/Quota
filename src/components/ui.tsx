@@ -1,6 +1,7 @@
 /** 通用 UI 原语：按钮、徽标、开关、分段控件、弹层、提示条 */
-import { useEffect, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef, type ReactNode } from "react";
 import { IconAlert, IconInfo, IconRefresh, IconX } from "./icons";
+import { ToastStack } from "./ToastStack";
 
 export function Button({
   children,
@@ -100,8 +101,19 @@ export function Seg<T extends string>({
           key={o.value}
           role="tab"
           aria-selected={o.value === value}
+          tabIndex={o.value === value ? 0 : -1}
           className={o.value === value ? "active" : ""}
           onClick={() => onChange(o.value)}
+          onKeyDown={(e) => {
+            const index = options.findIndex(option => option.value === o.value);
+            const next = e.key === "ArrowRight" ? (index + 1) % options.length
+              : e.key === "ArrowLeft" ? (index - 1 + options.length) % options.length
+              : e.key === "Home" ? 0 : e.key === "End" ? options.length - 1 : -1;
+            if (next < 0) return;
+            e.preventDefault();
+            onChange(options[next].value);
+            e.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="tab"]')[next]?.focus();
+          }}
           type="button"
         >
           {o.label}
@@ -122,7 +134,7 @@ export function Notice({
 }) {
   const Icon = tone === "info" ? IconInfo : IconAlert;
   return (
-    <div className={`notice notice-${tone}`}>
+    <div className={`notice notice-${tone}`} role={tone === "error" ? "alert" : undefined}>
       <Icon size={14} />
       <div className="notice-text">
         <div>{children}</div>
@@ -145,19 +157,39 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <dialog ref={dialogRef} className="overlay" aria-labelledby={titleId}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onKeyDown={(e) => {
+        if (e.key !== "Tab") return;
+        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary,[tabindex]'))
+          .filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first) { e.preventDefault(); e.currentTarget.focus(); return; }
+        if (e.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement as HTMLElement))) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault(); first.focus();
+        }
+      }}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={wide ? { maxWidth: 620 } : undefined}>
         <div className="modal-head">
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <div className="spacer" />
           <IconButton title="关闭" onClick={onClose} type="button">
             <IconX size={15} />
@@ -166,7 +198,8 @@ export function Modal({
         <div className="modal-body">{children}</div>
         {footer ? <div className="modal-foot">{footer}</div> : null}
       </div>
-    </div>
+      <ToastStack />
+    </dialog>
   );
 }
 
@@ -179,11 +212,25 @@ export function Field({
   hint?: ReactNode;
   children: ReactNode;
 }) {
+  const fieldId = useId();
+  const hintId = `${fieldId}-hint`;
+  let controlId: string | undefined;
+  type ChildProps = { id?: string; type?: string; children?: ReactNode; "aria-describedby"?: string };
+  const associate = (nodes: ReactNode): ReactNode => Children.map(nodes, child => {
+    if (!isValidElement<ChildProps>(child)) return child;
+    if (!controlId && ["input", "select", "textarea"].includes(String(child.type)) && child.props.type !== "hidden") {
+      controlId = child.props.id || fieldId;
+      const describedBy = [...new Set([...(child.props["aria-describedby"]?.split(/\s+/) ?? []), ...(hint ? [hintId] : [])])].filter(Boolean).join(" ");
+      return cloneElement(child, { id: controlId, "aria-describedby": describedBy || undefined });
+    }
+    return child.props.children ? cloneElement(child, { children: associate(child.props.children) }) : child;
+  });
+  const controls = associate(children);
   return (
-    <div className="field">
-      <label>{label}</label>
-      {children}
-      {hint ? <div className="hint">{hint}</div> : null}
+    <div className="field" role={controlId ? undefined : "group"} aria-labelledby={controlId ? undefined : `${fieldId}-label`}>
+      <label id={`${fieldId}-label`} htmlFor={controlId}>{label}</label>
+      {controls}
+      {hint ? <div id={hintId} className="hint">{hint}</div> : null}
     </div>
   );
 }

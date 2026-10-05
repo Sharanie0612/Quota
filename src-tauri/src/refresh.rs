@@ -13,6 +13,8 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         // 启动后稍等，避免和界面首屏渲染抢资源
         tokio::time::sleep(Duration::from_secs(3)).await;
+        // 每次进程启动都查询一次，与后续定时刷新开关无关。
+        run_cycle(&app).await;
         loop {
             let (auto, minutes) = {
                 let state = app.state::<AppState>();
@@ -23,12 +25,11 @@ pub fn spawn(app: AppHandle) {
                 }
             };
 
-            if auto {
-                run_cycle(&app).await;
-            }
-
             let sleep_minutes = if auto { minutes } else { 10 };
             tokio::time::sleep(Duration::from_secs(sleep_minutes as u64 * 60)).await;
+            let enabled = app.state::<AppState>().config.lock()
+                .map(|c| c.settings.auto_refresh).unwrap_or(false);
+            if enabled { run_cycle(&app).await; }
         }
     });
 }
@@ -53,7 +54,7 @@ pub async fn run_cycle(app: &AppHandle) {
         return;
     }
 
-    for view in views.iter().filter(|v| v.low) {
+    for view in views.iter().filter(|v| v.low && v.status.balance_error.is_none()) {
         let should_notify = {
             let state = app.state::<AppState>();
             let lock = state.low_notified.lock();
@@ -76,8 +77,9 @@ pub async fn run_cycle(app: &AppHandle) {
         }
 
         let balance = view.status.balance.as_ref();
-        let total = balance.and_then(|b| b.total).unwrap_or(0.0);
-        let currency = balance.map(|b| b.currency.clone()).unwrap_or_default();
+        let total = view.status.subscription.as_ref().and_then(|s| s.windows.iter().map(|w| w.remaining).reduce(f64::min))
+            .or_else(|| balance.and_then(|b| b.total)).unwrap_or(0.0);
+        let currency = if view.status.subscription.is_some() { "%".into() } else { balance.map(|b| b.currency.clone()).unwrap_or_default() };
         let source_hint = match balance.map(|b| b.source.as_str()) {
             Some("manual") => "（手动余额）",
             _ => "",
@@ -104,7 +106,7 @@ pub async fn run_cycle(app: &AppHandle) {
             .builder()
             .title(format!("{} 余额不足", view.label))
             .body(format!(
-                "{} 当前余额 {:.2} {}{}，已低于提醒阈值 {:.2}。{}打开主面板即可一键跳转充值。",
+                "{} 剩余 {:.2} {}{}，低于提醒阈值 {:.2}。{}",
                 view.provider_name,
                 total,
                 currency,

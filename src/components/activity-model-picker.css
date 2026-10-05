@@ -1,0 +1,24 @@
+.activity-model-control { position:relative; margin:0 0 20px; min-width:0; }
+.activity-model-label { display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; margin-bottom:8px; font-size:13px; }
+.activity-model-label span,.activity-model-summary { color:var(--text-2); font-size:12px; }
+.activity-model-selection { display:flex; align-items:center; gap:10px; }
+.activity-model-trigger { display:flex; align-items:center; gap:12px; flex:1; min-width:0; padding:12px 14px; border:1px solid var(--border-strong); border-radius:var(--radius); background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+.activity-model-trigger:hover,.activity-model-trigger[aria-expanded="true"] { border-color:var(--blue); background:var(--surface-2); }
+.activity-model-trigger:focus-visible,.activity-model-option.is-active { outline:2px solid var(--blue); outline-offset:-2px; }
+.activity-model-title { display:flex; flex:1; min-width:0; flex-direction:column; gap:4px; }
+.activity-model-title b { font-size:13px; font-weight:600; overflow-wrap:anywhere; }
+.activity-model-title small { font-size:11px; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.activity-model-change { flex-shrink:0; color:var(--text-2); font-size:12px; }
+.activity-model-all { display:grid; place-items:center; width:32px; height:32px; flex-shrink:0; border-radius:8px; background:var(--blue-soft); color:var(--blue); }
+.activity-model-summary { margin:8px 2px 0; min-height:18px; font-variant-numeric:tabular-nums; }
+.activity-model-popover { position:absolute; top:100%; left:0; width:min(100%,620px); z-index:30; border:1px solid var(--border-strong); background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow-pop); overflow:hidden; }
+.activity-model-search { display:flex; gap:8px; align-items:center; padding:12px; border-bottom:1px solid var(--border); color:var(--text-2); }
+.activity-model-search .input { flex:1; min-width:0; }
+.activity-model-options { max-height:min(45vh,340px); overflow-y:auto; padding:6px; }
+.activity-model-option { display:flex; gap:12px; align-items:center; min-height:58px; padding:10px; border-radius:var(--radius-sm); cursor:pointer; color:var(--text); }
+.activity-model-option[aria-selected="true"] { background:var(--blue-soft); }
+.activity-model-option > svg { flex-shrink:0; color:var(--blue); }
+.activity-model-vendor { padding:14px 10px 6px; color:var(--text-2); font-size:11px; font-weight:600; }
+.activity-model-empty,.activity-model-help { margin:0; padding:10px 14px; font-size:11px; color:var(--text-2); }
+.activity-model-help { border-top:1px solid var(--border); }
+@media (max-width:1100px) { .activity-model-selection { flex-wrap:wrap; } .activity-model-trigger { flex-basis:75%; } }

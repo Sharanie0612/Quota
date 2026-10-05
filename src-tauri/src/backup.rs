@@ -82,6 +82,9 @@ pub fn open(password: &str, file_bytes: &[u8]) -> Result<Vec<u8>, String> {
     let ciphertext = engine
         .decode(&file.ciphertext)
         .map_err(|_| "备份文件已损坏".to_string())?;
+    if salt.len() != SALT_LEN || nonce.len() != NONCE_LEN || file.iterations != KDF_ITERATIONS {
+        return Err("备份文件已损坏".into());
+    }
 
     let key = derive_key(password, &salt, file.iterations);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| format!("初始化解密失败：{e}"))?;

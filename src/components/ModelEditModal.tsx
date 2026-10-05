@@ -28,6 +28,9 @@ export function ModelEditModal({
       ? String(card.price.output)
       : "",
   );
+  const [cached,setCached]=useState(card.price?.cachedInput==null?"":String(card.price.cachedInput));
+  const [write,setWrite]=useState(card.price?.cacheWrite==null?"":String(card.price.cacheWrite));
+  const [longWrite,setLongWrite]=useState(card.price?.cacheWriteLong==null?"":String(card.price.cacheWriteLong));
   const [priceNote, setPriceNote] = useState(card.price?.note ?? "");
   const [abilities, setAbilities] = useState(card.abilities.join("、"));
   const [source, setSource] = useState(card.source ?? "");
@@ -35,6 +38,32 @@ export function ModelEditModal({
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
+    const prices = [["输入价格", input], ["输出价格", output], ["缓存命中", cached], ["缓存写入 5 分钟", write], ["缓存写入 1 小时", longWrite]];
+    for (const [label, value] of prices) {
+      if (value.trim() && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+        toast(`${label}须为有效的非负数，未知请留空`, "error");
+        return;
+      }
+    }
+    for (const [label, value] of [["上下文长度", context], ["最大输出", maxOutput]]) {
+      if (value.trim() && (!Number.isSafeInteger(Number(value)) || Number(value) <= 0)) {
+        toast(`${label}须为正整数，未知请留空`, "error");
+        return;
+      }
+    }
+    if (prices.some(([, value]) => value.trim()) && (!currency.trim() || !unit.trim())) {
+      toast("填写价格时还须填写币种与计价单位", "error");
+      return;
+    }
+    if (verified) {
+      try {
+        const url = new URL(source.trim());
+        if (!["https:", "http:"].includes(url.protocol) || !url.hostname) throw new Error();
+      } catch {
+        toast("标记已核实前，请填写有效的官方来源链接", "error");
+        return;
+      }
+    }
     setSaving(true);
     const entry: CatalogEntry = {
       match: [card.id],
@@ -49,6 +78,7 @@ export function ModelEditModal({
         unit: unit.trim(),
         input: input.trim() === "" ? null : Number(input),
         output: output.trim() === "" ? null : Number(output),
+        cachedInput:cached.trim()?Number(cached):null, cacheWrite:write.trim()?Number(write):null, cacheWriteLong:longWrite.trim()?Number(longWrite):null,
         note: priceNote.trim() || null,
       },
       abilities: abilities
@@ -154,6 +184,7 @@ export function ModelEditModal({
       </div>
 
       <div className="row-2">
+        {[["缓存命中输入",cached,setCached],["缓存写入（5 分钟）",write,setWrite],["缓存写入（1 小时）",longWrite,setLongWrite]].map(([label,value,setter])=><Field key={String(label)} label={String(label)}><input type="number" min="0" step="any" className="input" value={String(value)} onChange={e=>(setter as (v:string)=>void)(e.target.value)}/></Field>)}
         <Field label="币种">
           <select
             className="select"

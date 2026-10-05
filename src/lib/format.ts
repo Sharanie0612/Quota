@@ -20,6 +20,7 @@ function isCredits(currency: string): boolean {
 /** 余额显示：智能保留小数位。
  *  Credits（额度单位）数值可能上亿，直接显示完整数字没人看得懂，按 亿/万 紧凑显示。 */
 export function money(value: number, currency = "CNY"): string {
+  if (currency === "%") return `${value.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}%`;
   if (isCredits(currency)) {
     const abs = Math.abs(value);
     if (abs >= 1e8) return `${(value / 1e8).toFixed(2)} 亿 Credits`;
@@ -40,8 +41,11 @@ export function priceText(v: number | null | undefined, currency = ""): string {
   if (v === null || v === undefined) return "—";
   if (v === 0) return `${symbol(currency)}0`; // 免费模型显示 ¥0，不要 ¥0.000
   const abs = Math.abs(v);
-  const digits = abs >= 100 ? 0 : abs >= 1 ? 2 : 3;
-  return `${symbol(currency)}${v.toFixed(digits)}`;
+  if (!Number.isFinite(v)) return "—";
+  const value = abs < 1e-12 || abs >= 1e15 ? String(v) : new Intl.NumberFormat("en-US", {
+    useGrouping: false, minimumFractionDigits: abs >= 1 ? 2 : 0, maximumFractionDigits: 15,
+  }).format(v);
+  return `${symbol(currency)}${value}`;
 }
 
 export function contextText(tokens: number | null | undefined): string | null {
@@ -106,7 +110,7 @@ export function providerInitial(providerName: string, provider: string): string 
 export function balanceSourceLabel(source: string): string | null {
   if (source === "manual") return "手动";
   if (source === "custom") return "自定义接口";
-  if (source === "console") return "控制台 Cookie";
+  if (source === "console") return "登录同步";
   if (source === "aliyun") return "阿里云账单";
   if (source === "costs") return "用量估算";
   return null;

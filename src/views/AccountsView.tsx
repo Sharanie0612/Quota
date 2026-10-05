@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { AccountCard, EmptyAccounts, LowBalanceBanner } from "../components/AccountCard";
 import { api } from "../lib/api";
 import { money } from "../lib/format";
+import { isSubscriptionAccount, overviewState } from "../lib/accountOverview";
 import type { AccountTrend, AccountView, HistoryPoint } from "../lib/types";
 
 /** 顶部汇总卡：总余额（按币种）+ 本月消耗估算 + 余额预警数 */
@@ -18,11 +19,11 @@ function SummaryBar({
     const map = new Map<string, number>();
     for (const a of accounts) {
       const b = a.status.balance;
-      if (b && b.total !== null) {
+      if (b && b.total !== null && ["CNY", "USD", "EUR", "JPY"].includes(b.currency)) {
         map.set(b.currency, (map.get(b.currency) ?? 0) + b.total);
       }
     }
-    return Array.from(map.entries()).slice(0, 2);
+    return Array.from(map.entries());
   })();
 
   /** 本月消耗 = 本月初最近一条历史余额 − 当前余额；月初前没有记录的账户不猜 */
@@ -33,7 +34,7 @@ function SummaryBar({
     for (const a of accounts) {
       const b = a.status.balance;
       const pts: HistoryPoint[] = trends[a.id]?.points ?? [];
-      if (!b || b.total === null || pts.length < 2) continue;
+      if (!b || !["CNY", "USD", "EUR", "JPY"].includes(b.currency) || b.total === null || pts.length < 2) continue;
       let start: HistoryPoint | null = null;
       for (const p of pts) {
         if (p.t <= monthStart) start = p;
@@ -41,34 +42,35 @@ function SummaryBar({
       }
       if (!start) continue;
       const diff = start.v - b.total;
-      if (diff > 0) map.set(b.currency, (map.get(b.currency) ?? 0) + diff);
+      map.set(b.currency, (map.get(b.currency) ?? 0) + diff);
     }
-    return Array.from(map.entries()).slice(0, 2);
+    return Array.from(map.entries()).map(([currency, value]): [string, number] => [currency, Math.max(0, value)]);
   })();
 
-  const lowCount = accounts.filter((a) => a.low).length;
+  const { low: lowCount, failed, pending } = overviewState(accounts);
 
   return (
-    <div className="summary-bar">
+    <div className="summary-bar account-summary">
       <div className="stat">
         <span className="stat-label">总余额</span>
         <span className="stat-value">
-          {totals.length > 0 ? totals.map(([c, v]) => money(v, c)).join(" + ") : "—"}
+          {totals.length > 0 ? totals.map(([c, v]) => <span key={c}>{money(v, c)}</span>) : "—"}
         </span>
       </div>
       <div className="stat">
-        <span className="stat-label">本月消耗（估算）</span>
+        <span className="stat-label">本月余额净减少</span>
         <span className="stat-value">
           {spent.length > 0
-            ? spent.map(([c, v]) => money(v, c)).join(" + ")
-            : "积累几天历史后显示"}
+            ? spent.map(([c, v]) => <span key={c}>{money(v, c)}</span>)
+            : "暂无月初记录"}
         </span>
       </div>
       <div className="stat">
         <span className="stat-label">余额预警</span>
         <span className={`stat-value${lowCount > 0 ? " is-alert" : ""}`}>
-          {lowCount > 0 ? `${lowCount} 个账户余额不足` : "全部正常"}
+          {lowCount > 0 ? `${lowCount} 个账户不足` : failed || pending ? "待确认" : "全部正常"}
         </span>
+        {failed || pending ? <span className="hint">{[failed ? `${failed} 个同步异常` : "", pending ? `${pending} 个待查询` : ""].filter(Boolean).join(" · ")}</span> : null}
       </div>
     </div>
   );
@@ -88,7 +90,7 @@ export function AccountsView({
   refreshing: boolean;
   onRefreshOne: (id: string) => void;
   onAdd: () => void;
-  onEdit: (account: AccountView) => void;
+  onEdit: (account: AccountView, mode?: "manual") => void;
   onOpenModels: (provider: string) => void;
 }) {
   const [trends, setTrends] = useState<Record<string, AccountTrend>>({});
@@ -140,8 +142,11 @@ export function AccountsView({
     <div className="content-inner">
       <SummaryBar accounts={accounts} trends={trends} />
       <LowBalanceBanner accounts={accounts} trends={trends} />
-      <div className="grid">
-        {accounts.map((a) => (
+      {[{title:"余额账户",items:accounts.filter(a => !isSubscriptionAccount(a))},{title:"订阅账户",items:accounts.filter(isSubscriptionAccount)}].filter(group => group.items.length).map(group => <section className="account-group" key={group.title}>
+      <h3 className="account-group-title">{group.title}<span>{group.items.length} 个</span></h3>
+      {group.title === "余额账户" ? <p className="account-group-hint">“—”表示未取得该项数据；充值余额与累计充值分别展示，不作推算。</p> : null}
+      <div className="accounts-grid">
+        {group.items.map((a) => (
           <AccountCard
             key={a.id}
             account={a}
@@ -149,10 +154,11 @@ export function AccountsView({
             trend={trends[a.id]}
             onRefresh={() => onRefreshOne(a.id)}
             onEdit={() => onEdit(a)}
+            onUseManual={() => onEdit(a, "manual")}
             onShowModels={() => onOpenModels(a.provider)}
           />
         ))}
-      </div>
+      </div></section>)}
     </div>
   );
 }

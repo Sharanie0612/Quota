@@ -9,7 +9,7 @@
 //! 可信度由「来源数量 + 是否核实 + 各来源是否一致」推出来，而不是靠单点数据。
 
 use crate::catalog;
-use crate::model::{ModelPrice, PriceComparison, PriceSource};
+use crate::model::{CatalogEntry, ModelPrice, PriceComparison, PriceSource};
 use chrono::Local;
 
 const PRICE_KEYWORDS: [&str; 14] = [
@@ -233,6 +233,11 @@ pub async fn scan_pricing_page(
         return scan;
     }
 
+    scan_pricing_body(url, &body, hints)
+}
+
+pub fn scan_pricing_body(url: &str, body: &str, hints: &[String]) -> PageScan {
+    let mut scan = PageScan { url:url.into(), fetched_at:Local::now().to_rfc3339(), excerpts:Vec::new(), candidates:Vec::new(), error:None };
     let lines = if body.trim_start().starts_with('{') || body.trim_start().starts_with('[') {
         // 有些平台把定价表直接做成 JSON
         serde_json::to_string_pretty(&serde_json::from_str::<serde_json::Value>(&body).ok())
@@ -282,6 +287,7 @@ pub async fn scan_pricing_page(
                 input: Some(nums[0]),
                 output: Some(nums[1]),
                 note: Some(format!("定价页原文：{}", truncate(line, 160))),
+                ..Default::default()
             });
         }
     }
@@ -401,11 +407,30 @@ fn within_tolerance(a: f64, b: f64) -> bool {
     (hi - lo) / hi <= 0.15
 }
 
-/// 计算可信度：来源越多、越一致，可信度越高
+fn values(source: &PriceSource) -> [Option<f64>; 5] {
+    [source.input, source.output, source.cached_input, source.cache_write, source.cache_write_long]
+}
+
+fn unit_key(unit: &str) -> String {
+    let compact: String = unit.chars().filter(|c| !c.is_whitespace()).collect::<String>().to_lowercase();
+    match compact.as_str() {
+        "每1mtokens" | "每1mtoken" | "每百万tokens" | "每百万token" | "per1mtokens" => "tokens/1000000".into(),
+        _ => compact,
+    }
+}
+
+fn comparable_and_agree(a: &PriceSource, b: &PriceSource) -> bool {
+    if a.currency.trim().is_empty() || !a.currency.trim().eq_ignore_ascii_case(b.currency.trim())
+        || unit_key(&a.unit).is_empty() || unit_key(&a.unit) != unit_key(&b.unit) { return false; }
+    let pairs: Vec<_> = values(a).into_iter().zip(values(b)).filter_map(|(x, y)| x.zip(y)).collect();
+    !pairs.is_empty() && pairs.iter().all(|(x, y)| x.is_finite() && y.is_finite() && *x >= 0.0 && *y >= 0.0 && within_tolerance(*x, *y))
+}
+
+/// 重叠价格字段、币种和单位均须一致；同一官网的本机/内置副本不算独立来源。
 fn grade(sources: &[PriceSource]) -> (String, String) {
     let with_price: Vec<&PriceSource> = sources
         .iter()
-        .filter(|s| s.input.is_some() || s.output.is_some())
+        .filter(|s| values(s).into_iter().any(|v| v.is_some()))
         .collect();
     if with_price.is_empty() {
         return (
@@ -414,33 +439,32 @@ fn grade(sources: &[PriceSource]) -> (String, String) {
         );
     }
     let trusted = with_price.iter().filter(|s| s.trusted).count();
-    let agree = with_price.len() >= 2
-        && with_price.iter().all(|s| {
-            match (s.input, with_price[0].input) {
-                (Some(x), Some(y)) => within_tolerance(x, y),
-                _ => true,
-            }
-        });
+    let agree = with_price.iter().enumerate().all(|(index, a)|
+        with_price.iter().skip(index + 1).all(|b| comparable_and_agree(a, b)));
+    let origins: std::collections::HashSet<_> = with_price.iter().filter_map(|s|
+        reqwest::Url::parse(&s.url).ok().and_then(|u| u.host_str().map(|h| h.to_ascii_lowercase()))).collect();
 
-    if with_price.len() >= 2 && agree {
+    if with_price.len() >= 2 && !agree {
         return (
-            "high".into(),
-            format!(
-                "{} 个独立来源给出的价格一致（相差 <15%），可以放心参考。",
-                with_price.len()
-            ),
+            if trusted > 0 { "medium".into() } else { "low".into() },
+            "价格记录存在差异，或币种、单位、字段不可比。请分别核实标准价格和缓存价格。".into(),
         );
     }
-    if trusted >= 1 && with_price.len() >= 2 {
+    if origins.len() >= 2 && agree {
         return (
-            "medium".into(),
-            "多个来源都有价格，但数值差异较大，请以官方定价页为准。".into(),
+            if trusted > 0 { "high".into() } else { "medium".into() },
+            format!("{} 个不同来源的重叠价格字段一致（相差不超过 15%）。{}", origins.len(),
+                if trusted > 0 { "仍需注意具体计费档位与核实日期。" } else { "尚未对照官网核实，不能视为已核实价格。" }),
         );
     }
     if trusted >= 1 {
         return (
             "medium".into(),
-            "只有 1 个来源给出价格（已对照官网核实），建议再抓一次官方定价页交叉验证。".into(),
+            if with_price.len() > 1 {
+                "已有官网核实记录；当前记录来自同一出处，不能算独立的交叉验证。".into()
+            } else {
+                "只有 1 份已对照官网核实的价格记录，请注意核实日期。".into()
+            },
         );
     }
     (
@@ -458,6 +482,7 @@ pub fn build_comparison(
     catalog_verified: bool,
     catalog_verified_at: Option<String>,
     catalog_source: Option<String>,
+    builtin: Option<&CatalogEntry>,
     page: Option<PageScan>,
     reference: Option<RefPrice>,
 ) -> PriceComparison {
@@ -466,11 +491,13 @@ pub fn build_comparison(
     let mut excerpts: Vec<String> = Vec::new();
 
     if let Some(p) = catalog_price.clone() {
+        let trusted = catalog::verified_record(catalog_verified, catalog_source.as_deref(), catalog_verified_at.as_deref());
+        if catalog_verified && !trusted { warnings.push("当前记录缺少有效的核实来源或日期，仍须重新核实。".into()); }
         sources.push(PriceSource {
-            name: if catalog_verified {
-                "本地资料库（已核实）".into()
+            name: if trusted {
+                "当前价格（已核实）".into()
             } else {
-                "本地资料库（未核实）".into()
+                "当前价格（待核实）".into()
             },
             kind: "catalog".into(),
             url: catalog_source.clone().unwrap_or_default(),
@@ -478,10 +505,28 @@ pub fn build_comparison(
             unit: p.unit.clone(),
             input: p.input,
             output: p.output,
+            cached_input: p.cached_input,
+            cache_write: p.cache_write,
+            cache_write_long: p.cache_write_long,
             note: p.note.clone(),
             fetched_at: catalog_verified_at.clone(),
-            trusted: catalog_verified,
+            trusted,
         });
+    }
+
+    if let Some(entry) = builtin {
+        if let Some(p) = &entry.price {
+            let trusted = catalog::verified_record(entry.verified, entry.source.as_deref(), entry.verified_at.as_deref());
+            sources.push(PriceSource {
+                name: if trusted { "内置官方资料（已核实）".into() } else { "内置资料（待核实）".into() },
+                kind: "builtin".into(),
+                url: entry.source.clone().unwrap_or_default(),
+                currency: p.currency.clone(), unit: p.unit.clone(),
+                input: p.input, output: p.output,
+                cached_input: p.cached_input, cache_write: p.cache_write, cache_write_long: p.cache_write_long,
+                note: p.note.clone(), fetched_at: entry.verified_at.clone(), trusted,
+            });
+        }
     }
 
     if let Some(scan) = page {
@@ -498,6 +543,9 @@ pub fn build_comparison(
                 unit: p.unit,
                 input: p.input,
                 output: p.output,
+                cached_input: p.cached_input,
+                cache_write: p.cache_write,
+                cache_write_long: p.cache_write_long,
                 note: p.note,
                 fetched_at: Some(scan.fetched_at.clone()),
                 trusted: false,
@@ -514,6 +562,9 @@ pub fn build_comparison(
             unit: "每 1M tokens".into(),
             input: r.input,
             output: r.output,
+            cached_input: None,
+            cache_write: None,
+            cache_write_long: None,
             note: Some("OpenRouter 公开的聚合价格，仅作旁证，不一定等于官方直连价".into()),
             fetched_at: Some(Local::now().to_rfc3339()),
             trusted: false,
@@ -521,20 +572,30 @@ pub fn build_comparison(
     }
 
     let (confidence, confidence_reason) = grade(&sources);
-    let suggested = sources
+    let suggested_source = sources
         .iter()
-        .find(|s| s.kind == "official_page" && (s.input.is_some() || s.output.is_some()))
-        .or_else(|| sources.iter().find(|s| s.trusted))
-        .or_else(|| sources.first())
-        .map(|s| ModelPrice {
+        .filter(|s| s.trusted && values(s).into_iter().any(|v| v.is_some()))
+        .max_by_key(|s| (
+            s.fetched_at.as_deref().and_then(|at| chrono::DateTime::parse_from_rfc3339(at).ok())
+                .map(|at| at.timestamp_millis()).unwrap_or(i64::MIN),
+            values(s).into_iter().filter(Option::is_some).count(),
+        ))
+        .or_else(|| sources.iter().find(|s| s.kind == "official_page" && values(s).into_iter().any(|v| v.is_some())))
+        .or_else(|| sources.iter().find(|s| values(s).into_iter().any(|v| v.is_some())))
+        .cloned();
+    let suggested = suggested_source.as_ref().map(|s| ModelPrice {
             currency: s.currency.clone(),
             unit: s.unit.clone(),
             input: s.input,
             output: s.output,
+            cached_input: s.cached_input,
+            cache_write: s.cache_write,
+            cache_write_long: s.cache_write_long,
             note: Some(format!("来自「{}」（{}）", s.name, s.url)),
         });
 
     PriceComparison {
+        suggested_source,
         model_id: model_id.to_string(),
         model_name: model_name.to_string(),
         provider: provider.to_string(),
@@ -616,11 +677,15 @@ mod tests {
             trusted: true,
             input: Some(1.0),
             output: Some(2.0),
+            url: "https://official.example/pricing".into(),
+            currency: "CNY".into(),
+            unit: "每 1M tokens".into(),
             ..Default::default()
         };
         let mut b = a.clone();
         b.name = "b".into();
         b.kind = "official_page".into();
+        b.url = "https://reference.example/pricing".into();
         b.trusted = false;
         b.input = Some(1.05);
         b.output = Some(2.02);

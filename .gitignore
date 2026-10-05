@@ -19,3 +19,14 @@ Thumbs.db
 
 # 临时截图（不入库）
 shot.png
+
+# 本地验证输出、工作树与临时官网抓取
+/target/
+/.aitier-page.html
+/.harness-*
+/.kimi-pricing.md
+/.mimo-main.js
+/.mimo-price-doc.js
+/.mimo-pricing.html
+/.official-*-pricing.md
+/feishu-login-qr.png

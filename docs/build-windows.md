@@ -18,3 +18,5 @@ npm run tauri build
 安装包在 `src-tauri/target/release/bundle/nsis/`；可执行文件是 `src-tauri/target/release/quota.exe`。在真实安装并确保没有同名旧进程后，用 `scripts/check-install.ps1` 对默认位置 `%LOCALAPPDATA%\Quota\quota.exe` 做启动检查；如果升级保留了自定义安装目录，传入 `-ExePath`。脚本只结束它启动的实例。NSIS 工具链首次下载可能需要网络代理。
 
 本机 `cargo test` 曾在加载 tauri-winrt-notification 的 WinRT API-set DLL 时失败（`STATUS_ENTRYPOINT_NOT_FOUND`）。`cargo check` 可做 Rust 类型检查；签名与解析等纯逻辑另由 `scripts/verify-logic.cjs` 验证。可运行 `src-tauri/examples/` 中的例子做特定逻辑检查。
+
+标准打包命令 npm run tauri build 现在经过 scripts/tauri.cjs：构建前核对各根包版本、归档旧安装包，成功后以 A.B.FFBB 命名唯一安装包；归档位于 src-tauri/target/installer-archive。直接运行 npx tauri 会绕过此检查。

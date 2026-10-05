@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    #[serde(default = "enabled")]
+    pub notify_recharge: bool,
+    #[serde(default = "enabled")]
+    pub tray_alert: bool,
+    #[serde(default = "enabled")]
+    pub ladder_auto_update: bool,
     /// 是否开启后台自动刷新
     pub auto_refresh: bool,
     /// 自动刷新间隔（分钟）
@@ -19,6 +25,9 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            notify_recharge: true,
+            tray_alert: true,
+            ladder_auto_update: true,
             auto_refresh: true,
             refresh_interval_minutes: 30,
             notify_low_balance: true,
@@ -27,6 +36,8 @@ impl Default for Settings {
         }
     }
 }
+
+fn enabled() -> bool { true }
 
 /// 一个模型供应商账户（API Key 单独保存在系统凭据管理器中，不写入本文件）
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -51,6 +62,10 @@ pub struct Account {
     pub manual_balance: Option<f64>,
     #[serde(default)]
     pub manual_currency: Option<String>,
+    pub manual_recharge_total: Option<f64>,
+    pub manual_spend_total: Option<f64>,
+    pub manual_recharge_currency: Option<String>,
+    pub manual_spend_currency: Option<String>,
     #[serde(default)]
     pub note: Option<String>,
     /// 余额获取方式：auto（按官方接口）/ custom（自定义余额接口）/ manual（手动余额）
@@ -128,6 +143,7 @@ pub struct RemoteModel {
 #[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountStatus {
+    pub subscription: Option<crate::subscription::Subscription>,
     pub balance: Option<Balance>,
     pub models: Vec<RemoteModel>,
     pub last_checked: Option<String>,
@@ -150,6 +166,10 @@ pub struct AccountView {
     pub low_balance_threshold: f64,
     pub manual_balance: Option<f64>,
     pub manual_currency: Option<String>,
+    pub manual_recharge_total: Option<f64>,
+    pub manual_spend_total: Option<f64>,
+    pub manual_recharge_currency: Option<String>,
+    pub manual_spend_currency: Option<String>,
     /// 余额获取方式：auto | custom | manual
     pub balance_mode: String,
     pub custom_url: Option<String>,
@@ -195,6 +215,8 @@ pub struct AccountView {
 #[serde(rename_all = "camelCase")]
 pub struct AccountInput {
     #[serde(default)]
+    pub connection_id: Option<String>,
+    #[serde(default)]
     pub id: Option<String>,
     pub provider: String,
     pub label: String,
@@ -210,6 +232,10 @@ pub struct AccountInput {
     pub manual_balance: Option<f64>,
     #[serde(default)]
     pub manual_currency: Option<String>,
+    pub manual_recharge_total: Option<f64>,
+    pub manual_spend_total: Option<f64>,
+    pub manual_recharge_currency: Option<String>,
+    pub manual_spend_currency: Option<String>,
     #[serde(default)]
     pub note: Option<String>,
     // ---- 其他获取方式 ----
@@ -240,6 +266,25 @@ pub struct AccountInput {
     /// MiMo 控制台 Cookie（浏览器小米账号 SSO 会话），仅写入凭据管理器
     #[serde(default)]
     pub console_cookie: Option<String>,
+}
+
+impl AccountInput {
+    pub fn validate_numbers(&self) -> Result<(), String> {
+        if self.low_balance_threshold.is_some_and(|v| !v.is_finite() || v < 0.0) {
+            return Err("提醒阈值须为有限非负数".into());
+        }
+        if self.manual_recharge_total.is_some_and(|v| !v.is_finite() || v < 0.0) { return Err("累计充值须为有限非负数".into()); }
+        if self.manual_recharge_total.is_some() && !matches!(self.manual_recharge_currency.as_deref(), Some("CNY" | "USD")) { return Err("累计充值币种须为 CNY 或 USD".into()); }
+        if self.manual_spend_total.is_some_and(|v| !v.is_finite() || v < 0.0) { return Err("累计消费须为有限非负数".into()); }
+        if self.manual_spend_total.is_some() && !matches!(self.manual_spend_currency.as_deref(), Some("CNY" | "USD")) { return Err("累计消费币种须为 CNY 或 USD".into()); }
+        if let Some(v) = self.manual_balance {
+            if !v.is_finite() { return Err("手动余额须为有限数值".into()); }
+            if self.manual_currency.as_deref().is_some_and(|c| c.trim() == "%") && !(0.0..=100.0).contains(&v) {
+                return Err("剩余百分比须在 0–100 之间".into());
+            }
+        }
+        Ok(())
+    }
 }
 
 /// 「订阅 / 账单」快捷入口（只做跳转，不代管支付）
@@ -321,6 +366,12 @@ impl Default for AppConfig {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelPrice {
+    #[serde(default)]
+    pub cached_input: Option<f64>,
+    #[serde(default)]
+    pub cache_write: Option<f64>,
+    #[serde(default)]
+    pub cache_write_long: Option<f64>,
     #[serde(default)]
     pub currency: String,
     #[serde(default)]
@@ -417,13 +468,16 @@ pub struct ModelCard {
 pub struct PriceSource {
     /// 展示名，如「内置资料库」「官方定价页」
     pub name: String,
-    /// catalog | official_page | reference
+    /// catalog | builtin | official_page | reference
     pub kind: String,
     pub url: String,
     pub currency: String,
     pub unit: String,
     pub input: Option<f64>,
     pub output: Option<f64>,
+    pub cached_input: Option<f64>,
+    pub cache_write: Option<f64>,
+    pub cache_write_long: Option<f64>,
     pub note: Option<String>,
     /// 抓取/记录时间（RFC3339）
     pub fetched_at: Option<String>,
@@ -435,6 +489,7 @@ pub struct PriceSource {
 #[derive(Serialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PriceComparison {
+    pub suggested_source: Option<PriceSource>,
     pub model_id: String,
     pub model_name: String,
     pub provider: String,

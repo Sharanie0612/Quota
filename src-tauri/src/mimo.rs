@@ -93,6 +93,9 @@ pub struct MimoMoney {
     pub gift: Option<f64>,
     pub frozen: Option<f64>,
     pub overdraft: Option<f64>,
+    /// Only explicit cumulative fields, never the current cash balance.
+    pub cumulative_recharge: Option<f64>,
+    pub cumulative_spend: Option<f64>,
     pub currency: String,
     /// 结构变动时发现的其他数值字段，方便排查
     pub discovered: Vec<(String, f64)>,
@@ -115,6 +118,8 @@ pub fn parse_balance(text: &str) -> Result<MimoMoney, String> {
         gift: get("giftBalance"),
         frozen: get("frozenBalance"),
         overdraft: get("overdraftLimit"),
+        cumulative_recharge: get("cumulativeRecharge").or_else(|| get("totalRechargeAmount")).or_else(|| get("totalRecharge")),
+        cumulative_spend: get("totalSpendAmount").or_else(|| get("cumulativeSpend")).or_else(|| get("totalConsumption")),
         currency: data
             .get("currency")
             .and_then(|c| c.as_str())
@@ -155,7 +160,7 @@ impl PlanInfo {
     pub fn summary(&self) -> String {
         let mut parts = vec![format!("{} 套餐", self.plan_name)];
         if !self.current_period_end.is_empty() {
-            let day = &self.current_period_end[..10.min(self.current_period_end.len())];
+            let day: String = self.current_period_end.chars().take(10).collect();
             parts.push(format!("当前期至 {day}"));
         }
         if self.expired {
@@ -206,7 +211,7 @@ fn check_envelope(v: &Value, what: &str) -> Result<(), String> {
     let msg = v.get("message").or_else(|| v.get("msg")).and_then(|m| m.as_str()).unwrap_or("");
     if code == 401 {
         return Err(
-            "MiMo 控制台 Cookie 已失效或未登录，请到浏览器重新复制 Cookie（打开 platform.xiaomimimo.com 后 F12 → Network → 任意请求 → 复制 Cookie 请求头）"
+            "小米登录已过期，请编辑账户并重新登录"
                 .into(),
         );
     }
@@ -285,14 +290,16 @@ pub async fn fetch_console(
 
     // 2) 套餐额度 + 本月用量
     let usage_url = format!("{CONSOLE_BASE}/tokenPlan/usage");
-    let usage_text = get_json(client, &usage_url, cookie)
-        .send()
-        .await
-        .map_err(|e| format!("请求 MiMo 用量接口失败：{e}"))?
-        .text()
-        .await
-        .unwrap_or_default();
-    let quotas = parse_token_plan_usage(&usage_text)?;
+    let usage_text = match get_json(client, &usage_url, cookie).send().await {
+        Ok(response) => response.text().await.unwrap_or_default(),
+        Err(_) if money.is_some() && provider_id == "mimo" => String::new(),
+        Err(_) => return Err("同步失败，请稍后重试".into()),
+    };
+    let quotas = match parse_token_plan_usage(&usage_text) {
+        Ok(quotas) => quotas,
+        Err(_) if money.is_some() && provider_id == "mimo" => Vec::new(),
+        Err(e) => return Err(e),
+    };
 
     // 3) 套餐详情（套餐名 / 到期时间 / 自动续费），没有套餐就跳过
     let plan_info = match get_json(client, &format!("{CONSOLE_BASE}/tokenPlan/detail"), cookie)
@@ -305,11 +312,14 @@ pub async fn fetch_console(
 
     if money.is_none() && quotas.is_empty() {
         return Err(money_err.unwrap_or_else(|| {
-            "MiMo 控制台没有返回余额或额度数据（Cookie 可能已失效，请重新复制）。".into()
+            "小米暂未返回数据，请重新连接或稍后重试".into()
         }));
     }
 
     let plan = quotas.iter().find(|q| q.name == "plan_total_token");
+    if provider_id == "mimo-plan" && plan.and_then(|q| q.remaining()).is_none() {
+        return Err("未找到有效小米订阅，请在官网查看套餐".into());
+    }
     let month = quotas.iter().find(|q| q.name == "month_total_token");
     let mut amounts = Vec::new();
     let mut total: Option<f64> = None;
@@ -329,7 +339,10 @@ pub async fn fetch_console(
         .unwrap_or_default();
     let plan_text = plan_info.as_ref().map(|p| p.summary()).unwrap_or_default();
 
-    if provider_id == "mimo-plan" && plan.and_then(|q| q.remaining()).is_some() {
+    if provider_id == "mimo-plan" && plan.and_then(|q| q.remaining()).is_none() {
+        return Err("未找到有效的小米订阅，请确认已开通 Token Plan".into());
+    }
+    if provider_id == "mimo-plan" {
         // 订阅账户：大数字 = 套餐剩余额度
         let p = plan.unwrap();
         currency = "CREDITS".into();
@@ -366,8 +379,14 @@ pub async fn fetch_console(
             if let Some(v) = m.cash {
                 amounts.push(BalanceAmount { label: "现金余额".into(), value: v, kind: "cash".into() });
             }
-            if let Some(v) = m.gift.filter(|v| *v > 0.0) {
+            if let Some(v) = m.gift {
                 amounts.push(BalanceAmount { label: "赠送余额".into(), value: v, kind: "granted".into() });
+            }
+            if let Some(v) = m.cumulative_recharge.filter(|value| value.is_finite() && *value >= 0.0) {
+                amounts.push(BalanceAmount { label: "累计充值".into(), value: v, kind: "cumulative_recharge".into() });
+            }
+            if let Some(v) = m.cumulative_spend.filter(|value| value.is_finite() && *value >= 0.0) {
+                amounts.push(BalanceAmount { label: "累计消费".into(), value: v, kind: "cumulative_spend".into() });
             }
             if let Some(v) = m.frozen.filter(|v| *v > 0.0) {
                 amounts.push(BalanceAmount { label: "冻结".into(), value: v, kind: "frozen".into() });
@@ -401,9 +420,7 @@ pub async fn fetch_console(
     }
 
     if note.is_empty() {
-        note = "来自 MiMo 控制台接口（platform.xiaomimimo.com，需浏览器 Cookie）".into();
-    } else {
-        note.push_str(" ·来自 MiMo 控制台接口");
+        note = "已同步小米账户".into();
     }
 
     Ok(Balance {

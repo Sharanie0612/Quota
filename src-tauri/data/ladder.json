@@ -1,0 +1,7234 @@
+{
+  "updatedAt": "2026-10-03T18:00:00+08:00",
+  "checkedAt": null,
+  "source": "https://aitier.net/zh",
+  "entries": [
+    {
+      "id": "gpt-6-astra",
+      "name": "GPT-6 Astra (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 26,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 7,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 7,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 1,
+          "score": 77,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 8,
+          "score": 70,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 10,
+        "output": 50,
+        "note": "Standard 短上下文，非缓存",
+        "cachedInput": 1,
+        "cacheWrite": 12.5,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-1-sol",
+      "name": "GPT-6.1 Sol (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 20,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 11,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 43,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 56,
+          "score": 56,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 40,
+          "score": 50,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 2,
+        "output": 10,
+        "note": "Standard 短上下文，非缓存",
+        "cachedInput": 0.1,
+        "cacheWrite": 2.5,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna",
+      "name": "GPT-6 Luna (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 24,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 119,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 121,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 0.1,
+        "output": 0.5,
+        "note": "Standard 短上下文，非缓存",
+        "cachedInput": 0.01,
+        "cacheWrite": 0.125,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://developers.openai.com/api/docs/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-5",
+      "name": "Claude Opus 5.5 (Max, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "science": {
+          "rank": 1,
+          "score": 100,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 1,
+          "score": 100,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 9,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 5,
+          "score": 68,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 13,
+          "score": 65,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 4,
+        "output": 20,
+        "note": "全球标准 API，非缓存",
+        "cachedInput": 0.2,
+        "cacheWrite": 5,
+        "cacheWriteLong": 8
+      },
+      "priceSource": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5 (Max, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "general": {
+          "rank": 2,
+          "score": 97,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 35,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 10,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 14,
+          "score": 63,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 2,
+        "output": 10,
+        "note": "全球标准 API，非缓存",
+        "cachedInput": 0.2,
+        "cacheWrite": 2.5,
+        "cacheWriteLong": 4
+      },
+      "priceSource": "https://platform.claude.com/docs/en/about-claude/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-8-flash",
+      "name": "Gemini 3.8 Flash (High)",
+      "vendor": "Google",
+      "provider": "gemini",
+      "rankings": {
+        "coding": {
+          "rank": 32,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 25,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 78,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 34,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "USD",
+        "unit": "每百万 tokens",
+        "input": 0.75,
+        "output": 3.75,
+        "note": "Standard 付费档；官方优惠至 2026-12-31，之后输入 $1.50 / 输出 $7.50",
+        "cachedInput": 0.075,
+        "cacheWrite": null,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://ai.google.dev/gemini-api/docs/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-1-flash",
+      "name": "DeepSeek V4.1 Flash (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 13,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 4,
+          "score": 73,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 134,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 100,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 49,
+          "score": 48,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 2,
+        "output": 8,
+        "note": "高峰标准价，非缓存",
+        "cachedInput": 0.04,
+        "cacheWrite": null,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro 0813 (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 88,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 71,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 150,
+          "score": 60,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 9,
+        "output": 27,
+        "note": "高峰标准价，非缓存",
+        "cachedInput": 0.3,
+        "cacheWrite": null,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://api-docs.deepseek.com/zh-cn/quick_start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "kimi-k3",
+      "name": "Kimi K3 (Max)",
+      "vendor": "Kimi",
+      "provider": "moonshot",
+      "rankings": {
+        "coding": {
+          "rank": 8,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 22,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 49,
+          "score": 74,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 9,
+          "score": 70,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 30,
+          "score": 55,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 20,
+        "output": 100,
+        "note": "缓存命中输入 ¥2；缓存写入 5 分钟 TTL ¥20、1 小时 TTL ¥40",
+        "cachedInput": 2,
+        "cacheWrite": 20,
+        "cacheWriteLong": 40
+      },
+      "priceSource": "https://platform.kimi.com/docs/pricing/chat",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "glm-5-3",
+      "name": "GLM-5.3 (Max)",
+      "vendor": "Z AI",
+      "provider": "zhipu",
+      "rankings": {
+        "coding": {
+          "rank": 49,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 38,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 39,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 31,
+          "score": 54,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "input": 8,
+        "output": 28,
+        "cachedInput": 2,
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "cacheWrite": null,
+        "cacheWriteLong": null,
+        "note": "官方标准首档；缓存存储限时免费"
+      },
+      "priceSource": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-6-pro",
+      "name": "MiMo-V2.6-Pro",
+      "vendor": "Xiaomi",
+      "provider": "mimo",
+      "rankings": {
+        "coding": {
+          "rank": 4,
+          "score": 97,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 30,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 32,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 41,
+          "score": 59,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 26,
+          "score": 57,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 3,
+        "output": 6,
+        "note": "国内实时标准价，非缓存",
+        "cachedInput": 0.025,
+        "cacheWrite": 0,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-6-flash",
+      "name": "MiMo-V2.6-Flash",
+      "vendor": "Xiaomi",
+      "provider": "mimo",
+      "rankings": {
+        "coding": {
+          "rank": 102,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 162,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 122,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 58,
+          "score": 56,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 1,
+        "output": 2,
+        "note": "国内实时标准价，非缓存",
+        "cachedInput": 0.02,
+        "cacheWrite": 0,
+        "cacheWriteLong": null
+      },
+      "priceSource": "https://mimo.mi.com/docs/zh-CN/price/pay-as-you-go",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "wan-3-0",
+      "name": "Wan 3.0",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "video-gen": {
+          "rank": 1,
+          "score": 100,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-09-30T10:00:00.947Z"
+        },
+        "image-to-video": {
+          "rank": 4,
+          "score": 98,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-omni-flash",
+      "name": "Gemini Omni Flash",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "image-to-video": {
+          "rank": 1,
+          "score": 100,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "video-gen": {
+          "rank": 2,
+          "score": 99,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-09-30T10:00:00.947Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-2026-09-08",
+      "name": "GPT Image 2.5 Sunburst (max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "image-gen": {
+          "rank": 1,
+          "score": 100,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-image-2.5-flare-2026-09-08",
+      "name": "GPT Image 2.5 Flare (max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "image-gen": {
+          "rank": 2,
+          "score": 99,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5-1",
+      "name": "Claude Fable 5.1 (Max, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 2,
+          "score": 99,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 2,
+          "score": 96,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 5,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 19,
+          "score": 63,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 43,
+          "score": 49,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-5-xhigh",
+      "name": "Claude Opus 5.5 (Xhigh, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "general": {
+          "rank": 3,
+          "score": 97,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 3,
+          "score": 96,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 10,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5-1-xhigh",
+      "name": "Claude Fable 5.1 (Xhigh, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 3,
+          "score": 97,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 4,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 6,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5-1-low",
+      "name": "Claude Fable 5.1 (Low, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 1,
+          "score": 97,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 3,
+          "score": 92,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 41,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 31,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 27,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-astra-low",
+      "name": "GPT-6 Astra (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 6,
+          "score": 97,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 2,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 42,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 28,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 35,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-5-low",
+      "name": "Claude Opus 5.5 (Low, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 2,
+          "score": 97,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 8,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 52,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 53,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 58,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-1-sol-low",
+      "name": "GPT-6.1 Sol (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 12,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 12,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 7,
+          "score": 92,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 87,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 60,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-5-low",
+      "name": "Claude Sonnet 5.5 (Low, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 9,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 26,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 93,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 168,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 151,
+          "score": 60,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-low",
+      "name": "Claude Opus 5 (Low)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 8,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 9,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 96,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 76,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 101,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5",
+      "name": "Claude Fable 5 (Max, Opus 4.8 Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 7,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 15,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 5,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 13,
+          "score": 90,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 19,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 16,
+          "score": 64,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 36,
+          "score": 51,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol-non-reasoning",
+      "name": "GPT-5.6 Sol (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 11,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 6,
+          "score": 92,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 130,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 209,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol-non-reasoning",
+      "name": "GPT-6 Sol (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 13,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 20,
+          "score": 89,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 169,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 293,
+          "score": 48,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 257,
+          "score": 47,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5-1-high",
+      "name": "Claude Fable 5.1 (High, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 5,
+          "score": 96,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 9,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 13,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol",
+      "name": "GPT-5.6 Sol (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 6,
+          "score": 96,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 20,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 24,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 11,
+          "score": 64,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 36,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-non-reasoning",
+      "name": "GPT-5.5 (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 10,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 14,
+          "score": 90,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 173,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 277,
+          "score": 49,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 246,
+          "score": 48,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-7-low",
+      "name": "Grok 4.7 (Low)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "math": {
+          "rank": 14,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 62,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 37,
+          "score": 83,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 114,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 59,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-spark-1-3-xhigh",
+      "name": "Muse Spark 1.3 (Xhigh)",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "math": {
+          "rank": 15,
+          "score": 96,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 17,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 16,
+          "score": 90,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 21,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 37,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra-non-reasoning",
+      "name": "GPT-5.6 Terra (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 16,
+          "score": 95,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 10,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 211,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 245,
+          "score": 52,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol-xhigh",
+      "name": "GPT-5.6 Sol (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 7,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 24,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 29,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-5-medium",
+      "name": "Claude Opus 5.5 (Medium, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 11,
+          "score": 95,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 16,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 12,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol-medium",
+      "name": "GPT-5.6 Sol (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 19,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 40,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 50,
+          "score": 74,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-imagine-image-2-0",
+      "name": "Grok Imagine Image 2.0",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "image-gen": {
+          "rank": 4,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen-audio-3-1-tts-plus",
+      "name": "Qwen-Audio-3.1-TTS-Plus",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "audio": {
+          "rank": 2,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol",
+      "name": "GPT-6 Sol (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 22,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 26,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 60,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 29,
+          "score": 55,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 78,
+          "score": 52,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol-high",
+      "name": "GPT-6 Sol (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 23,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 93,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 57,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-fable-5-1-medium",
+      "name": "Claude Fable 5.1 (Medium, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 16,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 18,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 21,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Claude Opus 4.8 (Max)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 17,
+          "score": 94,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 53,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 17,
+          "score": 89,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 33,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 41,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 10,
+          "score": 69,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 34,
+          "score": 53,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-1-sol-medium",
+      "name": "GPT-6.1 Sol (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 21,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 25,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 70,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol-high",
+      "name": "GPT-5.6 Sol (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 18,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 29,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 40,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5",
+      "name": "Claude Opus 5 (Max)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 14,
+          "score": 94,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 12,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 16,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 53,
+          "score": 56,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-spark-1-3",
+      "name": "Muse Spark 1.3 (Max)",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "coding": {
+          "rank": 30,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 19,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 23,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 4,
+          "score": 70,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 68,
+          "score": 54,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-xhigh",
+      "name": "Claude Opus 5 (Xhigh)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 28,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 13,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 18,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-7-flash",
+      "name": "Gemini 3.7 Flash (High)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "coding": {
+          "rank": 33,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 23,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 108,
+          "score": 66,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 64,
+          "score": 54,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-5-high",
+      "name": "Claude Opus 5.5 (High, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 36,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 4,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 11,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-1-sol-high",
+      "name": "GPT-6.1 Sol (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 37,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 17,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 45,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-6",
+      "name": "Grok 4.6 (High)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "coding": {
+          "rank": 31,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 39,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 43,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5",
+      "name": "GPT-5.5 (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 34,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 35,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 34,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 21,
+          "score": 62,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 38,
+          "score": 50,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-7-flash-low",
+      "name": "Gemini 3.7 Flash (Low)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "math": {
+          "rank": 22,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 74,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 21,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 77,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 136,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-astra-high",
+      "name": "GPT-6 Astra (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 27,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 15,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 14,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-6-low",
+      "name": "Grok 4.6 (Low)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "math": {
+          "rank": 24,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 11,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 98,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 135,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 158,
+          "score": 59,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-non-reasoning",
+      "name": "Claude Sonnet 5 (Non-reasoning, High)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 20,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 18,
+          "score": 89,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 121,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 226,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol-medium",
+      "name": "GPT-6 Sol (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 38,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 115,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 96,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-astra-medium",
+      "name": "GPT-6 Astra (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 29,
+          "score": 93,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 17,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 20,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-1-flash-non-reasoning",
+      "name": "DeepSeek V4.1 Flash (Non-reasoning)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "math": {
+          "rank": 21,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 27,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 232,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-4-7-non-reasoning",
+      "name": "Claude Opus 4.7 (Non-reasoning, High)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "math": {
+          "rank": 19,
+          "score": 93,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 25,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 103,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 106,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 193,
+          "score": 55,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-6-xhigh",
+      "name": "Grok 4.6 (Xhigh)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "coding": {
+          "rank": 44,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 46,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 46,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra",
+      "name": "GPT-5.6 Terra (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 45,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 48,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 33,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 72,
+          "score": 53,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 58,
+          "score": 47,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-8-flash-medium",
+      "name": "Gemini 3.8 Flash (Medium)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "coding": {
+          "rank": 46,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 49,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 97,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol-xhigh",
+      "name": "GPT-6 Sol (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 47,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 74,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 45,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-max",
+      "name": "Qwen3.8 Max (0902)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 43,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 31,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 24,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 1,
+          "score": 84,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 62,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 36,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 18,
+          "score": 61,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-8-flash-low",
+      "name": "Gemini 3.8 Flash (Low)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "math": {
+          "rank": 25,
+          "score": 92,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 58,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 19,
+          "score": 89,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 72,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 187,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-astra-xhigh",
+      "name": "GPT-6 Astra (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 39,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 9,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 8,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-high",
+      "name": "Claude Opus 5 (High)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 40,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 15,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 22,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-imagine-video-1.5",
+      "name": "grok-imagine-video-1.5",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "image-to-video": {
+          "rank": 7,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-4-argon",
+      "name": "Gemini 4 Argon (High)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "science": {
+          "rank": 6,
+          "score": 92,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 8,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 59,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-5",
+      "name": "Grok 4.5 (High)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "math": {
+          "rank": 29,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 66,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 28,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 51,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 109,
+          "score": 66,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 21,
+          "score": 59,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "kimi-k3-low",
+      "name": "Kimi K3 (Low)",
+      "vendor": "Kimi",
+      "provider": "kimi",
+      "rankings": {
+        "reasoning": {
+          "rank": 12,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 76,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 47,
+          "score": 84,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 143,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 233,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 20,
+        "output": 100,
+        "note": "缓存命中输入 ¥2；缓存写入 5 分钟 TTL ¥20、1 小时 TTL ¥40",
+        "cachedInput": 2,
+        "cacheWrite": 20,
+        "cacheWriteLong": 40
+      },
+      "priceSource": "https://platform.kimi.com/docs/pricing/chat",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-pro-non-reasoning",
+      "name": "DeepSeek V4 Pro 0813 (Non-reasoning)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "math": {
+          "rank": 26,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 35,
+          "score": 83,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 263,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-6-medium",
+      "name": "Grok 4.6 (Medium)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "coding": {
+          "rank": 50,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 47,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 54,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-spark-1-2",
+      "name": "Muse Spark 1.2 (Xhigh)",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "math": {
+          "rank": 30,
+          "score": 91,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 15,
+          "score": 90,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 72,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 34,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 99,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-5-medium",
+      "name": "Claude Opus 5 (Medium)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 48,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 32,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 38,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-8-flash-tts",
+      "name": "Gemini 3.8 Flash TTS",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 3,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-high",
+      "name": "GPT-5.5 (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 51,
+          "score": 91,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 36,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 44,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra-xhigh",
+      "name": "GPT-5.6 Terra (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 56,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 65,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 67,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-7-flash-medium",
+      "name": "Gemini 3.7 Flash (Medium)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "coding": {
+          "rank": 55,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 50,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 98,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-flash-next",
+      "name": "Qwen3.8-Flash-Next",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 54,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 29,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 43,
+          "score": 86,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 88,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 95,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 9,
+          "score": 65,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 39,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-5-xhigh",
+      "name": "Claude Sonnet 5.5 (Xhigh, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "general": {
+          "rank": 10,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 60,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 42,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna",
+      "name": "GPT-5.6 Luna (Max)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 57,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 66,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 128,
+          "score": 63,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna-xhigh",
+      "name": "GPT-6 Luna (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 63,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 163,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 167,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "glm-5-2-non-reasoning",
+      "name": "GLM-5.2 (Non-reasoning)",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "math": {
+          "rank": 32,
+          "score": 90,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 44,
+          "score": 79,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 276,
+          "score": 54,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-1-sol-xhigh",
+      "name": "GPT-6.1 Sol (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 61,
+          "score": 90,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 14,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 44,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "glm-5-3-flash",
+      "name": "GLM 5.3 Flash",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "coding": {
+          "rank": 64,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 49,
+          "score": 81,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 46,
+          "score": 78,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 75,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 66,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 11,
+          "score": 66,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 28,
+          "score": 55,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "input": 0.8,
+        "output": 2.8,
+        "cachedInput": 0.23,
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "cacheWrite": null,
+        "cacheWriteLong": null,
+        "note": "官方标准首档；缓存存储限时免费"
+      },
+      "priceSource": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "muse-image-1.0",
+      "name": "Muse Image",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "image-gen": {
+          "rank": 8,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-medium",
+      "name": "GPT-5.5 (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 68,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 57,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 61,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-2-4t-a95b",
+      "name": "Qwen3.8 2.4T A95B",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 65,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 56,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 89,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna-high",
+      "name": "GPT-6 Luna (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 70,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 175,
+          "score": 63,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 192,
+          "score": 55,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-sol-low",
+      "name": "GPT-6 Sol (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 69,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 169,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 175,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna-non-reasoning",
+      "name": "GPT-6 Luna (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 34,
+          "score": 89,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 41,
+          "score": 82,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5",
+      "name": "Claude Sonnet 5 (Max)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 67,
+          "score": 89,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 63,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 120,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 54,
+          "score": 56,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen-audio-3-0-tts-plus",
+      "name": "Qwen-Audio-3.0-TTS-Plus",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "audio": {
+          "rank": 5,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-5-flash",
+      "name": "Gemini 3.5 Flash (High)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "math": {
+          "rank": 36,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 40,
+          "score": 82,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 59,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 122,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 52,
+          "score": 74,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 26,
+          "score": 61,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 20,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-max-0803",
+      "name": "Qwen3.8 Max",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 71,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 55,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 88,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-5-high",
+      "name": "Claude Sonnet 5.5 (High, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 77,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 28,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 92,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "glm-5-3-low",
+      "name": "GLM-5.3 (Low)",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "math": {
+          "rank": 37,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 30,
+          "score": 86,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 111,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 207,
+          "score": 59,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 174,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-spark-1-1",
+      "name": "Muse Spark 1.1 (Xhigh)",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "reasoning": {
+          "rank": 23,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 84,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 40,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 37,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 8,
+          "score": 65,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 37,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 184,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash-vision-exp",
+      "name": "DeepSeek-V4-Flash-Vision-Exp",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "math": {
+          "rank": 35,
+          "score": 88,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 32,
+          "score": 85,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 30,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-sol-low",
+      "name": "GPT-5.6 Sol (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 75,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 67,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 110,
+          "score": 66,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna-medium",
+      "name": "GPT-6 Luna (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 79,
+          "score": 88,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 208,
+          "score": 59,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 239,
+          "score": 49,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash 0731 (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 82,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 50,
+          "score": 80,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 89,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 51,
+          "score": 71,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 173,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-opus-4-7",
+      "name": "Claude Opus 4.7 (Max)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 80,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 54,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 55,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 6,
+          "score": 67,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 83,
+          "score": 50,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna-xhigh",
+      "name": "GPT-5.6 Luna (Xhigh)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 81,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 94,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 168,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-6-flash",
+      "name": "Gemini 3.6 Flash (High)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "coding": {
+          "rank": 83,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 41,
+          "score": 86,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 33,
+          "score": 85,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 64,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 33,
+          "score": 60,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 176,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna-non-reasoning",
+      "name": "GPT-5.6 Luna (Non-reasoning)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "math": {
+          "rank": 39,
+          "score": 87,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 31,
+          "score": 86,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 313,
+          "score": 48,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-7-high",
+      "name": "Grok 4.7 (High)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "coding": {
+          "rank": 86,
+          "score": 87,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 31,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 86,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-high",
+      "name": "Claude Sonnet 5 (High)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 95,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 141,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 209,
+          "score": 53,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen-image-3-0-pro",
+      "name": "Qwen-Image-3.0-Pro",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "image-gen": {
+          "rank": 14,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "nano-banana-2-lite",
+      "name": "Nano Banana 2 Lite (Gemini 3.1 Flash Lite Image)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "image-gen": {
+          "rank": 13,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-27b-non-reasoning",
+      "name": "Qwen3.8 27B (Non-reasoning)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "math": {
+          "rank": 42,
+          "score": 86,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 43,
+          "score": 80,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 222,
+          "score": 63,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 263,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-27b",
+      "name": "Qwen3.8 27B (Xhigh)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 89,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 6,
+          "score": 72,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 116,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 185,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-5-medium",
+      "name": "Claude Sonnet 5.5 (Medium, Default Fallback)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 92,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 118,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 79,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-xhigh",
+      "name": "Claude Sonnet 5 (Xhigh)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 94,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 120,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 169,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-7",
+      "name": "Grok 4.7 (Xhigh)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "coding": {
+          "rank": 91,
+          "score": 86,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 30,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 85,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-7-max",
+      "name": "Qwen3.7 Max",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "math": {
+          "rank": 44,
+          "score": 85,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 39,
+          "score": 83,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 109,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 82,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 56,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 12,
+          "score": 64,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra-high",
+      "name": "GPT-5.6 Terra (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 97,
+          "score": 85,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 78,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 102,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen-image-3-0",
+      "name": "Qwen-Image-3.0",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "image-gen": {
+          "rank": 16,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-3-non-reasoning",
+      "name": "Grok 4.3 (Non-reasoning)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "math": {
+          "rank": 45,
+          "score": 84,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 53,
+          "score": 71,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "kimi-k2-6-non-reasoning",
+      "name": "Kimi K2.6 (Non-reasoning)",
+      "vendor": "Kimi",
+      "provider": "kimi",
+      "rankings": {
+        "math": {
+          "rank": 46,
+          "score": 84,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 45,
+          "score": 79,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 199,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 51,
+          "score": 57,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 225,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 202,
+          "score": 54,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 35,
+          "score": 52,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 6.5,
+        "output": 27,
+        "note": "缓存命中输入 ¥1.1",
+        "cachedInput": 1.1
+      },
+      "priceSource": "https://platform.kimi.com/docs/pricing/chat",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash-vision",
+      "name": "DeepSeek V4 Flash Vision (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 99,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 101,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 166,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-8-flash-lite-tts",
+      "name": "Gemini 3.8 Flash-Lite TTS",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 7,
+          "score": 84,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-6-luna-low",
+      "name": "GPT-6 Luna (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 107,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 275,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "kimi-k2-7-code",
+      "name": "Kimi K2.7 Code",
+      "vendor": "Kimi",
+      "provider": "kimi",
+      "rankings": {
+        "reasoning": {
+          "rank": 38,
+          "score": 83,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "math": {
+          "rank": 51,
+          "score": 80,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 131,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 109,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 7,
+          "score": 65,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 137,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 6.5,
+        "output": 27,
+        "note": "缓存命中输入 ¥1.3",
+        "cachedInput": 1.3
+      },
+      "priceSource": "https://platform.kimi.com/docs/pricing/chat",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "glm-5-2",
+      "name": "GLM-5.2 (Max)",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "coding": {
+          "rank": 104,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 79,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 48,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 50,
+          "score": 48,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "input": 8,
+        "output": 28,
+        "cachedInput": 2,
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "cacheWrite": null,
+        "cacheWriteLong": null,
+        "note": "官方标准首档；缓存存储限时免费"
+      },
+      "priceSource": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-medium",
+      "name": "Claude Sonnet 5 (Medium)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 106,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 192,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "wan2-7-260612",
+      "name": "Wan2.7-260612",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "video-gen": {
+          "rank": 7,
+          "score": 83,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-09-30T10:00:00.947Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna-high",
+      "name": "GPT-5.6 Luna (High)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 108,
+          "score": 82,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 102,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 208,
+          "score": 53,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-imagine-image-quality",
+      "name": "grok-imagine-image-quality",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "image-gen": {
+          "rank": 18,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-5-flash-medium",
+      "name": "Gemini 3.5 Flash (Medium)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "science": {
+          "rank": 58,
+          "score": 81,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 51,
+          "score": 74,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 168,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-6-27b-non-reasoning",
+      "name": "Qwen3.6 27B (Non-reasoning)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "math": {
+          "rank": 52,
+          "score": 80,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 54,
+          "score": 70,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 267,
+          "score": 55,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 236,
+          "score": 54,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 224,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-low",
+      "name": "GPT-5.5 (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 117,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 103,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 115,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 22,
+          "score": 62,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 39,
+          "score": 50,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra-medium",
+      "name": "GPT-5.6 Terra (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 119,
+          "score": 80,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 107,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 145,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-spark",
+      "name": "Muse Spark",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "science": {
+          "rank": 68,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 146,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 62,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 12,
+          "score": 66,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-6-max",
+      "name": "Qwen3.6 Max Preview",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 127,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 71,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 121,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen-image-2-1",
+      "name": "Qwen-Image-2.1",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "image-gen": {
+          "rank": 20,
+          "score": 79,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "kimi-k2-6",
+      "name": "Kimi K2.6 (Reasoning)",
+      "vendor": "Kimi",
+      "provider": "kimi",
+      "rankings": {
+        "coding": {
+          "rank": 128,
+          "score": 78,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 90,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 82,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "input": 6.5,
+        "output": 27,
+        "note": "缓存命中输入 ¥1.1",
+        "cachedInput": 1.1
+      },
+      "priceSource": "https://platform.kimi.com/docs/pricing/chat",
+      "verifiedAt": "2026-10-04T03:57:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-1-tts",
+      "name": "Gemini 3.1 Flash TTS",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 12,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-build-0-1-06-16",
+      "name": "Grok Build 0.1 0616",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "science": {
+          "rank": 83,
+          "score": 77,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 176,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-27b-medium",
+      "name": "Qwen3.8 27B (Medium)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 135,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 232,
+          "score": 54,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-8-27b-low",
+      "name": "Qwen3.8 27B (Low)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 136,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 233,
+          "score": 54,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-5-pro",
+      "name": "MiMo-V2.5-Pro (Reasoning)",
+      "vendor": "Xiaomi",
+      "provider": "xiaomi",
+      "rankings": {
+        "coding": {
+          "rank": 137,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 104,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 83,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 55,
+          "score": 48,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-sonnet-5-low",
+      "name": "Claude Sonnet 5 (Low)",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "coding": {
+          "rank": 145,
+          "score": 76,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 244,
+          "score": 53,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-7-plus",
+      "name": "Qwen3.7 Plus",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "multimodal": {
+          "rank": 2,
+          "score": 75,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 156,
+          "score": 73,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 113,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 103,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 33,
+          "score": 54,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-20",
+      "name": "Grok 4.20 0309 v2 (Reasoning)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "science": {
+          "rank": 99,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 84,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 198,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-pro-0424",
+      "name": "DeepSeek V4 Pro 0424 (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "science": {
+          "rank": 95,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 147,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 63,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-pro-0424-high",
+      "name": "DeepSeek V4 Pro 0424 (High)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "science": {
+          "rank": 96,
+          "score": 75,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 160,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 73,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-3",
+      "name": "Grok 4.3 (High)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "science": {
+          "rank": 100,
+          "score": 74,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 85,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 235,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-5-flash-lite",
+      "name": "Gemini 3.5 Flash-Lite",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "math": {
+          "rank": 55,
+          "score": 74,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 186,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "reasoning": {
+          "rank": 55,
+          "score": 60,
+          "source": "livebench",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 216,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 94,
+          "score": 48,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-terra-low",
+      "name": "GPT-5.6 Terra (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 161,
+          "score": 72,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 137,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 194,
+          "score": 55,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash-0420",
+      "name": "DeepSeek V4 Flash 0420 (Max)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "science": {
+          "rank": 117,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 184,
+          "score": 69,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 104,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-glimmer",
+      "name": "Muse Glimmer (High)",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "coding": {
+          "rank": 174,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 188,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "glm-5-1",
+      "name": "GLM-5.1 (Reasoning)",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "coding": {
+          "rank": 171,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 92,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 145,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "agents": {
+          "rank": 44,
+          "score": 49,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "input": 6,
+        "output": 24,
+        "cachedInput": 1.3,
+        "currency": "CNY",
+        "unit": "每百万 tokens",
+        "cacheWrite": null,
+        "cacheWriteLong": null,
+        "note": "官方标准首档；缓存存储限时免费"
+      },
+      "priceSource": "https://docs.bigmodel.cn/cn/guide/start/pricing",
+      "verifiedAt": "2026-10-04T00:00:00+08:00",
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-5-0424",
+      "name": "MiMo-V2.5",
+      "vendor": "Xiaomi",
+      "provider": "xiaomi",
+      "rankings": {
+        "coding": {
+          "rank": 172,
+          "score": 71,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 165,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 130,
+          "score": 63,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-3-medium",
+      "name": "Grok 4.3 (Medium)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "science": {
+          "rank": 122,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 93,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 210,
+          "score": 66,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna-medium",
+      "name": "GPT-5.6 Luna (Medium)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 177,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 157,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemini-3-5-flash-minimal",
+      "name": "Gemini 3.5 Flash (Minimal)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "coding": {
+          "rank": 181,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 182,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-instant-05-26",
+      "name": "GPT-5.5 Instant (May 2026)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 182,
+          "score": 70,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 195,
+          "score": 60,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 222,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-6-27b",
+      "name": "Qwen3.6 27B (Reasoning)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "coding": {
+          "rank": 194,
+          "score": 68,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "multimodal": {
+          "rank": 14,
+          "score": 65,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 183,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 156,
+          "score": 60,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash-0420-high",
+      "name": "DeepSeek V4 Flash 0420 (High)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 201,
+          "score": 67,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 116,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 166,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-3-low",
+      "name": "Grok 4.3 (Low)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "general": {
+          "rank": 112,
+          "score": 66,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 233,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 211,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "glm-5-1-non-reasoning",
+      "name": "GLM-5.1 (Non-reasoning)",
+      "vendor": "Z AI",
+      "provider": "z-ai",
+      "rankings": {
+        "science": {
+          "rank": 159,
+          "score": 65,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 170,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 262,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-5-instant-06-26",
+      "name": "GPT-5.5 Instant (June 2026)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "science": {
+          "rank": 164,
+          "score": 64,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 249,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2.5",
+      "name": "MiMo-V2.5",
+      "vendor": "Xiaomi",
+      "provider": "xiaomi",
+      "rankings": {
+        "multimodal": {
+          "rank": 24,
+          "score": 62,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "xai-text-to-speech",
+      "name": "SpaceXAI TTS",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "audio": {
+          "rank": 26,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5-6-luna-low",
+      "name": "GPT-5.6 Luna (Low)",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "coding": {
+          "rank": 227,
+          "score": 62,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 198,
+          "score": 60,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "grok-4-20-non-reasoning",
+      "name": "Grok 4.20 0309 v2 (Non-reasoning)",
+      "vendor": "SpaceXAI",
+      "provider": "spacexai",
+      "rankings": {
+        "science": {
+          "rank": 190,
+          "score": 61,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-6-35b-a3b",
+      "name": "Qwen3.6 35B A3B (Reasoning)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "multimodal": {
+          "rank": 44,
+          "score": 59,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 246,
+          "score": 59,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 221,
+          "score": 57,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 188,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-pro-0424-non-reasoning",
+      "name": "DeepSeek V4 Pro 0424 (Non-reasoning)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "coding": {
+          "rank": 254,
+          "score": 58,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "general": {
+          "rank": 223,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "tts-1-hd",
+      "name": "TTS-1 HD",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "audio": {
+          "rank": 35,
+          "score": 56,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "claude-mythos-preview",
+      "name": "Claude Mythos Preview",
+      "vendor": "Anthropic",
+      "provider": "anthropic",
+      "rankings": {
+        "multimodal": {
+          "rank": 61,
+          "score": 55,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "tts-1",
+      "name": "TTS-1",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "audio": {
+          "rank": 41,
+          "score": 53,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "qwen3-6-35b-a3b-non-reasoning",
+      "name": "Qwen3.6 35B A3B (Non-reasoning)",
+      "vendor": "Alibaba",
+      "provider": "alibaba",
+      "rankings": {
+        "science": {
+          "rank": 247,
+          "score": 52,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-5-pro-non-reasoning",
+      "name": "MiMo-V2.5-Pro (Non-reasoning)",
+      "vendor": "Xiaomi",
+      "provider": "xiaomi",
+      "rankings": {
+        "coding": {
+          "rank": 301,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "science": {
+          "rank": 266,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "deepseek-v4-flash-0420-non-reasoning",
+      "name": "DeepSeek V4 Flash 0420 (Non-reasoning)",
+      "vendor": "DeepSeek",
+      "provider": "deepseek",
+      "rankings": {
+        "general": {
+          "rank": 225,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        },
+        "coding": {
+          "rank": 305,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "studio",
+      "name": "Studio",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 46,
+          "score": 51,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-5.5-instant",
+      "name": "GPT-5.5 Instant",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "multimodal": {
+          "rank": 81,
+          "score": 51,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gemma-4-12b",
+      "name": "Gemma 4 12B (Reasoning)",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "science": {
+          "rank": 270,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "journey",
+      "name": "Journey",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 48,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "gpt-realtime-2",
+      "name": "GPT-Realtime-2",
+      "vendor": "OpenAI",
+      "provider": "openai",
+      "rankings": {
+        "audio": {
+          "rank": 47,
+          "score": 50,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "muse-glimmer-30b",
+      "name": "Muse Glimmer-30B",
+      "vendor": "Meta",
+      "provider": "meta",
+      "rankings": {
+        "multimodal": {
+          "rank": 98,
+          "score": 47,
+          "source": "llm-stats",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "mimo-v2-5-tts",
+      "name": "MiMo-V2.5-TTS",
+      "vendor": "Xiaomi",
+      "provider": "xiaomi",
+      "rankings": {
+        "audio": {
+          "rank": 58,
+          "score": 46,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    },
+    {
+      "id": "chirp3-hd",
+      "name": "Chirp 3: HD",
+      "vendor": "Google",
+      "provider": "google",
+      "rankings": {
+        "audio": {
+          "rank": 56,
+          "score": 46,
+          "source": "artificial-analysis",
+          "updatedAt": "2026-10-03T10:00:00.915Z"
+        }
+      },
+      "price": {
+        "currency": "",
+        "unit": "",
+        "input": null,
+        "output": null,
+        "cachedInput": null,
+        "note": "原厂价格待核实"
+      },
+      "priceSource": "",
+      "verifiedAt": null,
+      "candidate": null
+    }
+  ],
+  "error": null
+}

@@ -67,8 +67,10 @@ export function useAccounts() {
     setRefreshing(true);
     try {
       setAccounts(await api.refreshAll());
+      return true;
     } catch (e) {
       toast(`刷新失败：${errText(e)}`, "error");
+      return false;
     } finally {
       setRefreshing(false);
     }

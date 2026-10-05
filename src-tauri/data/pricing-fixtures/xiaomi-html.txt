@@ -1,0 +1,23 @@
+元 / 百万 tokens
+<table class="mdx-table"><colgroup><col style="width: 11.45%"><col style="width: 44.67%"><col style="width: 15.01%"><col style="width: 17.41%"><col style="width: 11.459999999999994%"></colgroup><thead class="mdx-thead"><tr class="mdx-tr"><p class="mdx-p"><th class="mdx-th"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">推理类型</strong></span></th>
+<th class="mdx-th"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">模型名称</strong></span></th>
+<th class="mdx-th"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">输入（命中缓存）</strong> </span></th>
+<th class="mdx-th"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">输入（未命中缓存）</strong> </span></th>
+<th class="mdx-th"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">输出</strong></span></th></p></tr></thead><tbody class="mdx-tbody"><tr class="mdx-tr"><p class="mdx-p"><td rowspan="3" class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">实时推理</strong></span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><code class="mdx-code-inline">mimo-v2.6-pro</code>、<code class="mdx-code-inline">mimo-v2.5-pro</code>（即将下线）</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.025</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥3.00</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥6.00</span></td></p></tr><tr class="mdx-tr"><p class="mdx-p"><td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><code class="mdx-code-inline">mimo-v2.6-flash</code>、<code class="mdx-code-inline">mimo-v2.5</code>（即将下线）</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.02</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥1.00</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥2.00</span></td></p></tr><tr class="mdx-tr"><p class="mdx-p"><td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><code class="mdx-code-inline">mimo-v2.6-pro-ultraspeed</code></span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.25</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥30.00</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥60.00</span></td></p></tr><tr class="mdx-tr"><p class="mdx-p"><td rowspan="2" class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><strong class="mdx-strong">批量推理</strong></span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><code class="mdx-code-inline">mimo-v2.6-pro</code></span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.0125</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥1.50</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥3.00</span></td></p></tr><tr class="mdx-tr"><p class="mdx-p"><td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;"><code class="mdx-code-inline">mimo-v2.6-flash</code></span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.01</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥0.50</span></td>
+<td class="mdx-td"><span style="display: inline-block; width: 100%; text-align: left;">¥1.00</span></td></p></tr></tbody></table>

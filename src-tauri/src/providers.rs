@@ -106,13 +106,17 @@ pub fn balance_alternatives(def: &ProviderDef) -> Vec<String> {
 /// 该账户可选的「余额获取方式」，按平台能力裁剪
 pub fn balance_modes(def: &ProviderDef) -> Vec<BalanceModeOption> {
     let mut out = Vec::new();
+    if def.id == "custom" {
+        return vec![BalanceModeOption { value: "codex".into(), label: "自动同步".into(), desc: "连接本机 Codex，查看订阅的 Codex 额度。".into() },
+            BalanceModeOption { value: "manual".into(), label: "手动记录".into(), desc: "手动记录。".into() }];
+    }
     match def.balance {
         BalanceProbe::Unsupported(_) => {}
         BalanceProbe::AliyunBss => {}
         BalanceProbe::MimoConsole => out.push(BalanceModeOption {
             value: "console".into(),
-            label: "控制台 Cookie".into(),
-            desc: "粘贴浏览器里的小米账号 Cookie，自动查余额、本月用量与套餐余量（官方没有查询 API，这是唯一能自动查的办法）。"
+            label: "登录同步".into(),
+            desc: "登录小米账号，自动同步余额与套餐额度。"
                 .into(),
         }),
         _ => {
@@ -123,7 +127,7 @@ pub fn balance_modes(def: &ProviderDef) -> Vec<BalanceModeOption> {
             };
             out.push(BalanceModeOption {
                 value: "auto".into(),
-                label: "官方接口".into(),
+                label: "自动同步".into(),
                 desc: desc.into(),
             });
         }
@@ -783,17 +787,17 @@ pub fn parse_zhipu_report(text: &str, provider: &str) -> Result<Balance, String>
         amounts.push(BalanceAmount {
             label: "累计充值".into(),
             value: x,
-            kind: "total".into(),
+            kind: "cumulative_recharge".into(),
         });
     }
     if let Some(x) = num_at(data, &["totalSpendAmount"]) {
         amounts.push(BalanceAmount {
             label: "累计消费".into(),
             value: x,
-            kind: "used".into(),
+            kind: "cumulative_spend".into(),
         });
     }
-    if let Some(x) = num_at(data, &["giveAmount"]).filter(|x| *x > 0.0) {
+    if let Some(x) = num_at(data, &["giveAmount"]) {
         amounts.push(BalanceAmount {
             label: "赠送余额".into(),
             value: x,

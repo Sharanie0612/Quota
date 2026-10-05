@@ -57,6 +57,15 @@ pub struct HistoryStore {
 }
 
 impl HistoryStore {
+    pub fn export_points(&self) -> HashMap<String, Vec<HistoryPoint>> {
+        self.data.accounts.clone()
+    }
+    pub fn replace_points(&mut self, accounts: HashMap<String, Vec<HistoryPoint>>) -> Result<(), String> {
+        let text = serde_json::to_string(&HistoryFile { accounts: accounts.clone() }).map_err(|_| "余额历史格式无效")?;
+        write_atomic(&self.path, &text)?;
+        self.data.accounts = accounts;
+        Ok(())
+    }
     pub fn load(dir: &Path) -> Self {
         let path = dir.join("balance_history.json");
         let data = std::fs::read_to_string(&path)

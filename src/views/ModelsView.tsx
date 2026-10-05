@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ModelEditModal } from "../components/ModelEditModal";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ModelRow } from "../components/ModelRow";
-import { PriceCompareModal } from "../components/PriceCompareModal";
 import { IconLayers, IconRefresh, IconSearch } from "../components/icons";
 import { Button, EmptyState, Notice, Seg } from "../components/ui";
-import { api, copyText, errText } from "../lib/api";
+import { api, errText } from "../lib/api";
 import { toast } from "../lib/store";
+import { groupModelComparisons } from "../lib/modelComparison";
 import type { AccountView, ModelCard as ModelCardType, ProviderView } from "../lib/types";
 
 type Mode = "list" | "compare";
@@ -16,7 +15,7 @@ const STALE_DAYS = 90;
 /** 有价格但资料需要复核：从未核实过，或已核实但超过保质期 */
 function needsRecheck(c: ModelCardType): boolean {
   const hasPrice =
-    !!c.price && (c.price.input !== null || c.price.output !== null);
+    !!c.price && [c.price.input,c.price.output,c.price.cachedInput,c.price.cacheWrite,c.price.cacheWriteLong].some(value => value != null);
   if (!hasPrice || c.hidden) return false;
   if (!c.verified) return c.priceConfidence === "medium";
   if (!c.verifiedAt) return true;
@@ -24,19 +23,12 @@ function needsRecheck(c: ModelCardType): boolean {
   return Number.isFinite(age) && age > STALE_DAYS * 86400_000;
 }
 
-/** 输入 + 输出的合计价格；没有价格的返回 Infinity（价格对比时排到最后） */
-function costOf(c: ModelCardType): number {
-  const p = c.price;
-  if (!p || (p.input === null && p.output === null)) return Number.POSITIVE_INFINITY;
-  return (p.input ?? 0) + (p.output ?? 0);
-}
-
 /**
  * 模型库：只做四件事——
  *   1. 刷新最新的模型列表（拉各账户的 /models）
- *   2. 一键复制调用 API 的 cURL 示例
+ *   2. 隐藏或恢复可用模型
  *   3. 看每个模型的价格
- *   4. 价格对比（按 输入+输出 合计从便宜到贵排）
+ *   4. 价格对比（币种和单位各自分组，组内按输入+输出合计排序）
  */
 export function ModelsView({
   accounts,
@@ -55,64 +47,62 @@ export function ModelsView({
   onAddAccount: () => void;
   onRefreshAll: () => Promise<unknown>;
 }) {
-  const [cards, setCards] = useState<ModelCardType[]>([]);
+  const [result, setResult] = useState<{ provider: string; cards: ModelCardType[] } | null>(null);
+  const [failure, setFailure] = useState<{ provider: string; message: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const request = useRef(0);
+  const live = useRef(false);
+  const scope = useRef(providerFilter);
+  scope.current = providerFilter;
+  const hasResult = result?.provider === providerFilter;
+  const cards = hasResult ? result.cards : [];
+  const readError = failure?.provider === providerFilter ? failure.message : null;
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState<Mode>("list");
   const [showHidden, setShowHidden] = useState(false);
   const [staleOnly, setStaleOnly] = useState(false);
-  const [copyingId, setCopyingId] = useState<string | null>(null);
-  const [editCard, setEditCard] = useState<ModelCardType | null>(null);
-  const [compareCard, setCompareCard] = useState<ModelCardType | null>(null);
 
   const load = useCallback(async () => {
+    if (!live.current || scope.current !== providerFilter) return false;
+    const current = ++request.current;
     setLoading(true);
+    setFailure(null);
     try {
       const list = await api.modelCards(providerFilter === "all" ? undefined : providerFilter);
-      setCards(list);
+      if (!live.current || current !== request.current || scope.current !== providerFilter) return false;
+      setResult({ provider: providerFilter, cards: list });
       onCount(list.filter((c) => !c.hidden).length);
+      return true;
     } catch (e) {
-      toast(`读取模型列表失败：${errText(e)}`, "error");
+      if (live.current && current === request.current && scope.current === providerFilter) {
+        setFailure({ provider: providerFilter, message: errText(e) });
+      }
+      return false;
     } finally {
-      setLoading(false);
+      if (live.current && current === request.current && scope.current === providerFilter) setLoading(false);
     }
   }, [providerFilter, onCount]);
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
 
   useEffect(() => {
+    live.current = true;
     void load();
+    return () => { live.current = false; ++request.current; };
   }, [load, accounts]);
 
   /** 1. 刷新最新的模型列表 */
   const refreshList = async () => {
     setBusy(true);
     try {
-      await onRefreshAll();
-      await load();
-      toast("已刷新，模型列表与价格都更新到最新");
+      const refreshed = await onRefreshAll();
+      if (!live.current || refreshed === false) return;
+      if (await latestLoad.current()) toast("模型列表已更新");
     } catch (e) {
       toast(`刷新失败：${errText(e)}`, "error");
     } finally {
       setBusy(false);
-    }
-  };
-
-  /** 2. 一键复制调用示例 */
-  const copyCall = async (card: ModelCardType) => {
-    const accountId = card.accountIds[0];
-    if (!accountId) {
-      toast("该模型没有关联的账户，无法生成调用示例", "error");
-      return;
-    }
-    setCopyingId(card.id);
-    try {
-      const snippet = await api.apiSnippet(accountId, card.id);
-      await copyText(snippet);
-      toast("已复制 cURL 调用示例（含 API Key，注意别外传）");
-    } catch (e) {
-      toast(errText(e), "error");
-    } finally {
-      setCopyingId(null);
     }
   };
 
@@ -138,7 +128,7 @@ export function ModelsView({
           ? `已恢复显示「${card.name}」`
           : `已隐藏「${card.name}」，点「显示已隐藏」可以找回`,
       );
-      await load();
+      await latestLoad.current();
     } catch (e) {
       toast(errText(e), "error");
     }
@@ -156,24 +146,23 @@ export function ModelsView({
     if (staleOnly && mode === "list") {
       list = list.filter((c) => needsRecheck(c));
     }
-    if (mode === "compare") {
-      // 没有价格的模型排到最后，不要被当成「最便宜」
-      list = [...list].sort((a, b) => costOf(a) - costOf(b));
-    }
     return list;
   }, [cards, search, mode, showHidden, staleOnly]);
 
-  const maxCost = useMemo(() => {
-    const costs = filtered.map(costOf).filter((c) => Number.isFinite(c));
-    return costs.length > 0 ? Math.max(...costs) : 0;
-  }, [filtered]);
+  const comparisonGroups = useMemo(() => mode === "compare" ? groupModelComparisons(filtered) : [], [filtered, mode]);
+
+  const renderRows = (list: ModelCardType[], maxCost?: number) => list.map(c => <ModelRow
+    key={c.id} card={c} provider={providerOf(c)} accountLabel={accountLabel(c.accountIds[0] ?? "")}
+    showBar={mode === "compare"} maxCost={maxCost}
+    onToggleHide={() => void toggleHide(c)}
+  />);
 
   const filterVendor = providers.find((p) => p.id === providerFilter)?.vendor;
 
   return (
     <div className="content-inner">
       <div className="mrow-toolbar">
-        <Button size="sm" variant="primary" onClick={() => void refreshList()} disabled={busy}>
+        <Button size="sm" variant="primary" onClick={() => void refreshList()} disabled={busy || loading}>
           <IconRefresh size={13} className={busy ? "spin" : ""} />
           {busy ? "刷新中…" : "刷新模型列表"}
         </Button>
@@ -182,6 +171,7 @@ export function ModelsView({
           <input
             className="input"
             placeholder="搜模型名或型号"
+            aria-label="搜索模型"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -227,10 +217,15 @@ export function ModelsView({
         />
       </div>
 
+      {readError && <Notice tone="error" actions={<Button size="sm" onClick={() => void load()} disabled={loading}>重试读取</Button>}>
+        读取模型列表失败：{readError}
+        {hasResult && <div className="hint" style={{ marginTop: 2 }}>已保留当前列表，可重试读取。</div>}
+      </Notice>}
+      {loading && hasResult && <div className="hint" role="status" style={{ margin: "0 2px 8px" }}>正在更新模型列表…</div>}
+
       {mode === "compare" && !loading && filtered.length > 0 ? (
         <div className="hint" style={{ margin: "0 2px 8px" }}>
-          按「输入 + 输出」合计价格从便宜到贵排列（各平台计价单位都是每 1M tokens），
-          条形长度表示相对价格高低。
+          按原厂币种和计价单位分组，组内比较各一单位的输入与输出合计。
         </div>
       ) : null}
 
@@ -250,21 +245,7 @@ export function ModelsView({
             </Button>
           }
         >
-          {(() => {
-            const expired = staleCards.filter(
-              (c) => c.verified && c.verifiedAt && Date.now() - Date.parse(c.verifiedAt) > STALE_DAYS * 86400_000,
-            ).length;
-            const fresh = staleCards.length - expired;
-            const parts: string[] = [];
-            if (expired > 0) parts.push(`${expired} 个已核实超过 ${STALE_DAYS} 天`);
-            if (fresh > 0) parts.push(`${fresh} 个还没有核实过`);
-            return (
-              <>
-                有 {staleCards.length} 个模型的价格资料需要复核（{parts.join("、")}）。
-                价格随时会变，建议点每行的「比价」对照官方定价页重新核实。
-              </>
-            );
-          })()}
+          {staleCards.length} 个模型价格待复核
         </Notice>
       ) : null}
 
@@ -272,14 +253,14 @@ export function ModelsView({
         <EmptyState
           icon={<IconLayers size={26} />}
           title="先添加一个账户"
-          desc="模型列表是按你的账户从各平台拉回来的。添加账户后点「刷新模型列表」，这里就会出现可用模型和价格。"
+          desc="添加账户后同步可用模型。"
           action={
             <Button variant="primary" onClick={onAddAccount}>
               添加模型账户
             </Button>
           }
         />
-      ) : loading ? (
+      ) : (!hasResult && !readError) ? (
         <div className="mrow-list">
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="mrow">
@@ -289,7 +270,7 @@ export function ModelsView({
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : (!hasResult && readError) ? null : filtered.length === 0 ? (
         <EmptyState
           icon={<IconLayers size={26} />}
           title={
@@ -303,45 +284,16 @@ export function ModelsView({
               : "换个关键词试试。"
           }
         />
-      ) : (
-        <div className="mrow-list">
-          {filtered.map((c) => (
-            <ModelRow
-              key={c.id}
-              card={c}
-              provider={providerOf(c)}
-              accountLabel={accountLabel(c.accountIds[0] ?? "")}
-              busy={copyingId === c.id}
-              showBar={mode === "compare"}
-              maxCost={maxCost}
-              onCopy={() => void copyCall(c)}
-              onCompare={() => setCompareCard(c)}
-              onEdit={() => setEditCard(c)}
-              onToggleHide={() => void toggleHide(c)}
-            />
-          ))}
-        </div>
-      )}
+      ) : mode === "compare" ? <div className="model-comparison-groups">
+        {comparisonGroups.map(group => <section key={group.key} aria-label={`${group.currency || "币种待核实"} · ${group.unit || "单位待核实"}价格比较`}>
+          <div className="model-comparison-heading"><b>{group.currency || "币种待核实"}</b><span>{group.unit || "单位待核实"}</span><span>{group.cards.length} 个模型</span></div>
+          <div className="mrow-list">{renderRows(group.cards, group.maxCost)}</div>
+        </section>)}
+      </div> : <div className="mrow-list">{renderRows(filtered)}</div>}
 
-      {editCard ? (
-        <ModelEditModal
-          card={editCard}
-          onClose={() => setEditCard(null)}
-          onSaved={() => {
-            setEditCard(null);
-            void load();
-          }}
-        />
-      ) : null}
 
-      {compareCard ? (
-        <PriceCompareModal
-          card={compareCard}
-          provider={providerOf(compareCard)}
-          onClose={() => setCompareCard(null)}
-          onAdopted={() => void load()}
-        />
-      ) : null}
+
+
     </div>
   );
 }

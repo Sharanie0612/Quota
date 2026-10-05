@@ -4,6 +4,7 @@ export interface BalanceAmount {
   label: string;
   value: number;
   kind: string;
+  currency?: string;
 }
 
 export interface Balance {
@@ -33,6 +34,7 @@ export interface RemoteModel {
 }
 
 export interface AccountStatus {
+  subscription?: { plan: string; windows: { label: string; remaining: number; resetAt: number | null }[] } | null;
   balance: Balance | null;
   models: RemoteModel[];
   lastChecked: string | null;
@@ -52,6 +54,10 @@ export interface AccountView {
   lowBalanceThreshold: number;
   manualBalance: number | null;
   manualCurrency: string | null;
+  manualRechargeTotal?: number | null;
+  manualRechargeCurrency?: string | null;
+  manualSpendTotal?: number | null;
+  manualSpendCurrency?: string | null;
   /** auto | custom | manual | aliyun */
   balanceMode: string;
   customUrl: string | null;
@@ -122,7 +128,33 @@ export interface ProviderView {
   actionLinks: ActionLink[];
 }
 
+export interface ImportSelection {
+  accountIds: string[];
+  credentials: boolean;
+  settings: boolean;
+  catalog: boolean;
+  balanceHistory: boolean;
+  activity: boolean;
+}
+
+export interface ImportPreview {
+  fingerprint: string;
+  encrypted: boolean;
+  accounts: {id: string; label: string; provider: string; hasCredentials: boolean}[];
+  credentials: boolean;
+  settings: boolean;
+  catalog: boolean;
+  catalogCount: number;
+  balanceHistory: boolean;
+  historyCount: number;
+  activity: boolean;
+  activityCount: number;
+}
+
 export interface Settings {
+  notifyRecharge: boolean;
+  trayAlert: boolean;
+  ladderAutoUpdate: boolean;
   autoRefresh: boolean;
   refreshIntervalMinutes: number;
   notifyLowBalance: boolean;
@@ -131,6 +163,9 @@ export interface Settings {
 }
 
 export interface ModelPrice {
+  cachedInput?: number | null;
+  cacheWrite?: number | null;
+  cacheWriteLong?: number | null;
   currency: string;
   unit: string;
   input: number | null;
@@ -183,18 +218,22 @@ export interface CatalogEntry {
 /** 「价格比对」里的一个来源 */
 export interface PriceSource {
   name: string;
-  kind: "catalog" | "official_page" | "reference";
+  kind: "catalog" | "builtin" | "official_page" | "reference";
   url: string;
   currency: string;
   unit: string;
   input: number | null;
   output: number | null;
+  cachedInput?: number | null;
+  cacheWrite?: number | null;
+  cacheWriteLong?: number | null;
   note: string | null;
   fetchedAt: string | null;
   trusted: boolean;
 }
 
 export interface PriceComparison {
+  suggestedSource?: PriceSource | null;
   modelId: string;
   modelName: string;
   provider: string;
@@ -221,6 +260,7 @@ export interface CustomProbe {
 }
 
 export interface AccountInput {
+  connectionId?: string | null;
   id?: string | null;
   provider: string;
   label: string;
@@ -230,6 +270,10 @@ export interface AccountInput {
   lowBalanceThreshold?: number | null;
   manualBalance?: number | null;
   manualCurrency?: string | null;
+  manualRechargeTotal?: number | null;
+  manualRechargeCurrency?: string | null;
+  manualSpendTotal?: number | null;
+  manualSpendCurrency?: string | null;
   note?: string | null;
   balanceMode?: string | null;
   customUrl?: string | null;
@@ -249,6 +293,34 @@ export interface AccountInput {
 export interface AppInfo {
   version: string;
   configDir: string;
+  storageIssues?: string[];
+}
+
+export interface LadderEntry {
+  candidate?: LadderPriceCheck | null;
+  id: string;
+  name: string;
+  vendor: string;
+  provider: string;
+  rankings: Record<string, { rank: number; score: number; source: string; updatedAt: string }>;
+  price: ModelPrice;
+  priceSource: string;
+  verifiedAt: string | null;
+}
+
+export interface LadderSnapshot {
+  entries: LadderEntry[];
+  source: string;
+  updatedAt: string;
+  checkedAt: string | null;
+  error: string | null;
+}
+
+export interface LadderPriceCheck {
+  prices: ModelPrice[];
+  excerpts: string[];
+  checkedAt: string;
+  error: string | null;
 }
 
 /** 余额历史采样点（t = Unix 秒，v = 余额） */
@@ -275,3 +347,7 @@ export type RechargeEvent = {
   amount: number;
   total: number;
 };
+export interface ActivityTokens { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; total: number }
+export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
+export interface ActivityOptions { deviceId: string; deviceName: string; autoCollect: boolean; codexHome: string; zcodeHome: string; harnessHome: string; syncDir: string }
+export interface ActivityReport { options: ActivityOptions; devices: {id: string; name: string}[]; totals: ActivityGroup; models: ActivityGroup[]; availableModels: ActivityGroup[]; tools: ActivityGroup[]; agents: ActivityGroup[]; daily: ActivityGroup[]; sources: ActivityGroup[]; byDevice: ActivityGroup[]; updatedAt: number | null; errors: string[] }

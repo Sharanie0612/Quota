@@ -20,6 +20,10 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 pub struct AppState {
+    pub activity_lock: Mutex<()>,
+    pub ladder: Mutex<crate::ladder::Snapshot>,
+    pub ladder_refreshing: Mutex<bool>,
+    pub pending_connections: Mutex<HashMap<String, String>>,
     pub store: Store,
     pub http: reqwest::Client,
     pub config: Mutex<AppConfig>,
@@ -43,6 +47,8 @@ const REFERENCE_TTL_SECONDS: i64 = 6 * 3600;
 
 impl AppState {
     pub fn new(store: Store, config: AppConfig, overrides: Vec<CatalogEntry>) -> Self {
+        let activity_options=crate::activity::options(store.dir());
+        let _=crate::activity::save_options(store.dir(),&activity_options);
         let hidden_models = store.load_hidden_models();
         let history = HistoryStore::load(store.dir());
         // 跟随系统代理：reqwest 默认只认环境变量，不读 Windows 系统代理，
@@ -63,6 +69,10 @@ impl AppState {
             builder.build().unwrap_or_default()
         };
         Self {
+            activity_lock: Mutex::new(()),
+            ladder: Mutex::new(crate::ladder::load(store.dir())),
+            ladder_refreshing: Mutex::new(false),
+            pending_connections: Mutex::new(HashMap::new()),
             store,
             http,
             config: Mutex::new(config),
@@ -88,12 +98,13 @@ fn lock_config(state: &AppState) -> AppConfig {
 /// 组装账户视图
 pub fn account_view(state: &AppState, account: &Account) -> AccountView {
     let def = providers::find(&account.provider);
-    let status = state
+    let mut status = state
         .statuses
         .lock()
         .ok()
         .and_then(|m| m.get(&account.id).cloned())
         .unwrap_or_default();
+    apply_manual_balance(account, &mut status);
 
     let provider_name = def
         .map(|d| d.name.to_string())
@@ -117,7 +128,8 @@ pub fn account_view(state: &AppState, account: &Account) -> AccountView {
         account_recharge
     };
 
-    let total = status.balance.as_ref().and_then(|b| b.total);
+    let total = status.subscription.as_ref().and_then(|s| s.windows.iter().map(|w| w.remaining).reduce(f64::min))
+        .or_else(|| status.balance.as_ref().and_then(|b| b.total));
     let low = account.low_balance_threshold > 0.0
         && total.map(|t| t < account.low_balance_threshold).unwrap_or(false);
 
@@ -135,6 +147,10 @@ pub fn account_view(state: &AppState, account: &Account) -> AccountView {
         low_balance_threshold: account.low_balance_threshold,
         manual_balance: account.manual_balance,
         manual_currency: account.manual_currency.clone(),
+        manual_recharge_total: account.manual_recharge_total,
+        manual_spend_total: account.manual_spend_total,
+        manual_recharge_currency: account.manual_recharge_currency.clone(),
+        manual_spend_currency: account.manual_spend_currency.clone(),
         balance_mode: account
             .balance_mode
             .clone()
@@ -222,6 +238,14 @@ pub async fn refresh_one(state: &AppState, account: &Account) -> AccountStatus {
             // ---------------- 余额 ----------------
             if mode == "manual" {
                 // 用户明确选择手动，不发起查询
+            } else if def.id == "custom" && matches!(mode.as_str(), "codex" | "auto") {
+                match blob.subscription_account.as_deref() {
+                    Some(id) => match crate::subscription::fetch(&state.http, Some(id)).await {
+                        Ok((quota, _)) => status.subscription = Some(quota),
+                        Err(e) => status.balance_error = Some(e),
+                    },
+                    None => status.balance_error = Some("请连接本机 ChatGPT 登录".into()),
+                }
             } else if mode == "custom" {
                 match custom::fetch_custom_balance(&state.http, account).await {
                     Ok(b) => status.balance = Some(b),
@@ -352,31 +376,14 @@ pub async fn refresh_one(state: &AppState, account: &Account) -> AccountStatus {
         }
     }
 
-    // 手动余额兜底：任何自动方式失败（或平台不支持）时使用用户填写的余额
-    if status.balance.is_none() {
-        if let Some(manual) = account.manual_balance {
-            status.balance = Some(Balance {
-                currency: account
-                    .manual_currency
-                    .clone()
-                    .filter(|c| !c.trim().is_empty())
-                    .unwrap_or_else(|| "CNY".into()),
-                total: Some(manual),
-                source: "manual".into(),
-                amounts: Vec::new(),
-                usable: Some(manual > 0.0),
-                note: Some("手动余额（该平台不支持自动查询，或上次查询失败）".into()),
-                raw: None,
-            });
-        }
-    }
+    apply_manual_balance(account, &mut status);
 
     // 平台本来就不支持余额接口时，不把说明当作错误报红
     if !matches!(mode.as_str(), "custom") {
         if let Some(def) = providers::find(&account.provider) {
             let unsupported_offline = matches!(def.balance, BalanceProbe::Unsupported(_))
                 && providers::admin_probe(def).is_none();
-            if unsupported_offline && status.balance_error.is_some() {
+            if unsupported_offline && account.provider != "custom" && status.balance_error.is_some() {
                 status.balance_error = None;
             }
         }
@@ -386,6 +393,29 @@ pub async fn refresh_one(state: &AppState, account: &Account) -> AccountStatus {
     status
 }
 
+/// 首次读取即可显示已保存的手动记录；自动订阅成功时不再被备用手动值遮住。
+pub fn apply_manual_balance(account: &Account, status: &mut AccountStatus) {
+    let explicit_manual = account.balance_mode.as_deref() == Some("manual");
+    if explicit_manual {
+        status.subscription = None;
+        status.balance = None;
+        status.balance_error = None;
+    } else if status.balance.is_some() || status.subscription.is_some() {
+        return;
+    }
+    if let Some(manual) = account.manual_balance.filter(|value| value.is_finite()) {
+        status.balance = Some(Balance {
+            currency: account.manual_currency.clone().filter(|currency| !currency.trim().is_empty()).unwrap_or_else(|| "CNY".into()),
+            total: Some(manual),
+            source: "manual".into(),
+            amounts: Vec::new(),
+            usable: Some(manual > 0.0),
+            note: Some(if explicit_manual { "手动记录" } else { "备用手动记录，尚未取得自动余额或订阅额度" }.into()),
+            raw: None,
+        });
+    }
+}
+
 /// 刷新拿到余额后追加一条历史记录；余额明显上涨时向前端广播疑似充值事件
 fn record_history(state: &AppState, account: &Account, app: &AppHandle) {
     let Some(balance) = state
@@ -393,6 +423,7 @@ fn record_history(state: &AppState, account: &Account, app: &AppHandle) {
         .lock()
         .ok()
         .and_then(|m| m.get(&account.id).cloned())
+        .filter(|s| s.balance_error.is_none())
         .and_then(|s| s.balance)
     else {
         return;
@@ -405,7 +436,7 @@ fn record_history(state: &AppState, account: &Account, app: &AppHandle) {
         .lock()
         .ok()
         .and_then(|mut h| h.record(&account.id, total));
-    if let Some(delta) = recharged {
+    if let Some(delta) = recharged.filter(|_| lock_config(state).settings.notify_recharge) {
         let _ = app.emit(
             "recharge-detected",
             serde_json::json!({
@@ -427,7 +458,7 @@ pub fn update_tray_alert(app: &AppHandle) {
         .iter()
         .filter(|a| account_view(&state, a).low)
         .count();
-    crate::tray::update_alert(app, low);
+    crate::tray::update_alert(app, if lock_config(&state).settings.tray_alert { low } else { 0 });
 }
 
 pub async fn refresh_account_inner(state: &AppState, app: &AppHandle, id: &str) -> Result<AccountView, String> {
@@ -436,8 +467,9 @@ pub async fn refresh_account_inner(state: &AppState, app: &AppHandle, id: &str) 
         .into_iter()
         .find(|a| a.id == id)
         .ok_or_else(|| format!("账户不存在：{id}"))?;
-    let status = refresh_one(state, &account).await;
+    let mut status = refresh_one(state, &account).await;
     if let Ok(mut map) = state.statuses.lock() {
+        preserve_snapshot(&mut status, map.get(&account.id));
         map.insert(account.id.clone(), status);
     }
     record_history(state, &account, app);
@@ -448,14 +480,27 @@ pub async fn refresh_all_inner(state: &AppState, app: &AppHandle) -> Vec<Account
     let accounts = lock_config(state).accounts;
     let mut views = Vec::with_capacity(accounts.len());
     for account in accounts.iter() {
-        let status = refresh_one(state, account).await;
+        let mut status = refresh_one(state, account).await;
         if let Ok(mut map) = state.statuses.lock() {
+            preserve_snapshot(&mut status, map.get(&account.id));
             map.insert(account.id.clone(), status);
         }
         record_history(state, account, app);
         views.push(account_view(state, account));
     }
     views
+}
+
+fn preserve_snapshot(status: &mut AccountStatus, previous: Option<&AccountStatus>) {
+    if status.balance_error.is_some() {
+        if let Some(previous) = previous {
+            if status.balance.is_none() && status.subscription.is_none() {
+                status.balance = previous.balance.clone();
+                status.subscription = previous.subscription.clone();
+            }
+            status.last_checked = previous.last_checked.clone();
+        }
+    }
 }
 
 fn emit_updated(app: &AppHandle) {
@@ -508,8 +553,10 @@ pub async fn save_account(
     app: AppHandle,
     input: AccountInput,
 ) -> Result<AccountView, String> {
+    state.store.ensure_config_writable()?;
     let def = providers::find(&input.provider)
         .ok_or_else(|| format!("未知供应商：{}", input.provider))?;
+    input.validate_numbers()?;
 
     let label = {
         let l = input.label.trim();
@@ -563,51 +610,70 @@ pub async fn save_account(
 
     let is_new = input.id.is_none();
     let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+    if let Some(connection_id) = &input.connection_id {
+        let pending = state.pending_connections.lock().map_err(|_| "连接状态不可用")?;
+        if pending.get(connection_id) != Some(&input.provider) { return Err("连接已失效，请重新连接".into()); }
+        let staged = secrets::get_secrets(connection_id)?;
+        let mut target = secrets::get_secrets(&id)?;
+        if let Some(cookie) = staged.console_cookie {
+            crate::connections::update_mimo_cookie(&state, &id, &cookie)?;
+            target.console_cookie = Some(cookie);
+        }
+        if staged.subscription_account.is_some() { target.subscription_account = staged.subscription_account; }
+        secrets::restore(&id, &target)?;
+    }
     let threshold = input.low_balance_threshold.unwrap_or(0.0).max(0.0);
 
     {
         let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
-        if let Some(existing) = cfg.accounts.iter_mut().find(|a| a.id == id) {
-            existing.label = label;
-            existing.base_url = base_url;
-            existing.recharge_url = recharge_url;
-            existing.low_balance_threshold = threshold;
-            existing.manual_balance = input.manual_balance;
-            existing.manual_currency = manual_currency;
-            existing.note = note;
-            existing.balance_mode = Some(balance_mode);
-            existing.custom_url = custom_url;
-            existing.custom_headers = custom_headers;
-            existing.custom_json_path = custom_json_path;
-            existing.custom_currency = custom_currency;
-            existing.custom_method = custom_method;
-            existing.custom_body = custom_body;
-            existing.quota_total = quota_total;
-        } else {
-            cfg.accounts.push(Account {
-                id: id.clone(),
-                provider: input.provider.clone(),
-                label,
-                base_url,
-                recharge_url,
-                low_balance_threshold: threshold,
-                manual_balance: input.manual_balance,
-                manual_currency,
-                note,
-                balance_mode: Some(balance_mode),
-                custom_url,
-                custom_headers,
-                custom_json_path,
-                custom_currency,
-                custom_method,
-                custom_body,
-                quota_total,
-                created_at: Local::now().to_rfc3339(),
-            });
-        }
-        let snapshot = cfg.clone();
-        drop(cfg);
-        state.store.save_config(&snapshot)?;
+        state.store.update_config(&mut cfg, |next| {
+            if let Some(existing) = next.accounts.iter_mut().find(|a| a.id == id) {
+                existing.label = label;
+                existing.base_url = base_url;
+                existing.recharge_url = recharge_url;
+                existing.low_balance_threshold = threshold;
+                existing.manual_balance = input.manual_balance;
+                existing.manual_currency = manual_currency;
+                existing.manual_recharge_total = input.manual_recharge_total;
+                existing.manual_spend_total = input.manual_spend_total;
+                existing.manual_recharge_currency = input.manual_recharge_currency.clone();
+                existing.manual_spend_currency = input.manual_spend_currency.clone();
+                existing.note = note;
+                existing.balance_mode = Some(balance_mode);
+                existing.custom_url = custom_url;
+                existing.custom_headers = custom_headers;
+                existing.custom_json_path = custom_json_path;
+                existing.custom_currency = custom_currency;
+                existing.custom_method = custom_method;
+                existing.custom_body = custom_body;
+                existing.quota_total = quota_total;
+            } else {
+                next.accounts.push(Account {
+                    id: id.clone(),
+                    provider: input.provider.clone(),
+                    label,
+                    base_url,
+                    recharge_url,
+                    low_balance_threshold: threshold,
+                    manual_balance: input.manual_balance,
+                    manual_currency,
+                    manual_recharge_total: input.manual_recharge_total,
+                    manual_spend_total: input.manual_spend_total,
+                    manual_recharge_currency: input.manual_recharge_currency.clone(),
+                    manual_spend_currency: input.manual_spend_currency.clone(),
+                    note,
+                    balance_mode: Some(balance_mode),
+                    custom_url,
+                    custom_headers,
+                    custom_json_path,
+                    custom_currency,
+                    custom_method,
+                    custom_body,
+                    quota_total,
+                    created_at: Local::now().to_rfc3339(),
+                });
+            }
+        })?;
     }
 
     if let Some(key) = input
@@ -653,9 +719,13 @@ pub async fn save_account(
         .map(str::trim)
         .filter(|c| !c.is_empty())
     {
-        secrets::set_console_cookie(&id, cookie)?;
+        crate::connections::update_mimo_cookie(&state, &id, cookie)?;
     }
 
+    if let Some(connection_id) = &input.connection_id {
+        state.pending_connections.lock().map_err(|_| "连接状态不可用")?.remove(connection_id);
+        secrets::delete(connection_id)?;
+    }
     let view = refresh_account_inner(&state, &app, &id).await?;
     emit_updated(&app);
     update_tray_alert(&app);
@@ -670,10 +740,7 @@ pub async fn delete_account(
 ) -> Result<(), String> {
     {
         let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
-        cfg.accounts.retain(|a| a.id != id);
-        let snapshot = cfg.clone();
-        drop(cfg);
-        state.store.save_config(&snapshot)?;
+        state.store.update_config(&mut cfg, |next| next.accounts.retain(|a| a.id != id))?;
     }
     let _ = secrets::delete(&id);
     if let Ok(mut map) = state.statuses.lock() {
@@ -720,16 +787,19 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
 #[tauri::command]
 pub fn save_settings(
     state: State<'_, AppState>,
+    app: AppHandle,
     settings: Settings,
 ) -> Result<Settings, String> {
     let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
     let mut next = settings;
+    if !next.default_low_threshold.is_finite() || next.default_low_threshold < 0.0 {
+        return Err("默认提醒阈值须为有限非负数".into());
+    }
     next.refresh_interval_minutes = next.refresh_interval_minutes.clamp(1, 1440);
     next.default_low_threshold = next.default_low_threshold.max(0.0);
-    cfg.settings = next.clone();
-    let snapshot = cfg.clone();
+    state.store.update_config(&mut cfg, |config| config.settings = next.clone())?;
     drop(cfg);
-    state.store.save_config(&snapshot)?;
+    update_tray_alert(&app);
     Ok(next)
 }
 
@@ -756,6 +826,8 @@ struct BackupPayload<'a> {
     hidden_models: Vec<String>,
     /// (账户 id, 凭据 blob)：解密后原样写回凭据管理器
     credentials: Vec<CredentialEntry>,
+    balance_history: HashMap<String, Vec<history::HistoryPoint>>,
+    activity: serde_json::Value,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -773,6 +845,7 @@ pub fn export_backup(
     password: String,
     path: String,
 ) -> Result<(), String> {
+    state.store.ensure_core_files_writable()?;
     let config = lock_config(&state);
     let overrides = state.overrides.lock().map_err(|_| "资料库锁定失败".to_string())?.clone();
     let hidden_models = state
@@ -791,98 +864,22 @@ pub fn export_backup(
         }
     }
     let payload = BackupPayload {
-        version: 1,
+        version: 2,
         exported_at: Local::now().to_rfc3339(),
         config: &config,
         catalog_overrides: overrides,
         hidden_models,
         credentials,
+        balance_history: state.history.lock().map_err(|_| "余额历史暂不可用")?.export_points(),
+        activity: {
+            let _guard = state.activity_lock.lock().map_err(|_| "活动统计暂不可用")?;
+            crate::data_export::activity_data(state.store.dir())?
+        },
     };
     let plaintext = serde_json::to_vec(&payload).map_err(|e| format!("打包备份失败：{e}"))?;
     let sealed = backup::seal(&password, &plaintext)?;
-    std::fs::write(&path, sealed).map_err(|e| format!("写入备份文件失败：{e}"))
-}
-
-/// 从加密备份恢复：覆盖当前配置、资料库、隐藏列表与凭据。
-/// 返回统计摘要文本（前端展示后整页刷新）。
-#[tauri::command]
-pub fn import_backup(
-    state: State<'_, AppState>,
-    password: String,
-    path: String,
-) -> Result<String, String> {
-    let bytes =
-        std::fs::read(&path).map_err(|e| format!("读取备份文件失败：{e}"))?;
-    let plaintext = backup::open(&password, &bytes)?;
-    #[derive(serde::Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Payload {
-        version: u32,
-        #[serde(default)]
-        config: Option<AppConfig>,
-        #[serde(default)]
-        catalog_overrides: Vec<CatalogEntry>,
-        #[serde(default)]
-        hidden_models: Vec<String>,
-        #[serde(default)]
-        credentials: Vec<CredentialEntry>,
-    }
-    let payload: Payload =
-        serde_json::from_slice(&plaintext).map_err(|e| format!("备份内容无法解析：{e}"))?;
-    if payload.version != 1 {
-        return Err(format!("不支持的备份版本：{}", payload.version));
-    }
-    let config = payload
-        .config
-        .ok_or_else(|| "备份里没有账户配置，已中止恢复".to_string())?;
-
-    // 写回凭据管理器（先写凭据再落配置，中途失败不至于留下指向空凭据的配置）
-    let mut restored_keys = 0usize;
-    for entry in &payload.credentials {
-        secrets::restore(&entry.account_id, &entry.blob)?;
-        if serde_json::to_string(&entry.blob)
-            .map(|s| s.len() > 2)
-            .unwrap_or(false)
-        {
-            restored_keys += 1;
-        }
-    }
-
-    {
-        let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
-        *cfg = config;
-        let snapshot = cfg.clone();
-        drop(cfg);
-        state.store.save_config(&snapshot)?;
-    }
-    {
-        let mut overrides = state
-            .overrides
-            .lock()
-            .map_err(|_| "资料库锁定失败".to_string())?;
-        *overrides = payload.catalog_overrides.clone();
-        drop(overrides);
-        state.store.save_overrides(&payload.catalog_overrides)?;
-    }
-    {
-        let mut hidden = state
-            .hidden_models
-            .lock()
-            .map_err(|_| "隐藏列表锁定失败".to_string())?;
-        *hidden = payload.hidden_models.clone();
-        drop(hidden);
-        state.store.save_hidden_models(&payload.hidden_models)?;
-    }
-    if let Ok(mut map) = state.statuses.lock() {
-        map.clear();
-    }
-    if let Ok(mut map) = state.low_notified.lock() {
-        map.clear();
-    }
-    let account_count = lock_config(&state).accounts.len();
-    Ok(format!(
-        "已恢复 {account_count} 个账户、{restored_keys} 组密钥，设置与模型资料也已还原"
-    ))
+    let sealed_json = serde_json::from_slice(&sealed).map_err(|_| "加密备份编码失败")?;
+    crate::data_export::write_file(std::path::Path::new(&path), state.store.dir(), &sealed_json)
 }
 
 // ---------------------------------------------------------------- 模型资料库
@@ -942,14 +939,15 @@ pub fn set_model_hidden(
         .lock()
         .map_err(|_| "隐藏列表锁定失败".to_string())?;
     let norm = catalog::normalize(&model_id);
+    let mut next = list.clone();
     // 先去掉同归一化 id 的旧记录，保证同一模型只有一条
-    list.retain(|id| catalog::normalize(id) != norm);
+    next.retain(|id| catalog::normalize(id) != norm);
     if hidden {
-        list.push(model_id);
+        next.push(model_id);
     }
-    let snapshot = list.clone();
-    drop(list);
-    state.store.save_hidden_models(&snapshot)
+    state.store.save_hidden_models(&next)?;
+    *list = next;
+    Ok(())
 }
 
 /// 保存用户对某个模型资料的本地修改（按 match 第一项作为键）
@@ -958,80 +956,26 @@ pub fn save_catalog_entry(
     state: State<'_, AppState>,
     entry: CatalogEntry,
 ) -> Result<(), String> {
-    let key = entry
-        .r#match
-        .first()
-        .map(|k| k.trim().to_string())
-        .filter(|k| !k.is_empty())
-        .ok_or_else(|| "条目缺少 match 字段，无法保存".to_string())?;
-
     let mut overrides = state.overrides.lock().map_err(|_| "资料库锁定失败".to_string())?;
-    let mut next = entry.clone();
-    next.edited = true;
-    // 首次标记为「已核实」时记下时间，界面上可以显示资料新鲜度
-    if next.verified && next.verified_at.is_none() {
-        next.verified_at = Some(Local::now().to_rfc3339());
-    }
-    if !next.verified {
-        next.verified_at = None;
-    }
-    if let Some(existing) = overrides
-        .iter_mut()
-        .find(|e| e.r#match.first().map(|k| k.trim()) == Some(key.as_str()))
-    {
-        *existing = next;
-    } else {
-        overrides.push(next);
-    }
-    let snapshot = overrides.clone();
-    drop(overrides);
-    state.store.save_overrides(&snapshot)
+    catalog::save_entry(&mut overrides, entry, |next| state.store.save_overrides(next))
 }
 
 /// 清空本地资料库覆盖，恢复内置资料
 #[tauri::command]
 pub fn reset_catalog_overrides(state: State<'_, AppState>) -> Result<(), String> {
     let mut overrides = state.overrides.lock().map_err(|_| "资料库锁定失败".to_string())?;
+    state.store.save_overrides(&[])?;
     overrides.clear();
-    drop(overrides);
-    state.store.save_overrides(&[])
+    Ok(())
 }
 
-/// 找到某个模型对应的资料条目：本地覆盖优先，其次内置资料；
-/// 覆盖里缺价格时回落到内置价格，这样「比价」不会因为一条只有简介的覆盖而丢价。
-fn resolve_entry(state: &AppState, provider: &str, model_id: &str) -> CatalogEntry {
+/// 保留当前覆盖，与内置资料分开供用户核对，不能自动合并不同来源的价格。
+fn resolve_entry(state: &AppState, provider: &str, model_id: &str) -> Result<(CatalogEntry, Option<CatalogEntry>), String> {
     let overrides = state
         .overrides
         .lock()
-        .map(|o| o.clone())
-        .unwrap_or_default();
-    let over = catalog::best_match(&overrides, provider, model_id).map(|(e, _)| e.clone());
-    let builtin = catalog::best_match(&state.catalog, provider, model_id).map(|(e, _)| e.clone());
-
-    match (over, builtin) {
-        (Some(mut o), Some(b)) => {
-            if o.price.is_none() {
-                o.price = b.price;
-            }
-            if o.verified_at.is_none() {
-                o.verified_at = b.verified_at;
-            }
-            if o.source.is_none() {
-                o.source = b.source;
-            }
-            if o.context.is_none() {
-                o.context = b.context;
-            }
-            o
-        }
-        (Some(o), None) => o,
-        (None, Some(b)) => b,
-        (None, None) => CatalogEntry {
-            r#match: vec![model_id.to_string()],
-            name: model_id.to_string(),
-            ..Default::default()
-        },
-    }
+        .map_err(|_| "资料库暂不可用".to_string())?;
+    Ok(catalog::comparison_entries(&state.catalog, &overrides, provider, model_id))
 }
 
 /// 取第三方参考价（带 6 小时内存缓存）
@@ -1067,7 +1011,7 @@ pub async fn compare_prices(
     include_page: bool,
     include_reference: bool,
 ) -> Result<PriceComparison, String> {
-    let entry = resolve_entry(&state, &provider, &model_id);
+    let (entry, builtin) = resolve_entry(&state, &provider, &model_id)?;
 
     let mut page = None;
     if include_page {
@@ -1106,6 +1050,7 @@ pub async fn compare_prices(
         entry.verified,
         entry.verified_at.clone(),
         entry.source.clone(),
+        builtin.as_ref(),
         page,
         reference,
     );
@@ -1146,6 +1091,10 @@ pub async fn probe_custom_balance(
         low_balance_threshold: 0.0,
         manual_balance: None,
         manual_currency: None,
+        manual_recharge_total: None,
+        manual_spend_total: None,
+        manual_recharge_currency: None,
+        manual_spend_currency: None,
         note: None,
         balance_mode: Some("custom".into()),
         custom_url: input.custom_url.clone(),
@@ -1258,8 +1207,9 @@ pub fn open_external(app: AppHandle, url: String) -> Result<(), String> {
 #[tauri::command]
 pub fn app_info(state: State<'_, AppState>) -> serde_json::Value {
     serde_json::json!({
-        "version": env!("CARGO_PKG_VERSION"),
+        "version": crate::version::display_version(),
         "configDir": state.store.dir().to_string_lossy(),
+        "storageIssues": state.store.read_issues(),
     })
 }
 
@@ -1270,24 +1220,8 @@ pub fn show_main_window(app: AppHandle, account: Option<String>) {
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
-    if let Some(p) = app.get_webview_window("tray") {
-        let _ = p.hide();
-    }
-    // 从悬浮卡点进来时，带着账户 id，主面板会直接打开该账户
+    // 可按账户 id 定位编辑面板
     if let Some(id) = account.filter(|s| !s.trim().is_empty()) {
         let _ = app.emit("focus-account", id);
-    }
-}
-
-/// 悬浮卡按内容自适应高度
-#[tauri::command]
-pub fn resize_popup(app: AppHandle, height: f64) {
-    crate::tray::resize_popup(&app, height);
-}
-
-#[tauri::command]
-pub fn hide_popup(app: AppHandle) {
-    if let Some(p) = app.get_webview_window("tray") {
-        let _ = p.hide();
     }
 }

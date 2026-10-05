@@ -1,27 +1,32 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountSheet } from "./components/AccountSheet";
 import { IconGear, IconLayers, IconPlus, IconRefresh, IconWallet } from "./components/icons";
-import { Button, EmptyState } from "./components/ui";
+import { Button, EmptyState, Notice } from "./components/ui";
 import { api, events } from "./lib/api";
 import { money } from "./lib/format";
-import { toast, useAccounts, useSettings, useToasts } from "./lib/store";
+import { overviewState } from "./lib/accountOverview";
+import { toast, useAccounts, useSettings } from "./lib/store";
+import { ToastStack } from "./components/ToastStack";
 import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
 import { ModelsView } from "./views/ModelsView";
 import { SettingsView } from "./views/SettingsView";
+import { LadderView } from "./views/LadderView";
+import { ActivityView } from "./views/ActivityView";
 import appIcon from "../src-tauri/icons/128x128.png";
 
-type View = "accounts" | "models" | "settings";
+type View = "accounts" | "models" | "ladder" | "activity" | "settings";
 
 export default function App() {
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
-  const toasts = useToasts();
 
   const [view, setView] = useState<View>("accounts");
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [info, setInfo] = useState<AppInfo | null>(null);
-  const [sheetFor, setSheetFor] = useState<{ account: AccountView | null } | null>(null);
+  const [sheetFor, setSheetFor] = useState<{ account: AccountView | null; mode?: "manual" } | null>(null);
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
   const [providerFilter, setProviderFilter] = useState("all");
   const [modelCount, setModelCount] = useState(0);
@@ -55,7 +60,7 @@ export default function App() {
     }
   }, [pendingFocus, accounts]);
 
-  const lowCount = accounts.filter((a) => a.low).length;
+  const { low: lowCount, failed: failedCount, pending: pendingCount } = overviewState(accounts);
   const onCount = useCallback((n: number) => setModelCount(n), []);
 
   const openModels = (provider: string) => {
@@ -64,15 +69,15 @@ export default function App() {
   };
 
   const title =
-    view === "accounts" ? "账户总览" : view === "models" ? "模型库" : "设置";
+    view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "ladder" ? "AI 模型天梯" : view === "activity" ? "Token 活动" : "设置";
   const sub =
     view === "accounts"
       ? accounts.length === 0
         ? "还没有添加账户"
-        : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个余额不足` : " · 余额都正常"}`
+        : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个额度不足` : ""}${failedCount > 0 ? ` · ${failedCount} 个同步异常` : ""}${pendingCount > 0 ? ` · ${pendingCount} 个待查询` : ""}${!lowCount && !failedCount && !pendingCount ? " · 状态正常" : ""}`
       : view === "models"
         ? `${modelCount} 个可用模型 · 价格以官网为准`
-        : "刷新频率、提醒阈值与数据位置";
+        : view === "ladder" ? "十家厂商的能力排名与官方价格" : view === "activity" ? "历史用量与跨设备同步" : "同步与提醒";
 
   return (
     <div className="app">
@@ -101,6 +106,10 @@ export default function App() {
           模型库
           <span className="count">{modelCount || ""}</span>
         </button>
+        <button className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
+          <IconLayers size={16} />AI 模型天梯
+        </button>
+        <button className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconLayers size={16}/>Token 活动</button>
         <button
           className={`nav-item${view === "settings" ? " active" : ""}`}
           onClick={() => setView("settings")}
@@ -115,9 +124,7 @@ export default function App() {
               {lowCount} 个账户余额不足
             </div>
           ) : null}
-          API Key 保存在系统凭据管理器
-          <br />
-          充值跳转官方页面，不经手支付
+          Quota {info?.version ?? ""}
         </div>
       </aside>
 
@@ -126,7 +133,7 @@ export default function App() {
           <h1>{title}</h1>
           <span className="sub">{sub}</span>
           <div className="spacer" />
-          {view !== "settings" ? (
+          {view === "accounts" || view === "models" ? (
             <Button
               size="sm"
               onClick={() => void refreshAll()}
@@ -136,13 +143,21 @@ export default function App() {
               {refreshing ? "刷新中…" : "刷新全部"}
             </Button>
           ) : null}
-          <Button size="sm" variant="primary" onClick={() => setSheetFor({ account: null })}>
+          {view === "accounts" || view === "models" ? <Button size="sm" variant="primary" onClick={() => setSheetFor({ account: null })}>
             <IconPlus size={13} />
             添加账户
-          </Button>
+          </Button> : null}
         </div>
 
-        <div className="content">
+        <div className="content" ref={contentRef}>
+          {info?.storageIssues?.length ? (
+            <div className="content-inner" style={{ paddingBottom: 0 }}>
+              <Notice tone="error" actions={<Button size="sm" onClick={() => setView("settings")}>查看配置目录</Button>}>
+                <strong>部分本机资料未能读取，相关文件已暂停保存</strong>
+                {info.storageIssues.map(issue => <p key={issue}>{issue}</p>)}
+              </Notice>
+            </div>
+          ) : null}
           {view === "accounts" ? (
             <AccountsView
               accounts={accounts}
@@ -150,7 +165,7 @@ export default function App() {
               refreshing={refreshing}
               onRefreshOne={(id) => void refreshOne(id)}
               onAdd={() => setSheetFor({ account: null })}
-              onEdit={(account) => setSheetFor({ account })}
+              onEdit={(account, mode) => setSheetFor({ account, mode })}
               onOpenModels={openModels}
             />
           ) : null}
@@ -161,7 +176,7 @@ export default function App() {
                 <EmptyState
                   icon={<IconLayers size={26} />}
                   title="模型库还空着"
-                  desc="模型库会根据你添加的账户，拉取该平台实际可用的模型，并匹配简介、价格与能力标签。先添加一个账户试试。"
+                  desc="添加账户后即可同步可用模型。"
                   action={
                     <Button variant="primary" onClick={() => setSheetFor({ account: null })}>
                       添加模型账户
@@ -182,6 +197,8 @@ export default function App() {
             )
           ) : null}
 
+          {view === "ladder" ? <LadderView autoUpdate={settings?.ladderAutoUpdate ?? false} /> : null}
+          {view === "activity" ? <ActivityView /> : null}
           {view === "settings" ? (
             <SettingsView settings={settings} onUpdate={(s) => void update(s)} info={info} />
           ) : null}
@@ -192,6 +209,7 @@ export default function App() {
         <AccountSheet
           providers={providers}
           initial={sheetFor.account}
+          initialBalanceMode={sheetFor.mode}
           defaultThreshold={settings?.defaultLowThreshold ?? 20}
           onClose={() => setSheetFor(null)}
           onSaved={(view) => {
@@ -208,13 +226,7 @@ export default function App() {
         />
       ) : null}
 
-      <div className="toasts">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast${t.kind === "error" ? " error" : ""}`}>
-            {t.text}
-          </div>
-        ))}
-      </div>
+      <ToastStack />
     </div>
   );
 }

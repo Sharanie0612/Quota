@@ -1,7 +1,7 @@
 {
   "name": "quota",
   "private": true,
-  "version": "1.0.1000",
+  "version": "1.0.1001",
   "type": "module",
   "description": "A lightweight local-first dashboard for AI provider balances and quotas.",
   "scripts": {

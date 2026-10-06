@@ -180,5 +180,66 @@ fn main() {
         Some(0.0)
     );
     println!("PASS restart restores display snapshot without credential access");
+    // The account form stores '%' even when an automatic subscription has no
+    // manual balance. It must not block the entire shared account exchange.
+    let percent_shared = root.join("percent-shared");
+    let mut percent_accounts = vec![];
+    for provider in ["mimo-plan", "custom"] {
+        for manual_balance in [None, Some(0.0), Some(65.0), Some(100.0)] {
+            percent_accounts.push(serde_json::from_value(json!({
+                "id":uuid::Uuid::new_v4().to_string(), "provider":provider,
+                "label":"百分比订阅", "createdAt":"2026-10-05T00:00:00Z",
+                "balanceMode":if manual_balance.is_some(){"manual"}else if provider=="custom"{"codex"}else{"console"},
+                "manualBalance":manual_balance, "manualCurrency":"%",
+                "manualRechargeCurrency":"CNY", "manualSpendCurrency":"CNY"
+            })).unwrap());
+        }
+    }
+    let percent_a = state(&root.join("percent-a"), &percent_shared, percent_accounts.clone());
+    let percent_b = state(&root.join("percent-b"), &percent_shared, vec![]);
+    for account in &percent_accounts {
+        if let Some(total) = account.manual_balance {
+            percent_a.statuses.lock().unwrap().insert(account.id.clone(), AccountStatus {
+                last_checked: Some("2026-10-05T00:00:00Z".into()),
+                balance: Some(Balance { currency:"%".into(), total:Some(total),
+                    source:"manual".into(), usable:None, note:None, raw:None, amounts:vec![] }),
+                ..Default::default()
+            });
+        }
+    }
+    account_sync::sync(&percent_a).unwrap();
+    account_sync::sync(&percent_b).unwrap();
+    account_sync::sync(&percent_a).unwrap();
+    account_sync::sync(&percent_b).unwrap();
+    let imported = percent_b.config.lock().unwrap();
+    assert_eq!(imported.accounts.len(), percent_accounts.len());
+    for original in &percent_accounts {
+        let copy = imported.accounts.iter().find(|a| a.id==original.id).unwrap();
+        assert_eq!(copy.manual_currency.as_deref(), Some("%"));
+        assert_eq!(copy.manual_balance, original.manual_balance);
+        if let Some(total) = original.manual_balance {
+            let statuses = percent_b.statuses.lock().unwrap();
+            let balance = statuses[&original.id].balance.as_ref().unwrap();
+            assert_eq!(balance.currency, "%");
+            assert_eq!(balance.total, Some(total));
+        }
+    }
+    drop(imported);
+    println!("PASS automatic and manual MiMo/ChatGPT percentage profiles and snapshots sync across devices; absent, zero, 65 and 100 stay distinct; repeat sync is idempotent");
+    for invalid in [-1.0, 101.0] {
+        percent_a.config.lock().unwrap().accounts[0].manual_balance = Some(invalid);
+        assert!(account_sync::sync(&percent_a).is_err());
+    }
+    percent_a.config.lock().unwrap().accounts[0].manual_balance = None;
+    for field in ["manualRechargeCurrency", "manualSpendCurrency", "manualCurrency"] {
+        let invalid_account = serde_json::from_value(json!({
+            "id":uuid::Uuid::new_v4().to_string(), "provider":"mimo-plan",
+            "label":"无效单位", "createdAt":"2026-10-05T00:00:00Z",
+            (field):if field=="manualCurrency"{"FORBIDDEN-UNIT"}else{"%"}
+        })).unwrap();
+        let invalid_state = state(&root.join(field), &root.join(format!("invalid-{field}")), vec![invalid_account]);
+        assert!(account_sync::sync(&invalid_state).is_err());
+    }
+    println!("PASS percentages outside 0..100, percentages used as spend/recharge currencies and unknown units are rejected");
     fs::remove_dir_all(root).unwrap();
 }

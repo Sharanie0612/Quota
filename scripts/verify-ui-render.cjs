@@ -23,6 +23,9 @@ const render = (Component, props) => renderToStaticMarkup(React.createElement(Co
 const { LadderChart, ladderCurrencyGroups } = load(path.resolve(__dirname, '../src/components/LadderChart.tsx'));
 const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
 const entries = [entry('model-yuan', 'CNY', 1), entry('model-dollar', 'USD', 1), { ...entry('unknown', 'CNY', null), verifiedAt: null }];
+const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, layout:'combined', exchange:null});
+assert.match(noExchange,/美元型号不会被隐藏/);
+assert.match(noExchange,/aria-label="model-dollar，/);
 assert.equal(ladderCurrencyGroups(entries).map(group => group.currency).join(','), 'CNY,USD');
 const props = { entries, domain: 'general', focused: null, onFocus: () => {}, exchange: { cnyPerUsd:7, date:"2026-10-02", error:null } };
 const split = render(LadderChart, { ...props, layout: 'split' });
@@ -37,7 +40,7 @@ for (const html of [split, combined]) {
 assert.match(combined, /1 USD = 7.0000 CNY/);
 assert.match(combined, /CNY统一价格与性能坐标图/);
 const noRate = render(LadderChart,{...props,layout:'combined',exchange:null});
-assert.equal((noRate.match(/role="button"/g)||[]).length,1);
+assert.equal((noRate.match(/role="button"/g)||[]).length,2);
 console.log('PASS one normalized price axis, original prices, FX-unavailable fallback and exclusion of unknown prices');
 
 const { AccountCard } = load(path.resolve(__dirname, '../src/components/AccountCard.tsx'));
@@ -89,9 +92,10 @@ console.log('PASS model namespaces/effort IDs preserved, vendor search and unkno
 
 const {SettingsView}=load(path.resolve(__dirname,'../src/views/SettingsView.tsx'));
 const settingsHtml=render(SettingsView,{settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},info:null});
-assert.match(settingsHtml,/>导出数据<\/button>/);assert.match(settingsHtml,/Token 活动/);assert.match(settingsHtml,/导入并合并统计/);assert.match(settingsHtml,/个人账户/);assert.match(settingsHtml,/导出加密备份/);
+assert.match(settingsHtml,/>导出<\/button>/);assert.match(settingsHtml,/Token 采集频率/);assert.match(settingsHtml,/导出备份/);assert.ok(!settingsHtml.includes('飞书'));assert.ok(!settingsHtml.includes('导出数据</button>'));
 assert.match(settingsHtml,/导入数据 \/ 迁移账户/);assert.match(settingsHtml,/未选内容保留/);assert.match(settingsHtml,/macOS/);
-console.log('PASS separate data export button, content scope and import limitation alongside encrypted backup');
+assert.match(settingsHtml,/跨设备同步/);assert.match(settingsHtml,/iCloud Drive/);assert.match(settingsHtml,/不含任何登录凭据/);
+console.log('PASS unified backup export/import, configurable collection frequency, shared account privacy boundary and no Feishu sync entry');
 
 const {priceText}=load(path.resolve(__dirname,'../src/lib/format.ts'));
 assert.equal(priceText(0.0125,'CNY'),'¥0.0125');assert.equal(priceText(123.456,'USD'),'$123.456');assert.equal(priceText(0.000001,'USD'),'$0.000001');

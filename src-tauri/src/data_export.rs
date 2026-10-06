@@ -112,7 +112,7 @@ pub async fn export_activity_sync(app:AppHandle,path:String)->Result<String,Stri
         let activity=activity_data(state.store.dir())?;
         let n=activity["events"].as_array().map_or(0,Vec::len);
         let value=json!({"format":"quota-activity-sync","schemaVersion":1,"exportedAt":chrono::Utc::now().to_rfc3339(),"activity":activity});
-        write_file(Path::new(&path),state.store.dir(),&value)?;Ok(format!("已导出 {n} 条统计记录，请上传到飞书 Quota 同步文件夹"))
+        write_file(Path::new(&path),state.store.dir(),&value)?;Ok(format!("已导出 {n} 条统计记录"))
     }).await.map_err(|_|"导出统计任务中断".to_string())?
 }
 #[tauri::command]

@@ -1,6 +1,6 @@
 # macOS 构建与本地交付
 
-展示版本 `1.0.0900`，包版本 `1.0.900`。2026-10-05 在 Apple Silicon Mac 上完成 arm64 原生构建；尚未公开发布，Intel / Universal 构建未验证。
+当前展示版本与包版本均为 `1.0.1000`。Apple Silicon 使用 arm64 原生构建；尚未公开发布，Intel / Universal 构建未验证。此前 1.0.0900 验证记录保留在下方。
 
 ## 环境与构建
 
@@ -24,13 +24,9 @@ npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"ma
 产物：
 
 - `src-tauri/target/release/bundle/macos/Quota.app`
-- `src-tauri/target/release/bundle/dmg/Quota_1.0.900_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Quota_1.0.1000_aarch64.dmg`
 
-自定义配置构建不会自动按展示号重命名 DMG。确认目标文件不存在后，交付时重命名：
-
-```bash
-mv -n src-tauri/target/release/bundle/dmg/Quota_1.0.900_aarch64.dmg src-tauri/target/release/bundle/dmg/Quota_1.0.0900_aarch64.dmg
-```
+当前展示号与包版本相同，无需重命名。将来二者不同时，交付需使用完整展示号命名；例如旧版包版本 `1.0.900` 对应展示号 `1.0.0900`，不要覆盖已有交付文件。
 
 若 DMG 创建步骤失败而 App 已生成，查看打包日志并确认当前运行环境允许 `hdiutil` 创建、挂载和卸载临时磁盘映像，再重试；无需删除已有编译缓存。
 
@@ -43,6 +39,8 @@ mv -n src-tauri/target/release/bundle/dmg/Quota_1.0.900_aarch64.dmg src-tauri/ta
 当前使用临时签名，未完成 Apple Developer ID 签名或公证。系统可能阻止首次打开；确认安装包来源后，在「系统设置 → 隐私与安全性」中允许打开。公开分发前需要另行完成正式签名与公证。
 
 ## 实际验证与限制
+
+2026-10-06 的 1.0.1000 已完成 arm64 App / DMG 构建、整包临时签名与 DMG 校验，隔离配置关闭账户查询/采集/同步后启动存活检查通过。包大小约 5.5 MB，完整 SHA-256 与范围见 [1.0.1000 交付说明](release-1.0.1000.md)。构建 App 副本已移入废纸篓，保留 DMG，不替换现有 `/Applications/Quota.app`。
 
 2026-10-05 本地构建结果：
 
@@ -63,6 +61,6 @@ shasum -a 256 src-tauri/target/release/bundle/dmg/Quota_1.0.0900_aarch64.dmg
 
 这些检查确认构建、签名结构和磁盘映像完整性，不代表五页界面、真实账户登录、Keychain 读写、备份恢复或跨设备统计已完成实机验收。
 
-macOS 配置与统计目录为 `~/Library/Application Support/Quota/`，凭据后端为系统 Keychain。共享目录需在每台设备重新选择，ChatGPT 需显式连接新设备的 Codex 登录，小米 Cookie 可能需要重新登录。飞书自动同步目前按 Windows 的默认 npm 全局路径查找 `lark-cli.exe`，不能宣称 macOS 自动同步已可用；文件导出 / 导入流程需另行实机验证。
+macOS 配置与统计目录为 `~/Library/Application Support/Quota/`，凭据后端为系统 Keychain。共享目录需在每台设备重新选择，ChatGPT 需显式连接新设备的 Codex 登录，小米 Cookie 可能需要重新登录。1.0.1000 已移除飞书同步，新增共享目录账户展示资料同步；不传任何凭据，详见 [账户同步](account-sync.md)。真实钥匙串迁移与云端传输需另行实机验证。
 
 构建产物遵守 `.gitignore`，不提交到 Git 源码仓库；安装包公开发布与源码推送分别进行。

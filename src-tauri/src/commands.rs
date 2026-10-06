@@ -20,6 +20,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 pub struct AppState {
+    pub account_sync_lock: Mutex<()>,
     pub activity_lock: Mutex<()>,
     pub ladder: Mutex<crate::ladder::Snapshot>,
     pub ladder_refreshing: Mutex<bool>,
@@ -69,6 +70,7 @@ impl AppState {
             builder.build().unwrap_or_default()
         };
         Self {
+            account_sync_lock: Mutex::new(()),
             activity_lock: Mutex::new(()),
             ladder: Mutex::new(crate::ladder::load(store.dir())),
             ladder_refreshing: Mutex::new(false),

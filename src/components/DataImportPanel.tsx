@@ -74,10 +74,10 @@ export function DataImportPanel({ onClose, onBusyChange }: {onClose: () => void;
       </fieldset>}
       {preview.credentials && <label className="migration-option"><input type="checkbox" checked={selection.credentials && selection.accountIds.length > 0} disabled={busy || !selection.accountIds.length}
         onChange={e => setSelection({...selection, credentials: e.target.checked})} />同时导入所选账户的 API Key 和小米登录信息</label>}
-      <fieldset className="migration-choices" disabled={busy}><legend>其他内容</legend>
+      <details><summary>自定义导入范围</summary><fieldset className="migration-choices" disabled={busy}><legend>其他内容</legend>
         {sections.map(section => <label key={section.key}><input type="checkbox" disabled={!section.available} checked={selection[section.key] && !!section.available}
           onChange={e => setSelection({...selection, [section.key]: e.target.checked})} />{section.label}{!section.available ? " · 文件未包含" : ""}</label>)}
-      </fieldset>
+      </fieldset></details>
       <p className="hint">选择账户时，余额历史只导入这些账户；只选余额历史时，仅合并本机已有账户的记录。ChatGPT 迁移后需连接新设备的 Codex 登录；共享目录和采集路径需在新设备重新选择。</p>
       <Button variant="primary" size="sm" disabled={busy || !chosen} onClick={() => void importSelected()}>导入所选内容</Button>
     </>}

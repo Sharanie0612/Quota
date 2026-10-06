@@ -5,7 +5,7 @@ import { Button, Notice, Seg, Switch } from "../components/ui";
 import { DataImportPanel } from "../components/DataImportPanel";
 import { api, copyText, errText } from "../lib/api";
 import { toast } from "../lib/store";
-import type { AppInfo, Settings } from "../lib/types";
+import type { ActivityOptions, AppInfo, Settings } from "../lib/types";
 
 const INTERVALS = [
   { value: "10", label: "10 分钟" },
@@ -36,27 +36,38 @@ export function SettingsView({
   const [backupPanel, setBackupPanel] = useState<BackupPanel>(null);
   const [backupPw, setBackupPw] = useState("");
   const [backupPw2, setBackupPw2] = useState("");
+  const [includeCredentials, setIncludeCredentials] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
   const [dataBusy, setDataBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [dataExport, setDataExport] = useState<{path:string; summary:string} | null>(null);
-  const [feishu, setFeishu] = useState<Awaited<ReturnType<typeof api.getFeishuSync>> | null>(null);
-  const [syncBusy, setSyncBusy] = useState(false);
-  useEffect(() => { void api.getFeishuSync().then(setFeishu).catch(() => undefined); }, []);
-  const syncCloud = async (enable: boolean) => {
-    setSyncBusy(true);
-    try { toast(await api.syncFeishu(enable)); }
-    catch (e) { toast(errText(e), "error"); }
-    finally { await api.getFeishuSync().then(setFeishu).catch(() => undefined); setSyncBusy(false); }
-  };
-  const syncFile = async (importing: boolean) => {
-    setSyncBusy(true);
+  const [activity, setActivity] = useState<ActivityOptions | null>(null);
+  const [activityBusy, setActivityBusy] = useState(false);
+  const [activityError, setActivityError] = useState("");
+  const [cloudStatus, setCloudStatus] = useState<{lastSynced:string|null;error:string|null}|null>(null);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  useEffect(() => {void api.getAccountSyncStatus().then(setCloudStatus).catch(()=>undefined);}, []);
+  useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
+  const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
+    if (!activity || activityBusy) return false;
+    setActivityBusy(true);
     try {
-      const filters=[{name:"Quota 统计同步",extensions:["json"]}];
-      const picked=importing?await open({title:"导入从飞书下载的统计文件",multiple:false,filters}):await save({title:"导出统计同步文件",defaultPath:`Quota统计-${new Date().toISOString().replace(/[:.]/g,"-")}.json`,filters});
-      const path=typeof picked==="string"?picked:Array.isArray(picked)?picked[0]:null;
-      if(path)toast(await (importing?api.importActivitySync(path):api.exportActivitySync(path)));
-    } catch(e){toast(errText(e),"error");} finally {setSyncBusy(false);}
+      const current = await api.getActivityOptions();
+      const next = {...current, ...patch};
+      await api.saveActivityOptions(next);setActivity(next);setActivityError("");return true;
+    } catch(e) {setActivityError(errText(e));return false;}
+    finally {setActivityBusy(false);}
+  };
+  const syncCloud = async () => {
+    setCloudBusy(true);
+    try {await api.syncAccounts();toast("账户展示资料已与共享目录合并；云盘传输由对应客户端完成");}
+    catch(e){toast(errText(e),"error");}
+    finally {await api.getAccountSyncStatus().then(setCloudStatus).catch(()=>undefined);setCloudBusy(false);}
+  };
+  const chooseCloud = async () => {
+    try {const path=await open({directory:true,multiple:false,title:"选择 iCloud Drive、OneDrive 或 NAS 中各设备共用的目录"});
+      if(typeof path==="string" && await updateActivity({syncDir:path}))await syncCloud();
+    }catch(e){toast(errText(e),"error");}
   };
 
   if (!settings) {
@@ -75,6 +86,7 @@ export function SettingsView({
     setBackupPanel(null);
     setBackupPw("");
     setBackupPw2("");
+    setIncludeCredentials(false);
   };
 
   /** 导出加密备份：选保存位置 → Rust 端打包 config + 资料 + 凭据并加密写入 */
@@ -118,6 +130,7 @@ export function SettingsView({
       const summary = await api.exportData(path);
       setDataExport({path,summary});
       toast(summary);
+      closeBackupPanel();
     } catch (e) { toast(errText(e), "error"); }
     finally { setDataBusy(false); }
   };
@@ -129,6 +142,22 @@ export function SettingsView({
 
   return (
     <div className="content-inner" style={{ maxWidth: 760 }}>
+      <div className="card section">
+        <h2><IconClock size={14} /> Token 活动</h2>
+        <p>从本地日志增量采集用量，采集完成后自动更新图表。</p>
+        <div className="setting-row"><div className="txt"><b>自动采集</b><span>仅在 Quota 运行时执行；关闭后可在 Token 活动页手动采集</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
+        <div className="setting-row"><div className="txt"><b>采集频率</b><span>默认 30 秒；Token 共享交换最低间隔 5 分钟</span></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        {activityError && <Notice tone="warn">{activityError}</Notice>}
+      </div>
+      <div className="card section">
+        <h2><IconGear size={14} /> 跨设备同步</h2>
+        <p>选择各设备共用的 iCloud Drive、OneDrive 或 NAS 文件夹；由对应云盘客户端传输，Quota 不创建云账户。</p>
+        <div className="setting-row"><div className="txt"><b>共享目录</b><span style={{overflowWrap:"anywhere"}}>{activity?.syncDir || "未开启；请在每台设备选择同一个目录"}</span></div><Button size="sm" disabled={!activity || activityBusy || cloudBusy} onClick={()=>void chooseCloud()}>选择目录</Button></div>
+        <div className="setting-row"><div className="txt"><b>同步账户展示资料</b><span>账户名称、金额、提醒阈值与余额/订阅快照；每 5 分钟合并，不含任何登录凭据或自定义连接配置</span></div><Switch checked={activity?.syncAccounts ?? true} disabled={!activity || activityBusy || cloudBusy} label="同步账户展示资料" onChange={value=>void updateActivity({syncAccounts:value})}/></div>
+        <p className="hint">Token 活动使用同一目录。删除账户仅影响本机；同账户资料冲突取最新编辑，余额快照取最新查询时间，不累加。新设备查询需单独连接账户。请勿在账户名称或设备名称中填写秘密。</p>
+        {activity?.syncDir && <div className="tag-row"><Button size="sm" disabled={cloudBusy || activityBusy || !activity.syncAccounts} onClick={()=>void syncCloud()}>{cloudBusy?"同步中…":"立即同步账户"}</Button><Button size="sm" disabled={cloudBusy || activityBusy} onClick={()=>void updateActivity({syncDir:""})}>关闭目录同步</Button><span className="hint">{cloudStatus?.lastSynced?`本机上次合并：${new Date(cloudStatus.lastSynced).toLocaleString()}`:"尚未合并"}</span></div>}
+        {cloudStatus?.error && <Notice tone="warn">{cloudStatus.error}</Notice>}
+      </div>
       <div className="card section">
         <h2>
           <IconClock size={14} /> 余额刷新
@@ -275,20 +304,12 @@ export function SettingsView({
         <h2>
           <IconGear size={14} /> 备份与迁移
         </h2>
-        <div className="setting-row"><div className="txt"><b>飞书跨设备统计同步</b><span>个人账户：导出 → 上传到“我的空间 / Quota 同步” → 其他设备下载并导入。按事件合并，重复导入不会叠加计数。</span></div><Button size="sm" disabled={syncBusy} onClick={() => void api.openExternal("https://my.feishu.cn/drive/me/").catch(e=>toast(errText(e),"error"))}>打开飞书云盘</Button></div>
-        <div className="setting-row"><Button size="sm" disabled={syncBusy} onClick={()=>void syncFile(false)}>导出统计同步文件</Button><Button size="sm" disabled={syncBusy} onClick={()=>void syncFile(true)}>{syncBusy?"处理中…":"导入并合并统计"}</Button></div>
-        <p className="hint">只同步设备名、模型、会话标识和用量指标；也支持已有“导出数据”文件中的活动记录。合并后再次导出可转交其他设备。</p>
-        <details><summary>企业账户自动同步（需要开放平台授权）</summary><p className="hint">每台设备需安装飞书官方 CLI 并登录同一飞书账号。个人账户无法授权时，请使用上方文件同步。</p><Button size="sm" disabled={syncBusy} onClick={() => void syncCloud(true)}>{syncBusy ? "同步中…" : feishu?.enabled ? "立即同步" : "连接并同步"}</Button></details>
-        {feishu?.enabled && <div className="setting-row"><span className="hint">上次同步：{feishu.lastSynced ? new Date(feishu.lastSynced).toLocaleString() : "尚未完成"}</span><Button size="sm" disabled={syncBusy} onClick={() => void syncCloud(false)}>关闭飞书同步</Button></div>}
-        {feishu?.error && <Notice tone="warn">{feishu.error}</Notice>}
-        <div className="setting-row"><div className="txt"><b>导出数据</b><span>账户资料、余额历史、设置、模型资料和 Token 活动，保存为跨平台 JSON；不含登录凭据。</span></div><Button size="sm" disabled={dataBusy || backupBusy} onClick={() => void doDataExport()}>{dataBusy ? "处理中…" : "导出数据"}</Button></div>
-        <p>普通 JSON 支持选择内容导入；账户名称、手动金额及提醒阈值会保留，密钥和小米登录信息请使用加密备份迁移到 macOS。</p>
+        <p>统一导出与导入账户、余额历史、设置、模型资料及 Token 活动。</p>
         {dataExport && <Notice><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
-        <p>加密保存账户与密钥。请妥善保管密码，遗失后无法恢复。</p>
         <div className="setting-row">
           <div className="txt">
-            <b>导出加密备份</b>
-            <span>包含全部账户、API Key、小米登录信息、设置、模型资料、余额历史和 Token 活动；Windows / macOS 通用</span>
+            <b>导出备份</b>
+            <span>默认不含登录信息；可选择加密保存密钥与小米连接</span>
           </div>
           <Button
             size="sm"
@@ -298,6 +319,8 @@ export function SettingsView({
             导出
           </Button>
         </div>
+        {backupPanel && <label className="migration-option"><input type="checkbox" checked={includeCredentials} disabled={backupBusy || dataBusy} onChange={e=>setIncludeCredentials(e.target.checked)}/>包含登录信息（需要加密密码）</label>}
+        {backupPanel && !includeCredentials && <div className="backup-panel"><Button variant="primary" size="sm" disabled={dataBusy || backupBusy} onClick={()=>void doDataExport()}>{dataBusy?"处理中…":"保存备份"}</Button><Button size="sm" variant="quiet" onClick={closeBackupPanel}>取消</Button></div>}
         <div className="setting-row">
           <div className="txt">
             <b>导入数据 / 迁移账户</b>
@@ -312,7 +335,7 @@ export function SettingsView({
           </Button>
         </div>
         {importOpen ? <DataImportPanel onClose={() => setImportOpen(false)} onBusyChange={setDataBusy} /> : null}
-        {backupPanel ? (
+        {backupPanel && includeCredentials ? (
           <div className="backup-panel">
             <div className="backup-fields">
               <input
@@ -360,7 +383,7 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>API Key 存放位置</b>
-            <span>Windows 凭据管理器</span>
+            <span>系统凭据库（Windows 凭据管理器 / macOS 钥匙串）</span>
           </div>
         </div>
         <div className="setting-row">

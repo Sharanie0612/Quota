@@ -1,7 +1,7 @@
 mod aliyun;
 pub mod activity;
+pub mod account_sync;
 pub mod data_export;
-mod feishu_sync;
 pub mod official_prices;
 pub mod official_tables;
 mod backup;
@@ -30,11 +30,13 @@ pub use catalog::{cards_for_account, comparison_entries, embedded_file, hidden_k
 pub use catalog::{save_entry as save_catalog_override, validate_entry as validate_catalog_entry};
 pub use mimo::{parse_balance, parse_plan_detail, parse_token_plan_usage, MimoMoney, PlanInfo, QuotaItem};
 pub use model::{Account, AccountInput, AccountStatus, AppConfig, CatalogEntry, RemoteModel};
+pub use model::{Balance, BalanceAmount};
 pub use commands::apply_manual_balance;
 pub use commands::AppState;
 pub use connections::update_mimo_cookie;
 pub use storage::Store;
 pub use proxy::system_proxy_url;
+pub use proxy::parse_macos_proxy;
 pub use providers::{fetch_balance, find, parse_zhipu_report};
 pub use secrets::get_secrets;
 pub use subscription::parse_usage as parse_subscription_usage;
@@ -63,6 +65,7 @@ pub fn run() {
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
             activity::spawn(app.handle().clone());
+            account_sync::spawn(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -87,6 +90,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             exchange::get_exchange_rate,
             activity::get_activity,
+            activity::get_activity_options,
             activity::refresh_activity,
             activity::save_activity_options,
             ladder::get_ladder,
@@ -112,9 +116,9 @@ pub fn run() {
             commands::export_backup,
             data_export::export_data,
             data_export::export_activity_sync,
+            account_sync::get_account_sync_status,
+            account_sync::sync_accounts,
             data_export::import_activity_sync,
-            feishu_sync::get_feishu_sync,
-            feishu_sync::sync_feishu,
             migration::preview_import,
             migration::import_data,
             commands::model_cards,

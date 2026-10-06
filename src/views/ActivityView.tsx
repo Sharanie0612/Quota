@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { api, errText } from "../lib/api";
 import { toast } from "../lib/store";
 import { Button, EmptyState, Field, Notice, Seg } from "../components/ui";
@@ -81,6 +82,11 @@ export function ActivityView() {
     void poll();
     return () => { cancelled = true; clearTimeout(timer); ++requestId.current; };
   }, [load, reloadKey]);
+  useEffect(() => {
+    let disposed=false;let cleanup:(()=>void)|undefined;
+    void listen("activity-updated",()=>setReloadKey(key=>key+1)).then(unlisten=>{if(disposed)unlisten();else cleanup=unlisten;}).catch(()=>undefined);
+    return ()=>{disposed=true;cleanup?.();};
+  }, []);
 
   useEffect(() => {
     let live = true; setRangeError("");
@@ -93,6 +99,7 @@ export function ActivityView() {
     setBusy("collect");
     try {
       await api.refreshActivity();
+      await api.syncAccounts();
       setSyncError("");
       // Restart with the current filters, even if they changed during collection.
       setReloadKey(key => key + 1);
@@ -112,11 +119,13 @@ export function ActivityView() {
     if (!options) return;
     setBusy("save");
     try {
-      await api.saveActivityOptions(options);
+      const current=await api.getActivityOptions();
+      await api.saveActivityOptions({...options,autoCollect:current.autoCollect,collectIntervalSeconds:current.collectIntervalSeconds,syncAccounts:current.syncAccounts});
       setOptions(null);
       // A collection failure must not be reported as a failed settings save.
       try {
         await api.refreshActivity();
+        await api.syncAccounts();
         setSyncError("");
         toast("统计设置已保存并同步");
       } catch (e) {
@@ -160,8 +169,8 @@ export function ActivityView() {
     {options && <section className="card activity-settings">
       <h3>自动采集与跨设备同步</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
-      <label className="review-confirm"><input type="checkbox" checked={options.autoCollect} disabled={!!busy} onChange={e => setOptions({ ...options, autoCollect: e.target.checked })} />打开 Quota 时每 5 分钟自动采集与同步</label>
-      <Field label="共享目录" hint="在每台设备选择同一个 OneDrive、网盘同步目录或 NAS。只同步用量记录。"><div className="activity-path">
+      <p className="hint">采集频率和账户跨设备同步在「设置」调整。</p>
+      <Field label="共享目录" hint="在每台设备选择同一个 iCloud Drive、OneDrive 或 NAS 目录；同步用量和已开启的账户展示资料，不同步密钥。"><div className="activity-path">
         <input className="input" aria-label="共享目录" readOnly value={options.syncDir} placeholder="尚未开启跨设备同步" />
         <Button disabled={!!busy} onClick={() => void choose("syncDir")}>选择目录</Button>
         <Button disabled={!!busy || !options.syncDir} onClick={() => setOptions({ ...options, syncDir: "" })}>关闭同步</Button>

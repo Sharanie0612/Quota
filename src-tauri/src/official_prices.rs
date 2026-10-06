@@ -67,7 +67,7 @@ async fn download_http(client:&reqwest::Client,url:&str)->Result<String,String>{
  let mut bytes=Vec::new();while let Some(chunk)=response.chunk().await.map_err(|_|"官网读取失败")? {if bytes.len()+chunk.len()>6*1024*1024{return Err("官网页面超出安全读取范围".into())}bytes.extend_from_slice(&chunk)}
  String::from_utf8(bytes).map_err(|_|"官网编码发生变化".into())
 }
-// Windows' native HTTP stack follows system networking that can differ from reqwest.
+// Native system networking can differ from reqwest on Windows and macOS.
 // Only public vendor documents/resources are allowed; no app data or credentials are passed.
 async fn download(client:&reqwest::Client,url:&str)->Result<String,String>{
  let result=download_http(client,url).await;
@@ -76,7 +76,20 @@ async fn download(client:&reqwest::Client,url:&str)->Result<String,String>{
   let known=SOURCES.iter().any(|(_,source)|*source==url)||url.strip_prefix("https://mimo.mi.com/static/").is_some_and(|path|path.ends_with(".chunk.js")&&path.chars().all(|c|c.is_ascii_alphanumeric()||matches!(c,'.'|'-')));
   if known {let url=url.to_string();if let Ok(Ok(body))=tauri::async_runtime::spawn_blocking(move||native_document(&url)).await{return Ok(body)}}
  }
+ #[cfg(target_os="macos")] {
+  let known=SOURCES.iter().any(|(_,source)|*source==url)||url.strip_prefix("https://mimo.mi.com/static/").is_some_and(|path|path.ends_with(".chunk.js")&&path.chars().all(|c|c.is_ascii_alphanumeric()||matches!(c,'.'|'-')));
+  if known {let url=url.to_string();if let Ok(Ok(body))=tauri::async_runtime::spawn_blocking(move||macos_document(&url)).await{return Ok(body)}}
+ }
  result
+}
+#[cfg(target_os="macos")]
+fn macos_document(url:&str)->Result<String,String>{
+ let mut command=std::process::Command::new("/usr/bin/curl");
+ command.args(["--disable","--fail","--location","--max-redirs","3","--proto","=https","--proto-redir","=https","--max-time","20","--max-filesize","6291456","--silent"]);
+ if let Some(proxy)=crate::proxy::system_proxy_url(){command.args(["--proxy",&proxy]);}
+ let output=command.arg(url).output().map_err(|_|"系统网络读取不可用")?;
+ if !output.status.success()||output.stdout.len()>6*1024*1024{return Err("系统网络读取失败".into())}
+ String::from_utf8(output.stdout).map_err(|_|"官网响应编码无效".into())
 }
 #[cfg(windows)]
 fn native_document(url:&str)->Result<String,String>{

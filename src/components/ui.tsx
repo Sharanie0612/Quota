@@ -69,10 +69,12 @@ export function Switch({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -80,6 +82,7 @@ export function Switch({
       onClick={() => onChange(!checked)}
       aria-label={label}
       aria-pressed={checked}
+      disabled={disabled}
       type="button"
     />
   );

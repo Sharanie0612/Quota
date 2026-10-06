@@ -724,6 +724,9 @@
         case "refresh_activity":
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
           return 0;
+        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",syncDir:""};
+        case "get_account_sync_status": return {lastSynced:null,error:null};
+        case "sync_accounts": return null;
         case "save_activity_options": window.demoActivityOptions=args.input;return null;
         case "get_exchange_rate": return { cnyPerUsd: 7, date: "2026-10-02", checkedAt: new Date().toISOString(), source: "synthetic UI demo", error: "演示汇率，非实际行情" };
         case "get_ladder":
@@ -779,10 +782,6 @@
             throw new Error("浏览器演示无法写入本机导出文件，请在 Quota 桌面应用中导出。");
         case "preview_import": return {fingerprint:"synthetic",encrypted:!!args.password,accounts:ACCOUNTS.slice(0,3).map(a=>({id:a.id,label:a.label,provider:a.provider,hasCredentials:!!args.password})),credentials:!!args.password,settings:true,catalog:true,catalogCount:2,balanceHistory:true,historyCount:12,activity:true,activityCount:42};
         case "import_data": return "演示：已导入所选内容，未选内容保留";
-        case "get_feishu_sync":
-          return {enabled:false,folderToken:"",lastSynced:null,error:null};
-        case "sync_feishu":
-          throw new Error("请在 Quota 桌面应用中连接飞书。");
         case "export_backup":
             return null;
         case "model_cards": {
@@ -846,7 +845,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.0900",
+            version: "1.0.1000",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen":

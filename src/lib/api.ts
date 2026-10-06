@@ -19,10 +19,11 @@ import type {
 } from "./types";
 
 export const api = {
-  getFeishuSync: () => invoke<{enabled:boolean; folderToken:string; lastSynced:string|null; error:string|null}>("get_feishu_sync"),
+  getAccountSyncStatus: () => invoke<{lastSynced:string|null;error:string|null}>("get_account_sync_status"),
+  syncAccounts: () => invoke<void>("sync_accounts"),
   exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
   importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
-  syncFeishu: (enable = true) => invoke<string>("sync_feishu", { enable }),
+  getActivityOptions: () => invoke<ActivityOptions>("get_activity_options"),
   exportData: (path: string) => invoke<string>("export_data", { path }),
   getExchangeRate: () => invoke<{ cnyPerUsd: number; date: string; checkedAt: string; source: string; error: string | null }>("get_exchange_rate"),
   getActivity: (device = "", source = "", days = 0, model = "", from = "", to = "") => invoke<ActivityReport>("get_activity", { device, source, days, model, from, to }),

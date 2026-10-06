@@ -1,4 +1,4 @@
-//! 读取 Windows 系统代理，让应用跟随系统代理（Clash / Clash Verge 开的代理）。
+//! 读取 Windows / macOS 系统 HTTP(S) 代理，让应用跟随系统代理。
 //!
 //! reqwest 默认只认环境变量代理（HTTP_PROXY 等），不认 Windows 的系统代理设置，
 //! 所以用户开了系统代理、应用仍然直连——对 chatgpt.com 这类直连不通的站点就全挂。
@@ -6,11 +6,14 @@
 //!
 //! 注意：代理设置改了要**重启应用**才会重新读取（只在启动时读一次）。
 
+#[cfg(any(windows, target_os="macos"))]
 use std::process::Command;
 
+#[cfg(windows)]
 const REG_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
 /// 读一个注册表值；拿不到（非 Windows、值不存在、reg 命令失败）返回 None
+#[cfg(windows)]
 fn query_reg_value(name: &str) -> Option<String> {
     let out = Command::new("reg")
         .args(["query", REG_KEY, "/v", name])
@@ -32,6 +35,7 @@ fn query_reg_value(name: &str) -> Option<String> {
 }
 
 /// `ProxyServer` 有两种格式：全局 `host:port` 或分协议 `http=h:80;https=h:443;socks=...`
+#[cfg(any(windows,test))]
 fn parse_proxy_server(raw: &str) -> Option<String> {
     let raw = raw.trim();
     if raw.is_empty() {
@@ -54,6 +58,7 @@ fn parse_proxy_server(raw: &str) -> Option<String> {
     chosen.filter(|v| !v.is_empty()).map(with_scheme)
 }
 
+#[cfg(any(windows,test))]
 fn with_scheme(v: &str) -> String {
     if v.contains("://") {
         v.to_string()
@@ -63,6 +68,7 @@ fn with_scheme(v: &str) -> String {
 }
 
 /// 系统代理地址（形如 `http://127.0.0.1:7897`）；未启用返回 None
+#[cfg(windows)]
 pub fn system_proxy_url() -> Option<String> {
     let enable = query_reg_value("ProxyEnable")?;
     // ProxyEnable 是 REG_DWORD，`reg query` 输出成 `0x1` / `1`
@@ -72,6 +78,26 @@ pub fn system_proxy_url() -> Option<String> {
     }
     parse_proxy_server(&query_reg_value("ProxyServer")?)
 }
+#[cfg(target_os="macos")]
+pub fn system_proxy_url()->Option<String>{
+    let out=Command::new("/usr/sbin/scutil").arg("--proxy").output().ok()?;
+    if !out.status.success(){return None}
+    parse_macos_proxy(&String::from_utf8_lossy(&out.stdout))
+}
+pub fn parse_macos_proxy(text:&str)->Option<String>{
+    let fields:std::collections::HashMap<_,_>=text.lines().filter_map(|line|line.split_once(':').map(|(k,v)|(k.trim(),v.trim()))).collect();
+    for kind in ["HTTPS","HTTP"]{
+        if fields.get(format!("{kind}Enable").as_str())==Some(&"1"){
+            let host=*fields.get(format!("{kind}Proxy").as_str())?;
+            let port=fields.get(format!("{kind}Port").as_str())?.parse::<u16>().ok()?;
+            if port==0||host.is_empty()||host.chars().any(|c|c.is_whitespace()||matches!(c,'/'|'@'|'?'|'#')){return None}
+            return Some(format!("http://{host}:{port}"))
+        }
+    }
+    None
+}
+#[cfg(not(any(windows,target_os="macos")))]
+pub fn system_proxy_url()->Option<String>{None}
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 [package]
 name = "quota"
-version = "1.0.900"
+version = "1.0.1000"
 description = "A lightweight local-first dashboard for AI provider balances and quotas."
 edition = "2021"
 rust-version = "1.77.2"

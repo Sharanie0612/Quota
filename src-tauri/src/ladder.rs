@@ -208,6 +208,8 @@ pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
         Ok((rankings,mut entries))=>{for e in &mut entries {e.rankings=rankings.get(&e.id).cloned().unwrap_or_default();} (entries,None)},
         Err(e)=>(previous.entries.clone(),Some(e)),
     };
+    // A partial ranking response must not discard verified models cached on another platform.
+    for old in &previous.entries {if !entries.iter().any(|entry|entry.id==old.id){entries.push(old.clone());}}
     for entry in &mut entries {
         if let Some(old)=previous.entries.iter().find(|e|e.id==entry.id&&e.verified_at.as_deref().unwrap_or("")>entry.verified_at.as_deref().unwrap_or("")){
             entry.price=old.price.clone();entry.price_source=old.price_source.clone();entry.verified_at=old.verified_at.clone();

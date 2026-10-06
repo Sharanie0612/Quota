@@ -4,7 +4,7 @@ use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use crate::commands::AppState;
 #[path = "activity_harness.rs"]
 mod harness;
@@ -17,14 +17,20 @@ fn now() -> i64 { chrono::Utc::now().timestamp_millis() }
 #[serde(rename_all="camelCase")]
 pub struct Options {
     pub device_id: String, pub device_name: String, pub auto_collect: bool,
+    #[serde(default = "default_interval")]
+    pub collect_interval_seconds: u64,
+    #[serde(default = "sync_accounts_default")]
+    pub sync_accounts: bool,
     pub codex_home: String, pub zcode_home: String, pub sync_dir: String,
     #[serde(default)]
     pub harness_home: String,
 }
+fn default_interval() -> u64 { 30 }
+fn sync_accounts_default() -> bool { true }
 pub fn options(dir: &Path) -> Options {
     fs::read(dir.join("activity-settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| {
         let home = std::env::var_os("USERPROFILE").map(PathBuf::from).or_else(dirs::home_dir).unwrap_or_default();
-        Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true,
+        Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
             codex_home: std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).to_string_lossy().into(),
             zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new() }
     })
@@ -165,6 +171,9 @@ fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,Stri
     if !path.exists(){return Ok(0)}
     let source=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_ONLY|OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|_| "ZCode 统计暂时无法读取")?;
     source.busy_timeout(std::time::Duration::from_millis(800)).map_err(|_| "ZCode 统计忙碌")?;
+    let modern = source.prepare("SELECT id FROM model_usage LIMIT 0").is_ok();
+    // New task-index databases hold scheduling metadata, not usage records.
+    if !modern && source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks')",[],|r|r.get::<_,bool>(0)).unwrap_or(false) { return Ok(0); }
     let key=format!("zcode:{}",path.to_string_lossy());let mut c=cursor(db,&key)?;let since=c.offset.saturating_sub(5000);
     let sql="SELECT logical_request_id,attempt_index,session_id,model_id,agent,COALESCE(completed_at,started_at,0),input_tokens,cache_read_input_tokens,cache_creation_input_tokens,output_tokens,reasoning_tokens,COALESCE(computed_total_tokens,provider_total_tokens),id FROM model_usage WHERE COALESCE(completed_at,started_at,0)>=?1 ORDER BY COALESCE(completed_at,started_at,0)";
     let mut statement=source.prepare(sql).map_err(|_| "此 ZCode 版本的统计格式暂不支持")?;
@@ -195,7 +204,7 @@ fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,Stri
 #[derive(Serialize,Deserialize)]
 struct Packet { schema:u32, device:OptionsDevice, events:Vec<Metric> }
 
-// 飞书只传输白名单指标包。每包最多 1000 条，重试按内容哈希复用文件名。
+// 旧指标包格式兼容：每包最多 1000 条，仅包含白名单指标。
 pub fn cloud_packets(dir: &Path) -> Result<Vec<(String,String)>,String> {
     let o=options(dir); save_options(dir,&o)?;
     let db=database(dir)?;
@@ -301,34 +310,59 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate(&token_events,|e|e.model.clone()),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default() })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
+    collect_cycle(dir, true)
+}
+fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     let o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
     let mut errors=Vec::new();let mut count=0;
     match collect_codex(&mut db,Path::new(&o.codex_home),&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}
     for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
-    if let Err(e)=sync(&mut db,&o){errors.push(e)}
-    if crate::feishu_sync::enabled(dir) { if let Err(e)=crate::feishu_sync::sync(dir) {errors.push(e)} }
-    crate::storage::write_atomic(&dir.join("activity-status.json"),&serde_json::json!({"at":now(),"errors":errors}).to_string())?;Ok(count)
+    let sync_errors:Vec<String>=if sync_enabled {
+        sync(&mut db,&o).err().into_iter().collect()
+    } else {
+        fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|v|v.get("syncErrors").cloned()).and_then(|v|serde_json::from_value(v).ok()).unwrap_or_default()
+    };
+    errors.extend(sync_errors.iter().cloned());
+    crate::storage::write_atomic(&dir.join("activity-status.json"),&serde_json::json!({"at":now(),"errors":errors,"syncErrors":sync_errors}).to_string())?;Ok(count)
 }
 #[tauri::command]
 pub async fn get_activity(app:AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();report_range(state.store.dir(),device,source,days,model,from,to)}).await.map_err(|_|"读取统计失败")?}
 #[tauri::command]
 pub async fn refresh_activity(app:AppHandle)->Result<usize,String>{
-    tauri::async_runtime::spawn_blocking(move ||{let state=app.state::<AppState>();let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;collect(state.store.dir())}).await.map_err(|_| "采集统计失败")?
+    tauri::async_runtime::spawn_blocking(move ||{let state=app.state::<AppState>();let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;let count=collect(state.store.dir())?;let _=app.emit("activity-updated", ());Ok(count)}).await.map_err(|_| "采集统计失败")?
 }
+#[tauri::command]
+pub fn get_activity_options(app:AppHandle)->Options{options(app.state::<AppState>().store.dir())}
 #[tauri::command]
 pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),String>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
     let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;
     let previous=options(state.store.dir());
     input.device_id=previous.device_id;input.device_name=label(&input.device_name);
+    if !(5..=3600).contains(&input.collect_interval_seconds) { return Err("采集间隔应为 5–3600 秒".into()); }
     for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
     if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}
     save_options(state.store.dir(),&input)
     }).await.map_err(|_|"保存统计设置失败")?
 }
-pub fn spawn(app:AppHandle){tauri::async_runtime::spawn(async move{tokio::time::sleep(std::time::Duration::from_secs(20)).await;loop{
-    let o={let state=app.state::<AppState>();options(state.store.dir())};if o.auto_collect{let _=refresh_activity(app.clone()).await;}
-    tokio::time::sleep(std::time::Duration::from_secs(300)).await;
-}});}
+pub fn spawn(app:AppHandle){tauri::async_runtime::spawn(async move{
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let mut last_collect=None;let mut last_sync=None;
+    loop {
+        let o={let state=app.state::<AppState>();options(state.store.dir())};
+        if o.auto_collect && last_collect.is_none_or(|t:std::time::Instant|t.elapsed().as_secs()>=o.collect_interval_seconds.clamp(5,3600)) {
+            let should_sync=last_sync.is_none_or(|t:std::time::Instant|t.elapsed().as_secs()>=300);
+            let handle=app.clone();
+            let completed=tauri::async_runtime::spawn_blocking(move||{
+                let state=handle.state::<AppState>();let Ok(_guard)=state.activity_lock.try_lock() else{return false};
+                if collect_cycle(state.store.dir(),should_sync).is_ok(){let _=handle.emit("activity-updated",());}
+                true
+            }).await.unwrap_or(false);
+            if completed{last_collect=Some(std::time::Instant::now());if should_sync{last_sync=last_collect;}}
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+});}

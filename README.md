@@ -1,13 +1,13 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/readme/hero-dark.svg">
-    <img src="assets/readme/hero-light.svg" alt="Quota — 本地优先的 AI 账户余额、订阅额度与用量看板。Windows 10+ · Tauri 2 · Rust · React">
+    <img src="assets/readme/hero-light.svg" alt="Quota — 本地优先的 AI 账户余额、订阅额度与用量看板。Windows 10+ · macOS Apple Silicon 本地构建 · Tauri 2 · Rust · React">
   </picture>
 </p>
 
 Quota 把散落在服务商控制台里的 AI 账户放进一个桌面窗口：查看余额和订阅额度，追踪 Token 用量，设置自动刷新与低余额提醒。充值与订阅按钮只打开官方页面，软件不经手支付。
 
-**Windows 10+ · 本地优先 · 浅色 / 深色模式 · 六种账户类型**
+**Windows 10+ · macOS Apple Silicon 本地构建 · 本地优先 · 浅色 / 深色模式 · 六种账户类型**
 
 [支持账户](#支持账户) · [备份与迁移](#备份与迁移) · [构建与开发](#构建与开发) · [文档](#文档)
 
@@ -15,7 +15,7 @@ Quota 把散落在服务商控制台里的 AI 账户放进一个桌面窗口：�
 
 最新本地交付版本为 **1.0.0900**（包版本 `1.0.900`，2026-10-05）。Windows 安装包已生成，隔离配置下的解包启动检查通过；尚未公开发布，实际覆盖安装与升级未验证。
 
-本次同步包含 **1.0.0900 的完整功能源码、验证脚本和文档**。构建前请确认检出的分支及 `package.json` 版本；产品源码同步与公开安装包发布分别进行。macOS 尚无已验证安装包，迁移格式已为后续 Mac 版本准备。
+`main` 已包含 **1.0.0900 的完整功能源码、验证脚本和文档**。2026-10-05 在 Apple Silicon Mac 上生成了原生 arm64 的 `Quota.app` 和 `Quota_1.0.0900_aarch64.dmg`，前端类型检查、生产构建、Rust 检查和逻辑自检（7/7）通过，整包临时签名与 DMG 完整性校验通过。macOS 安装包尚未公开发布，未做 Apple Developer ID 签名或公证；真实账户连接、钥匙串读写及跨平台迁移尚未完成实机验收，Intel / Universal 包未构建。
 
 本次更新：
 
@@ -90,7 +90,7 @@ Quota 把散落在服务商控制台里的 AI 账户放进一个桌面窗口：�
 2. 点击「读取内容」，选择具体账户及是否导入登录信息，再勾选设置、模型资料、余额历史或 Token 活动。
 3. 点击「导入所选内容」。按账户 ID 合并，其他账户与未选类别保留；历史和活动去重，写入失败时尝试回滚并报告结果。
 
-普通 JSON 与加密备份采用平台无关格式。**Mac 版本仍需接入相同迁移模块并验证系统钥匙串，不能将格式兼容视为 macOS 已可运行。** 新设备上的小米 Cookie 可能需要重新登录；ChatGPT 需连接新设备的 Codex。日志路径、共享目录与飞书授权应在新设备重新设置。
+普通 JSON 与加密备份采用平台无关格式，macOS 构建已包含同一迁移模块和 Keychain 后端。**构建通过不等于迁移与钥匙串读写已完成实机验证。** 新设备上的小米 Cookie 可能需要重新登录；ChatGPT 需连接新设备的 Codex。日志路径、共享目录与飞书授权应在新设备重新设置。
 
 加密备份使用 AES-256-GCM，密码经 PBKDF2-HMAC-SHA256 派生，不落盘。支持旧版导出，文件大小上限为 256 MB；详细兼容规则见 [数据迁移](docs/data-migration.md)。
 
@@ -105,11 +105,11 @@ Quota 只读取已保留的本地用量，保存指标，不保存对话正文�
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/readme/security-dark.svg">
-    <img src="assets/readme/security-light.svg" width="100%" alt="配置留在本机，凭据进入 Windows 凭据管理器，充值与订阅跳转官方页面">
+    <img src="assets/readme/security-light.svg" width="100%" alt="Windows 数据与安全示意：配置留在本机，凭据进入 Windows 凭据管理器，充值与订阅跳转官方页面">
   </picture>
 </p>
 
-- 配置和统计保存在 `%APPDATA%\Quota\`；API Key、AccessKey、管理密钥和小米 Cookie 存入 Windows 凭据管理器的 `Quota` 服务，不写入普通配置或日志。用户主动导出的加密备份可包含这些凭据。
+- 配置和统计保存在系统配置目录：Windows 为 `%APPDATA%\Quota\`，macOS 为 `~/Library/Application Support/Quota/`。API Key、AccessKey、管理密钥和小米 Cookie 使用系统凭据库的 `Quota` 服务：Windows 凭据管理器 / macOS Keychain；macOS 真实凭据读写尚未完成实机验收。用户主动导出的加密备份可包含这些凭据。
 - **自定义接口请求头与请求体会写入 `config.json`。不要在这些字段填写密钥；它们不受凭据管理器保护。** 普通 JSON 导出省略这些字段，加密备份可保存完整配置。
 - 从旧版 AgentPrice 升级时，逐项复制新位置缺失的配置及所需凭据，保留旧数据。
 - 数据采集以本机为主；查询余额、获取排名和核实价格会访问对应服务。统计同步只在用户选择共享目录后启用。
@@ -119,7 +119,9 @@ Quota 只读取已保留的本地用量，保存指标，不保存对话正文�
 
 ## 构建与开发
 
-仓库不包含预编译安装包，本地交付包尚未上传为公开 Release。下列命令用于从源码运行；若默认分支仍为旧版本，请先切换到包含 1.0.0900 的功能分支。
+仓库不包含预编译安装包，本地交付包尚未上传为公开 Release。`main` 当前对应 `1.0.0900`；Windows 和 macOS 分别在对应系统上原生构建。
+
+### Windows
 
 Windows 构建需 Node.js、Rust GNU 工具链和 WebView2 运行时：
 
@@ -138,6 +140,23 @@ npm run tauri build
 ```
 
 产物位于 `src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随安装包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建说明](docs/build-windows.md)。
+
+### macOS（Apple Silicon）
+
+需 Node.js、Rust stable 和 Xcode Command Line Tools；本次构建使用 `aarch64-apple-darwin` 工具链。安装依赖后，以命令行配置覆盖生成 App 和 DMG，排除 Windows 专用 DLL，并完成整包临时签名：
+
+```bash
+npm ci
+npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
+```
+
+App 位于 `src-tauri/target/release/bundle/macos/Quota.app`，DMG 默认位于 `src-tauri/target/release/bundle/dmg/Quota_1.0.900_aarch64.dmg`；交付时按完整展示号命名为 `Quota_1.0.0900_aarch64.dmg`。默认配置仍用于 Windows NSIS，macOS 构建需使用上述覆盖命令。
+
+打开 DMG，将 Quota 拖入「应用程序」，随后推出磁盘映像，日常只打开 `/Applications/Quota.app`。源码构建交付后，将 `bundle/macos/Quota.app` 副本移到废纸篓，避免应用搜索出现两份；保留 DMG 即可再次安装。
+
+当前包使用 ad-hoc 临时签名，未公证，首次打开可能被 macOS 拦截；确认来源后，可在「系统设置 → 隐私与安全性」中允许打开。详细构建命令、校验结果和平台限制见 [macOS 构建说明](docs/build-macos.md)。
+
+### 验证
 
 适用验证命令：
 
@@ -163,6 +182,7 @@ cargo check
 | [模型资料库](docs/model-catalog.md) | 官方价格来源与核实纪律 |
 | [安全规则](docs/security.md) | 凭据存储、自定义接口和旧版迁移 |
 | [Windows 构建说明](docs/build-windows.md) | GNU 工具链、NSIS 与 DLL 要求 |
+| [macOS 构建说明](docs/build-macos.md) | Apple Silicon 构建、临时签名、DMG 校验与安装 |
 | [开发指南](docs/development.md) | 开发运行与验证命令 |
 
 文档与本次功能源码一并维护；历史交付说明记录当时的行为与验收，不代表当前版本状态。

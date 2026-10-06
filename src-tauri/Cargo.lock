@@ -3311,7 +3311,7 @@ dependencies = [
 
 [[package]]
 name = "quota"
-version = "1.0.1001"
+version = "1.0.1100"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",

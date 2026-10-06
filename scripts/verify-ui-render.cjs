@@ -21,7 +21,7 @@ function load(file) {
 }
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 const { LadderChart, ladderCurrencyGroups } = load(path.resolve(__dirname, '../src/components/LadderChart.tsx'));
-const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
+const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input, unit: '每百万 Token' }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
 const entries = [entry('model-yuan', 'CNY', 1), entry('model-dollar', 'USD', 1), { ...entry('unknown', 'CNY', null), verifiedAt: null }];
 const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, layout:'combined', exchange:null});
 assert.match(noExchange,/美元型号不会被隐藏/);
@@ -55,23 +55,31 @@ const partialPlan = render(AccountCard, { ...cardProps, account: { ...account, p
 assert.match(partialPlan, /已同步额度/); assert.ok(!partialPlan.includes('暂无订阅额度'));
 console.log('PASS account details remain collapsed, zero displayed, unsupported-provider errors visible, partial subscription value retained');
 
-// Chart and legend use the requested circular markers and the same vendor colors.
-const vendorNames=['OpenAI','Anthropic','Google','DeepSeek','Kimi','Z AI','Xiaomi','Alibaba','SpaceXAI','Meta'];
-const allVendors=render(LadderChart,{...props,layout:'combined',entries:vendorNames.map((vendor,i)=>({...entry('vendor-'+i,'CNY',i+1),vendor}))});
-const markers=[...allVendors.matchAll(/<circle[^>]*fill="([^"]+)"[^>]*class="scatter-dot"[^>]*data-vendor="([^"]+)"/g)];
-assert.equal(markers.length,20);
-assert.equal(new Set(markers.map(m=>m[1])).size,10);
-for(const vendor of vendorNames) assert.equal(markers.filter(m=>m[2]===vendor).length,2);
+// Model families use their own local logos, rather than parent-company graphics.
+const modelNames=['GPT-6','Claude Opus','Gemini Flash','Gemma 4','Nano Banana 2','DeepSeek V4','Kimi K3','GLM-5','MiMo-V2','Qwen3','Grok 4','Muse Spark','Wan 3'];
+const {ModelLogo,modelBrand}=load(path.resolve(__dirname,'../src/components/ModelLogo.tsx'));
+const allModels=render(LadderChart,{...props,entries:modelNames.map((name,i)=>({...entry('model-'+i,'CNY',i+1),name}))});
+for(const name of modelNames) assert.equal(allModels.split('data-model-brand="'+modelBrand(name)+'"').length-1,2);
+for(const [name,file] of [['Claude Opus','claude-color'],['Gemini Flash','gemini-color'],['Gemma 4','gemma-color'],['GLM-5','chatglm-color'],['MiMo-V2','xiaomimimo'],['Qwen3','qwen-color'],['Grok 4','grok']]) assert.ok(render(ModelLogo,{name}).includes(file+'.svg'));
+assert.ok(render(ModelLogo,{name:'Muse Spark'}).includes('Muse 模型缩写'));
+assert.ok(!allModels.includes('scatter-dot'));
 const selectedCard=render(LadderChart,{...props,focused:entries[0]});
 assert.match(selectedCard,/scatter-selection-ring/);
-const css=fs.readFileSync(path.resolve(__dirname,'../src/styles.css'),'utf8');
-const paletteBlocks=[...css.matchAll(/:root \{ (--model-1:[^}]+)\}/g)].map(m=>m[1]);
-const palettes=paletteBlocks.map(block=>[...block.matchAll(/--model-\d+:(#[a-f0-9]{6})/g)].map(c=>c[1]));
-const outlines=paletteBlocks.map(block=>[...block.matchAll(/--model-\d+-border:(#[a-f0-9]{6})/g)].map(c=>c[1]));
-assert.equal(palettes.length,2);
-function luminance(hex){const values=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4));return values[0]*0.2126+values[1]*0.7152+values[2]*0.0722;}
-for(let i=0;i<2;i++){assert.equal(palettes[i].length,10);assert.equal(outlines[i].length,10);for(const c of outlines[i]){const bg=luminance(i?'#2c2c2e':'#ffffff'),fg=luminance(c);assert.ok((Math.max(bg,fg)+0.05)/(Math.min(bg,fg)+0.05)>=3,c+' circle boundary contrast below 3:1');}}
-console.log('PASS ten bright vendor colors on circular markers and matching legend; selected ring; light/dark boundary contrast >=3:1');
+console.log('PASS model-family logos identify chart points and legends; missing independent logos use labelled model initials');
+const overlapping=[entry('overlap-a','CNY',1),entry('overlap-b','CNY',1),entry('neighbour','CNY',1.01),entry('axis-end','CNY',10)];
+const overlapHtml=render(LadderChart,{...props,entries:overlapping,focused:overlapping[1]});
+assert.match(overlapHtml,/同坐标 2 个型号/);
+assert.match(overlapHtml,/此位置附近 3 个型号/);
+for(const id of ['overlap-a','overlap-b','neighbour']) assert.ok(overlapHtml.includes(id));
+const {ladderScale}=load(path.resolve(__dirname,'../src/lib/ladderPlot.ts'));
+const scale=ladderScale(overlapping.map(e=>({cost:e.price.input+e.price.output,score:90})));
+const pointTags=[...overlapHtml.matchAll(/data-cost="([^"]+)" data-score="([^"]+)" data-plot-x="([^"]+)" data-plot-y="([^"]+)"/g)];
+assert.equal(pointTags.length,3);
+for(const [,cost,score,x,y] of pointTags){assert.equal(Number(x),scale.x(Number(cost)));assert.equal(Number(y),scale.y(Number(score)));}
+const precise=render(LadderChart,{...props,entries:[entry('micro','CNY',0.000001)],focused:entry('micro','CNY',0.000001)});
+assert.match(precise,/¥0.000002/);
+for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/美元型号不会被隐藏/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,2);}
+console.log('PASS overlapping markers keep exact numeric coordinates and all models selectable; small-price precision and invalid-FX fallback retained');
 
 const {activityModelChoices,activityModelIdentity}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));
 const modelRows=['openai/gpt-5.4 (high)','gpt-5.4 (low)','zai/glm-5','deepseek/deepseek-v3','custom/model-x',''].map((key,i)=>({key,tokens:{total:100*(i+1)},sessions:i,calls:0}));
@@ -100,6 +108,3 @@ console.log('PASS unified backup export/import, configurable collection frequenc
 const {priceText}=load(path.resolve(__dirname,'../src/lib/format.ts'));
 assert.equal(priceText(0.0125,'CNY'),'¥0.0125');assert.equal(priceText(123.456,'USD'),'$123.456');assert.equal(priceText(0.000001,'USD'),'$0.000001');
 console.log('PASS official price precision retained for small cache rates and large values');
-
-function lab(hex){const rgb=hex.slice(1).match(/../g).map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);const f=v=>v>.008856?Math.cbrt(v):7.787*v+16/116;const x=f((rgb[0]*.4124564+rgb[1]*.3575761+rgb[2]*.1804375)/.95047),y=f(rgb[0]*.2126729+rgb[1]*.7151522+rgb[2]*.072175),z=f((rgb[0]*.0193339+rgb[1]*.119192+rgb[2]*.9503041)/1.08883);return [116*y-16,500*(x-y),200*(y-z)];}
-const labs=palettes[0].map(lab);let minimum=Infinity;for(let i=0;i<labs.length;i++)for(let j=i+1;j<labs.length;j++)minimum=Math.min(minimum,Math.hypot(...labs[i].map((v,k)=>v-labs[j][k])));assert.ok(minimum>=22,'vendor palette contains perceptually similar colors: '+minimum);console.log('PASS vendor palette minimum CIELAB separation '+minimum.toFixed(1));

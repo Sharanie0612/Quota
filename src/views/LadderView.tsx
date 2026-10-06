@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, EmptyState, Modal, Notice, Seg } from "../components/ui";
 import { IconLayers, IconRefresh } from "../components/icons";
-import { ProviderLogo } from "../components/logos";
+import { ModelLogo } from "../components/ModelLogo";
 import { api, errText } from "../lib/api";
 import { priceText, timeAgo } from "../lib/format";
 import { toast } from "../lib/store";
 import type { LadderEntry, LadderSnapshot } from "../lib/types";
-import { currencyTitle, LadderChart, ladderCurrencyGroups, ladderVendorColor, type LadderLayout } from "../components/LadderChart";
+import { currencyTitle, LadderChart, ladderCurrencyGroups, type LadderLayout } from "../components/LadderChart";
 
 const DOMAINS = [
   { value: "general", label: "综合能力" }, { value: "coding", label: "编程" },
@@ -35,7 +35,7 @@ function LadderTable({ entries, domain, selected, onToggle, onReview, label }: {
       const ranking = entry.rankings[domain];
       const known = entry.price.input != null && entry.price.output != null;
       return <tr key={entry.id}><td><span className={`rank-number${ranking && ranking.rank <= 10 ? " rank-top" : ""}`}>{ranking?.rank ?? "—"}</span></td>
-        <td><div className="ladder-model"><span className="ladder-vendor-logo" style={{borderColor:ladderVendorColor(entry.vendor)}}><ProviderLogo provider={entry.provider} size={26} /></span><div><b>{entry.name}</b><span>{entry.vendor}{entry.name.includes(" (") ? ` · ${entry.name.split(" (")[1].replace(")", "")}` : ""}</span></div></div></td>
+        <td><div className="ladder-model"><span className="ladder-vendor-logo"><ModelLogo name={entry.name} size={26} /></span><div><b>{entry.name}</b><span>{entry.vendor}{entry.name.includes(" (") ? ` · ${entry.name.split(" (")[1].replace(")", "")}` : ""}</span></div></div></td>
         <td>{ranking ? <div className="rank-score"><b>{ranking.score.toFixed(0)}</b><progress max={100} value={ranking.score} aria-label={`${entry.name} 能力分`} /></div> : <span className="hint">暂无评测</span>}</td>
         <td><button className="ladder-price" onClick={() => onReview(entry)}>{known ? <><b>{priceText(entry.price.input, entry.price.currency)} / {priceText(entry.price.cachedInput, entry.price.currency)}</b><span>{currencyTitle(entry.price.currency)} {entry.price.currency} · 核实 {entry.verifiedAt?.slice(0, 10) ?? "暂无官网价格"}{entry.candidate?.error ? " · 沿用上次价格" : ""}</span></> : <><Badge tone="amber">暂无官网价格</Badge><span>{currencyTitle(entry.price.currency)} {entry.price.currency}</span></>}</button></td>
         <td><b>{priceText(entry.price.output, entry.price.currency)}</b><span className="hint price-cache-line">写入 {priceText(entry.price.cacheWrite, entry.price.currency)}{entry.price.cacheWriteLong != null ? ` / 1h ${priceText(entry.price.cacheWriteLong, entry.price.currency)}` : ""}</span></td>

@@ -1,7 +1,7 @@
 import type { ActivityGroup, ActivityTokens } from "./types";
 
 export type TimeScale = "day" | "week" | "month";
-export type ActivityMetric = "total" | "input" | "output" | "cached";
+export type ActivityMetric = "total" | "input" | "output" | "cached" | "uncached";
 export type ActivityRange = { from: string; to: string };
 export function periodRange(key: string, scale: TimeScale, first: string, last: string): ActivityRange | null {
   const start = parseDay(key);
@@ -71,8 +71,18 @@ export function heatLevel(value: number, max: number): number {
 /** Smooth through observed points without overshooting either endpoint. No prediction. */
 export function smoothUsagePath(points: { x: number; y: number }[]): string {
   if (!points.length) return "";
+  const slopes=points.slice(1).map((p,i)=>(p.y-points[i].y)/(p.x-points[i].x));
+  const tangents=points.map((_,i)=>i===0?slopes[0]??0:i===points.length-1?slopes[i-1]:slopes[i-1]*slopes[i]<=0?0:2*slopes[i-1]*slopes[i]/(slopes[i-1]+slopes[i]));
   return `M ${points[0].x} ${points[0].y}` + points.slice(1).map((point, index) => {
     const previous = points[index]; const step = (point.x - previous.x) / 3;
-    return ` C ${previous.x + step} ${previous.y}, ${point.x - step} ${point.y}, ${point.x} ${point.y}`;
+    return ` C ${previous.x + step} ${previous.y+step*tangents[index]}, ${point.x - step} ${point.y-step*tangents[index+1]}, ${point.x} ${point.y}`;
   }).join("");
+}
+
+export function metricValue(tokens:ActivityTokens,metric:ActivityMetric) { return metric === "uncached" ? Math.max(0,tokens.input-tokens.cached) : tokens[metric]; }
+export function periodLabel(key:string,scale:TimeScale) {
+  const date=parseDay(key);if(!date)return key;
+  if(scale==="month")return `${date.getFullYear()} 年 ${date.getMonth()+1} 月`;
+  if(scale==="week") {const utc=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));utc.setUTCDate(utc.getUTCDate()+3-(utc.getUTCDay()+6)%7);const year=utc.getUTCFullYear();const start=new Date(Date.UTC(year,0,4));const week=1+Math.round(((utc.getTime()-start.getTime())/86400000-3+(start.getUTCDay()+6)%7)/7);return `${year} 年第 ${week} 周`;}
+  return key;
 }

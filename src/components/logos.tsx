@@ -1,12 +1,15 @@
-/** 供应商 logo 徽标。
- *
- *  DeepSeek / KIMI / 小米 用的是 Simple Icons 的官方品牌图形（CC0 许可，可自由内嵌）；
- *  OpenAI / ChatGPT 使用官网提供的黑白 Blossom SVG，保留原图比例和留白。
- *  智谱 GLM 没有收录的品牌图形，用字母徽标表示。
- */
+/** 账户与模型共用本地品牌资源；未知供应商保留缩写。 */
 import type { CSSProperties } from "react";
 import openaiBlack from "../assets/brands/openai-black.svg";
 import openaiWhite from "../assets/brands/openai-white.svg";
+
+import deepseek from "../assets/brands/deepseek-color.svg";
+import kimi from "../assets/brands/kimi.svg";
+import glm from "../assets/brands/zai.svg";
+import mimo from "../assets/brands/xiaomimimo.svg";
+import claude from "../assets/brands/claude-color.svg";
+import gemini from "../assets/brands/gemini-color.svg";
+import qwen from "../assets/brands/qwen-color.svg";
 
 type Mark = {
   /** 徽标底色渐变 */
@@ -56,6 +59,8 @@ export function ProviderLogo({
   radius?: number;
   style?: CSSProperties;
 }) {
+  const images: Record<string, string> = {deepseek, moonshot:kimi, zhipu:glm, mimo, "mimo-plan":mimo, anthropic:claude, google:gemini, alibaba:qwen};
+  if (images[provider]) return <span className={`vendor-logo${["moonshot","zhipu","mimo","mimo-plan"].includes(provider) ? " vendor-logo-mono" : ""}`} style={{width:size,height:size,...style}}><img src={images[provider]} alt={`${provider} Logo`} width={size} height={size}/></span>;
   const mark = MARKS[provider];
   const box: CSSProperties = {
     width: size,

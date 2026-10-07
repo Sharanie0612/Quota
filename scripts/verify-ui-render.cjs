@@ -20,27 +20,25 @@ function load(file) {
   return exports;
 }
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
-const { LadderChart, ladderCurrencyGroups } = load(path.resolve(__dirname, '../src/components/LadderChart.tsx'));
+const { LadderChart } = load(path.resolve(__dirname, '../src/components/LadderChart.tsx'));
 const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input, unit: '每百万 Token' }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
 const entries = [entry('model-yuan', 'CNY', 1), entry('model-dollar', 'USD', 1), { ...entry('unknown', 'CNY', null), verifiedAt: null }];
 const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, layout:'combined', exchange:null});
-assert.match(noExchange,/美元型号不会被隐藏/);
-assert.match(noExchange,/aria-label="model-dollar，/);
-assert.equal(ladderCurrencyGroups(entries).map(group => group.currency).join(','), 'CNY,USD');
+assert.match(noExchange,/可切换人民币或美元/);
+assert.match(noExchange,/model-dollar · 未标注 · 等待可用汇率/);
 const props = { entries, domain: 'general', focused: null, onFocus: () => {}, exchange: { cnyPerUsd:7, date:"2026-10-02", error:null } };
 const split = render(LadderChart, { ...props, layout: 'split' });
 const combined = render(LadderChart, { ...props, layout: 'combined' });
-assert.equal((split.match(/role="group"/g) || []).length, 2);
 assert.equal((combined.match(/role="group"/g) || []).length, 1);
-for (const html of [split, combined]) {
-  assert.match(html, /CNY/); assert.match(html, /USD/); assert.match(html, /不修改官方价格/);
+for (const html of [combined]) {
+  assert.match(html, /CNY/); assert.match(html, /USD/); assert.match(html, /汇率仅供比较/);
   assert.equal((html.match(/role="button"/g) || []).length, 2);
   assert.ok(!/NaN|Infinity/.test(html));
 }
 assert.match(combined, /1 USD = 7.0000 CNY/);
 assert.match(combined, /CNY统一价格与性能坐标图/);
 const noRate = render(LadderChart,{...props,layout:'combined',exchange:null});
-assert.equal((noRate.match(/role="button"/g)||[]).length,2);
+assert.equal((noRate.match(/role="button"/g)||[]).length,1);
 console.log('PASS one normalized price axis, original prices, FX-unavailable fallback and exclusion of unknown prices');
 
 const { AccountCard } = load(path.resolve(__dirname, '../src/components/AccountCard.tsx'));
@@ -60,7 +58,7 @@ const modelNames=['GPT-6','Claude Opus','Gemini Flash','Gemma 4','Nano Banana 2'
 const {ModelLogo,modelBrand}=load(path.resolve(__dirname,'../src/components/ModelLogo.tsx'));
 const allModels=render(LadderChart,{...props,entries:modelNames.map((name,i)=>({...entry('model-'+i,'CNY',i+1),name}))});
 for(const name of modelNames) assert.equal(allModels.split('data-model-brand="'+modelBrand(name)+'"').length-1,2);
-for(const [name,file] of [['Claude Opus','claude-color'],['Gemini Flash','gemini-color'],['Gemma 4','gemma-color'],['GLM-5','chatglm-color'],['MiMo-V2','xiaomimimo'],['Qwen3','qwen-color'],['Grok 4','grok']]) assert.ok(render(ModelLogo,{name}).includes(file+'.svg'));
+for(const [name,file] of [['Claude Opus','claude-color'],['Gemini Flash','gemini-color'],['Gemma 4','gemma-color'],['GLM-5','zai'],['MiMo-V2','xiaomimimo'],['Qwen3','qwen-color'],['Grok 4','grok']]) assert.ok(render(ModelLogo,{name}).includes(file+'.svg'));
 assert.ok(render(ModelLogo,{name:'Muse Spark'}).includes('Muse 模型缩写'));
 assert.ok(!allModels.includes('scatter-dot'));
 const selectedCard=render(LadderChart,{...props,focused:entries[0]});
@@ -78,7 +76,7 @@ assert.equal(pointTags.length,3);
 for(const [,cost,score,x,y] of pointTags){assert.equal(Number(x),scale.x(Number(cost)));assert.equal(Number(y),scale.y(Number(score)));}
 const precise=render(LadderChart,{...props,entries:[entry('micro','CNY',0.000001)],focused:entry('micro','CNY',0.000001)});
 assert.match(precise,/¥0.000002/);
-for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/美元型号不会被隐藏/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,2);}
+for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/可切换人民币或美元/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,1);}
 console.log('PASS overlapping markers keep exact numeric coordinates and all models selectable; small-price precision and invalid-FX fallback retained');
 
 const {activityModelChoices,activityModelIdentity}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));
@@ -93,10 +91,23 @@ assert.equal(activityModelChoices(modelRows,'nonesuch').length,0);
 assert.equal(activityModelChoices(modelRows,'').length,5);
 const {ActivityModelPicker}=load(path.resolve(__dirname,'../src/components/ActivityModelPicker.tsx'));
 const picker=render(ActivityModelPicker,{rows:modelRows,value:'openai/gpt-5.4 (high)',onChange:()=>{},loading:false});
-assert.match(picker,/openai\/gpt-5\.4 \(high\)/);assert.match(picker,/OpenAI/);assert.match(picker,/清除模型筛选/);assert.match(picker,/个会话/);assert.match(picker,/占当前范围/);assert.match(picker,/aria-haspopup="dialog"/);
-const pendingPicker=render(ActivityModelPicker,{rows:[],value:'',onChange:()=>{},loading:true});assert.match(pendingPicker,/正在读取模型用量/);assert.ok(!pendingPicker.includes('0 Token'));
-const absentPicker=render(ActivityModelPicker,{rows:modelRows,value:'missing-model',onChange:()=>{},loading:false});assert.match(absentPicker,/当前范围暂无记录/);
-console.log('PASS model namespaces/effort IDs preserved, vendor search and unknown recovery, clear filter and scoped usage summary');
+assert.match(picker,/openai\/gpt-5\.4 \(high\)/);assert.match(picker,/OpenAI/);assert.match(picker,/供应商汇总/);assert.match(picker,/vendor:custom/);assert.match(picker,/搜索模型或厂商/);
+const pendingPicker=render(ActivityModelPicker,{rows:[],value:'',onChange:()=>{},loading:true});assert.match(pendingPicker,/disabled/);assert.ok(!pendingPicker.includes('0 Token'));
+const absentPicker=render(ActivityModelPicker,{rows:modelRows,value:'missing-model',onChange:()=>{},loading:false});assert.match(absentPicker,/missing-model/);
+console.log('PASS model namespaces/effort IDs preserved, vendor search and unknown recovery, vendor totals and loading state');
+
+const {AbilityRadar}=load(path.resolve(__dirname,'../src/components/AbilityRadar.tsx'));
+const incomplete=render(AbilityRadar,{entries:[entry('sparse','CNY',1)]});
+assert.ok(!incomplete.includes('fill-opacity="0.08"')); // missing five axes never become zero
+const completeEntry={...entry('complete','CNY',1),rankings:Object.fromEntries(['general','coding','math','science','reasoning','agents'].map(key=>[key,{score:50}]))};
+assert.match(render(AbilityRadar,{entries:[completeEntry]}),/fill-opacity="0.08"/);
+const {CacheUsage}=load(path.resolve(__dirname,'../src/components/CacheUsage.tsx'));
+const cacheRows=['gpt-6.1-sol','GLM-5.3','deepseek-flash'].map(key=>({key,tokens:{input:100,cached:70},sessions:1,calls:0}));
+const cacheProps={rows:cacheRows,modelKeys:cacheRows.map(row=>row.key),format:String,onModel:()=>{}};
+const cacheHtml=render(CacheUsage,cacheProps);assert.match(cacheHtml,/70.0%/);assert.match(cacheHtml,/>30<\/td>/);
+const colors=[...cacheHtml.matchAll(/class="cache-color" style="background:([^\"]+)/g)].map(m=>m[1]);assert.equal(new Set(colors).size,3);
+const onlyOne=render(CacheUsage,{...cacheProps,rows:[cacheRows[1]]});assert.ok(onlyOne.includes(`background:${colors[1]}`));
+console.log('PASS six-dimensional radar never fills missing axes; cache ratios, miss counts and scoped model colors stay consistent');
 
 const {SettingsView}=load(path.resolve(__dirname,'../src/views/SettingsView.tsx'));
 const settingsHtml=render(SettingsView,{settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},info:null});

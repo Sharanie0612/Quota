@@ -277,7 +277,7 @@ fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
 pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub sessions:u64 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub sources:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String> }
+pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String> }
 fn aggregate(events:&[Metric],key:impl Fn(&Metric)->String)->Vec<Group>{
     let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
     for e in events{let k=key(e);let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
@@ -288,6 +288,14 @@ pub fn report(dir:&Path, device:Option<String>,source:Option<String>,days:Option
 }
 pub fn report_filtered(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>)->Result<Report,String>{
     report_range(dir,device,source,days,model,None,None)
+}
+pub fn model_vendor(key:&str)->&'static str {
+    let raw=key.to_lowercase();let name=raw.rsplit('/').next().unwrap_or(&raw);
+    if name.starts_with("gpt")||["o1","o3","o4"].iter().any(|p|name==*p||name.starts_with(&format!("{p}-")))||name.starts_with("codex")||raw.starts_with("openai/"){"custom"}
+    else if name.starts_with("deepseek"){"deepseek"} else if name.starts_with("glm")||["zai/","z-ai/","zhipu/"].iter().any(|p|raw.starts_with(p)){"zhipu"}
+    else if name.starts_with("kimi")||name.starts_with("moonshot"){"moonshot"} else if name.starts_with("mimo")||raw.starts_with("xiaomi/"){"mimo"}
+    else if name.starts_with("claude")||raw.starts_with("anthropic/"){"anthropic"} else if name.starts_with("gemini")||raw.starts_with("google/"){"google"}
+    else if name.starts_with("qwen")||raw.starts_with("alibaba/"){"alibaba"} else {"unknown"}
 }
 pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{
     let date=|value:Option<String>|->Result<Option<chrono::NaiveDate>,String>{value.filter(|s|!s.is_empty()).map(|s|chrono::NaiveDate::parse_from_str(&s,"%Y-%m-%d").map_err(|_|"日期格式无效".to_string())).transpose()};
@@ -305,9 +313,9 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     // Keep model choices scoped to device/source/dates while viewing one model.
     let available_models=aggregate(&events.iter().filter(|e|e.kind=="tokens").cloned().collect::<Vec<_>>(),|e|e.model.clone());
-    events.retain(|e|model.as_ref().is_none_or(|m|m.is_empty()||m==&e.model));
+    events.retain(|e|model.as_ref().is_none_or(|m|m.is_empty()||m==&e.model||m.strip_prefix("vendor:").is_some_and(|v|v==model_vendor(&e.model))));
     let token_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tokens").cloned().collect();let tool_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tool").cloned().collect();
-    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate(&token_events,|e|e.model.clone()),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default() })
+    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate(&token_events,|e|e.model.clone()),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default() })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)

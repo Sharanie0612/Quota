@@ -42,6 +42,8 @@ pub struct Entry {
     pub price_source: String,
     pub verified_at: Option<String>,
     pub candidate: Option<Candidate>,
+    #[serde(default)]
+    pub released_at: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -81,6 +83,9 @@ pub fn with_overrides(mut snapshot: Snapshot, overrides: &[crate::model::Catalog
     snapshot.entries.retain(|e| supported_vendor(&e.vendor));
     let embedded: Snapshot = serde_json::from_str(include_str!("../data/ladder.json")).expect("valid ladder");
     for e in &mut snapshot.entries {
+        if e.released_at.is_none() {
+            e.released_at=embedded.entries.iter().find(|b|b.id==e.id).and_then(|b|b.released_at.clone());
+        }
         if let Some(base) = embedded.entries.iter().find(|b| b.id == e.id).filter(|b|e.verified_at.as_deref().unwrap_or("")<=b.verified_at.as_deref().unwrap_or("")) {
             e.price = base.price.clone(); e.verified_at = base.verified_at.clone();
             e.price_source = base.price_source.clone();
@@ -165,9 +170,11 @@ pub fn parse_models(html: &str) -> Result<Vec<Entry>, String> {
         let name=m.get("name").and_then(Value::as_str).unwrap_or(id);
         let vendor=m.get("provider").and_then(Value::as_str).unwrap_or("Unknown");
         if !supported_vendor(vendor) { continue; }
-        if let Some(e)=base.entries.iter().find(|e|e.id==id) {entries.insert(id.to_string(),e.clone());continue}
+        let released_at=m.get("releaseDate").and_then(Value::as_str)
+            .filter(|s|chrono::NaiveDate::parse_from_str(s,"%Y-%m-%d").is_ok()).map(str::to_string);
+        if let Some(e)=base.entries.iter().find(|e|e.id==id) {let mut e=e.clone();if released_at.is_some(){e.released_at=released_at;}entries.insert(id.to_string(),e);continue}
         let template=base.entries.iter().find(|e|e.vendor==vendor&&!e.price_source.is_empty());
-        entries.insert(id.to_string(), Entry{id:id.into(),name:name.into(),vendor:vendor.into(),provider:template.map(|e|e.provider.clone()).unwrap_or_else(||vendor.to_lowercase()),rankings:HashMap::new(),price:ModelPrice::default(),price_source:template.map(|e|e.price_source.clone()).unwrap_or_default(),verified_at:None,candidate:None});
+        entries.insert(id.to_string(), Entry{id:id.into(),name:name.into(),vendor:vendor.into(),provider:template.map(|e|e.provider.clone()).unwrap_or_else(||vendor.to_lowercase()),rankings:HashMap::new(),price:ModelPrice::default(),price_source:template.map(|e|e.price_source.clone()).unwrap_or_default(),verified_at:None,candidate:None,released_at});
     }
     Ok(entries.into_values().collect())
 }

@@ -80,8 +80,10 @@ impl Profile {
             .iter()
             .flatten()
             .all(|v| v.is_finite())
+            && self.manual_currency.as_deref().is_none_or(balance_unit)
+            && (self.manual_currency.as_deref() != Some("%")
+                || self.manual_balance.is_none_or(|v| (0.0..=100.0).contains(&v)))
             && [
-                &self.manual_currency,
                 &self.manual_recharge_currency,
                 &self.manual_spend_currency,
             ]
@@ -91,6 +93,9 @@ impl Profile {
 }
 fn currency(c: &str) -> bool {
     matches!(c, "CNY" | "USD" | "EUR" | "GBP" | "JPY" | "HKD" | "Credits")
+}
+fn balance_unit(unit: &str) -> bool {
+    currency(unit) || unit == "%"
 }
 fn kind_label(kind: &str) -> Option<&'static str> {
     Some(match kind {
@@ -169,7 +174,7 @@ impl Snapshot {
         let balance = s
             .balance
             .as_ref()
-            .filter(|b| currency(&b.currency))
+            .filter(|b| balance_unit(&b.currency))
             .map(|b| Money {
                 currency: b.currency.clone(),
                 total: b.total,
@@ -215,8 +220,11 @@ impl Snapshot {
             t.timestamp_millis() <= chrono::Utc::now().timestamp_millis() + 24 * 3600 * 1000
         }) && (self.balance.is_some() || self.subscription.is_some())
             && self.balance.as_ref().is_none_or(|b| {
-                currency(&b.currency)
+                balance_unit(&b.currency)
                     && b.total.is_none_or(f64::is_finite)
+                    && (b.currency != "%"
+                        || (b.total.is_none_or(|v| (0.0..=100.0).contains(&v))
+                            && b.amounts.iter().all(|a| (0.0..=100.0).contains(&a.value))))
                     && b.amounts.len() <= 32
                     && b.amounts
                         .iter()

@@ -1,65 +1,88 @@
 import { useState } from "react";
 import type { LadderEntry } from "../lib/types";
+import { priceText } from "../lib/format";
+import { comparisonPrice, ladderScale, plotBounds, plotPrice, validExchange, type LadderExchange, type LadderMetric } from "../lib/ladderPlot";
+import { ModelLogo, modelBrand } from "./ModelLogo";
 import "./ladder-chart.css";
-export type LadderLayout = "split" | "combined";
-export const currencyTitle = (c: string) => c === "CNY" ? "人民币" : c === "USD" ? "美元" : c;
-export const ladderCurrencyGroups = (entries: LadderEntry[]) => [...new Set(entries.map(e => e.price.currency))].sort().map(currency => ({ currency, entries: entries.filter(e => e.price.currency === currency) }));
-export const reasoningLabel = (e: LadderEntry) => {
- const named=e.name.match(/[（(]([^）)]+)[）)]/)?.[1] ?? "";
- const effort=/^(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:\b|,)/i.exec(named)?.[1] ?? /(?:^|-)(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:-|$)/i.exec(e.id)?.[1];
- return effort ? effort.toLowerCase().replace(/^./,c=>c.toUpperCase()) : "未标注";
+export { comparisonPrice } from "../lib/ladderPlot";
+export const currencyTitle = (currency: string) => currency === "CNY" ? "人民币" : currency === "USD" ? "美元" : currency;
+export const reasoningLabel = (entry: LadderEntry) => {
+  const named = entry.name.match(/[（(]([^）)]+)[）)]/)?.[1] ?? "";
+  const effort = /^(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:\b|,)/i.exec(named)?.[1] ?? /(?:^|-)(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:-|$)/i.exec(entry.id)?.[1];
+  return effort ? effort.toLowerCase().replace(/^./, char => char.toUpperCase()) : "未标注";
 };
-type Metric = "total" | "input" | "output";
-export const comparisonPrice = (e: LadderEntry, metric: Metric) => metric === "input" ? e.price.input : metric === "output" ? e.price.output : e.price.input != null && e.price.output != null ? e.price.input + e.price.output : null;
-const vendors = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Kimi", "Z AI", "Xiaomi", "Alibaba", "SpaceXAI", "Meta"];
-export const ladderVendorColor = (vendor: string) => `var(--model-${Math.max(0,vendors.indexOf(vendor))+1})`;
-function VendorMarker({ vendor, x = 10, y = 10, active = false }: { vendor: string; x?: number; y?: number; active?: boolean }) {
- const index = Math.max(0, vendors.indexOf(vendor));
- return <circle cx={x} cy={y} r={active ? 8.5 : 6.5} fill={`var(--model-${index + 1})`} stroke={`var(--model-${index + 1}-border)`} className="scatter-dot" data-vendor={vendor} />;
+
+type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null };
+function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency, highlightBrand }: Props & { metric: LadderMetric; currency: string; highlightBrand: string }) {
+  const [hover, setHover] = useState<LadderEntry | null>(null);
+  const points = entries.map(entry => ({ entry, cost: plotPrice(entry, metric, currency, exchange)!, score: entry.rankings[domain].score }));
+  const scale = ladderScale(points);
+  const active = entries.find(entry => entry.id === (hover?.id ?? focused?.id));
+  const groups = new Map<string, typeof points>();
+  for (const point of points) {
+    const key = `${point.cost}:${point.score}`;
+    groups.set(key, [...(groups.get(key) ?? []), point]);
+  }
+  const clusters = [...groups.values()].map(group => group.sort((a, b) => a.entry.id.localeCompare(b.entry.id)));
+  const priority = (group: typeof points) => group.some(point => point.entry.id === active?.id) ? 2 : group.some(point => modelBrand(point.entry.name) === highlightBrand) ? 1 : 0;
+  clusters.sort((a, b) => priority(a) - priority(b));
+  const neighbours = active ? points.filter(point => Math.hypot(scale.x(point.cost) - scale.x(plotPrice(active, metric, currency, exchange)!), scale.y(point.score) - scale.y(active.rankings[domain].score)) <= 26) : [];
+  return <div className="scatter-panel"><svg viewBox="0 0 880 580" role="group" aria-label={`${currency}统一价格与性能坐标图`}>
+    <text x="62" y="18" className="scatter-axis-title">能力更强 ↑</text>
+    {scale.scoreTicks.map(value => <g key={value}>
+      <line x1={plotBounds.left} x2={plotBounds.right} y1={scale.y(value)} y2={scale.y(value)} className="scatter-grid" />
+      <text x="49" y={scale.y(value) + 4} textAnchor="end" className="scatter-tick">{value}</text>
+    </g>)}
+    {scale.ticks.map(value => <g key={value}>
+      <line x1={scale.x(value)} x2={scale.x(value)} y1={plotBounds.top} y2={plotBounds.bottom} className="scatter-grid" />
+      <text x={scale.x(value)} y={plotBounds.bottom+30} textAnchor="middle" className="scatter-tick">{Number(value.toPrecision(3))}</text>
+    </g>)}
+    <text x="452" y={plotBounds.bottom+65} textAnchor="middle" className="scatter-axis-title">标准未命中成本（{currency} / {metric === "total" ? "百万输入 + 百万输出 Token" : "百万 Token"}）→</text>
+    {clusters.map(group => {
+      const chosen = group.find(point => point.entry.id === active?.id) ?? group.find(point => modelBrand(point.entry.name) === highlightBrand) ?? group[0];
+      const { entry, cost, score } = chosen;
+      const x = scale.x(cost), y = scale.y(score);
+      const selected = group.some(point => point.entry.id === focused?.id);
+      return <g key={`${cost}:${score}`} className="scatter-point" style={{ opacity: !highlightBrand || group.some(point => modelBrand(point.entry.name) === highlightBrand) ? 1 : .15 }} role="button" tabIndex={0}
+        data-cost={cost} data-score={score} data-plot-x={x} data-plot-y={y}
+        aria-label={`${entry.name}，推理强度 ${reasoningLabel(entry)}，能力 ${score}，成本 ${priceText(cost, currency)}${group.length > 1 ? `，同坐标 ${group.length} 个型号` : ""}`}
+        aria-pressed={selected} onMouseEnter={() => setHover(entry)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(entry)} onBlur={() => setHover(null)} onClick={() => onFocus(entry)}
+        onKeyDown={event => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); onFocus(entry); } }}>
+        <title>{`${entry.vendor} · ${entry.name} · ${reasoningLabel(entry)} · ${priceText(cost, currency)}${group.length > 1 ? ` · 同坐标 ${group.length} 个型号，点击查看` : ""}`}</title>
+        <circle cx={x} cy={y} r="7" className="scatter-logo-background" />
+        {group.some(point => point.entry.id === active?.id) && <circle cx={x} cy={y} r="10" className="scatter-selection-ring" />}
+        <foreignObject x={x - 6} y={y - 6} width="12" height="12" className="scatter-logo"><ModelLogo name={entry.name} size={12} /></foreignObject>
+        {group.length > 1 && <g className="scatter-cluster-count"><rect x={x + 5} y={y + 4} width="18" height="16" rx="6" /><text x={x + 14} y={y + 16} textAnchor="middle">{group.length}</text></g>}
+      </g>;
+    })}
+  </svg>
+    <div className="scatter-inspector" aria-live="polite">{active ? <>
+      <div className="scatter-detail"><ModelLogo name={active.name} size={22} /><b>{active.name}</b><span>{active.vendor} · {reasoningLabel(active)} · 能力 {active.rankings[domain].score.toFixed(1)} 分</span></div>
+      <div className="scatter-prices"><span>标准成本 {priceText(comparisonPrice(active, metric), active.price.currency)}</span><span>图中 {priceText(plotPrice(active, metric, currency, exchange), currency)}</span><span>{metric === "total" ? "每百万输入 + 百万输出 Token" : "每百万 Token"}</span></div>
+    </> : <span className="hint">点击模型查看详情</span>}</div>
+    {active && neighbours.length > 1 && <div className="scatter-neighbours"><span className="hint">此位置附近 {neighbours.length} 个型号</span><div>{neighbours.map(({ entry, cost }) => <button key={entry.id} type="button" aria-pressed={focused?.id === entry.id} onClick={() => onFocus(entry)}><ModelLogo name={entry.name} size={18} /><span>{entry.name}</span><b>{priceText(cost, currency)}</b></button>)}</div></div>}
+  </div>;
 }
-type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (e: LadderEntry) => void; layout?: LadderLayout; exchange?: { cnyPerUsd: number; date: string; error: string | null } | null };
-function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency, highlightVendor }: Props & { metric: Metric; currency: string; highlightVendor: string }) {
- const [hover, setHover] = useState<LadderEntry | null>(null);
- const cost = (e: LadderEntry) => comparisonPrice(e, metric)! * (currency === "CNY" && e.price.currency === "USD" ? exchange!.cnyPerUsd : 1);
- const max = Math.max(1, ...entries.map(cost)), min = Math.max(0, Math.floor(Math.min(100, ...entries.map(e => e.rankings[domain].score)) / 10) * 10 - 10);
- const x = (v: number) => 62 + Math.log1p(v) / Math.log1p(max) * 780;
- const y = (v: number) => 344 - (v - min) / (100 - min) * 310;
- const active = entries.find(e => e.id === (hover?.id ?? focused?.id));
- const positions = new Map<string, {x:number;y:number}>();
- const clusters = new Map<string, LadderEntry[]>();
- for (const e of entries) { const key = `${Math.round(x(cost(e)) / 12)}:${Math.round(y(e.rankings[domain].score) / 12)}`; clusters.set(key, [...(clusters.get(key) ?? []), e]); }
- for (const group of clusters.values()) group.sort((a,b)=>a.id.localeCompare(b.id)).forEach((e,i)=>{
-   const angle = i * Math.PI * 2 / group.length;
-   const radius=Math.min(60,Math.max(18,group.length*3));
-   positions.set(e.id, group.length>1 ? {x:Math.min(842-radius,Math.max(62+radius,x(cost(e))))+Math.cos(angle)*radius,y:Math.min(344-radius,Math.max(34+radius,y(e.rankings[domain].score)))+Math.sin(angle)*radius} : {x:x(cost(e)),y:y(e.rankings[domain].score)});
- });
- const ticks = [0,.1,.5,1,2,5,10,20,50,100,200,500,1000].filter(v => v <= max).reduce<number[]>((a,v) => !a.length || x(v)-x(a[a.length-1]) > 45 ? [...a,v] : a,[]);
- return <div className="scatter-panel"><svg viewBox="0 0 880 405" role="group" aria-label={`${currency}统一价格与性能坐标图`}>
- <text x="62" y="18" className="scatter-axis-title">能力更强 ↑</text>
- {Array.from({length:Math.floor((100-min)/10)+1},(_,i)=>min+i*10).map(v=><g key={v}><line x1="62" x2="842" y1={y(v)} y2={y(v)} className="scatter-grid"/><text x="49" y={y(v)+4} textAnchor="end" className="scatter-tick">{v}</text></g>)}
- {ticks.map(v=><g key={v}><line x1={x(v)} x2={x(v)} y1="34" y2="344" className="scatter-grid"/><text x={x(v)} y="366" textAnchor="middle" className="scatter-tick">{v}</text></g>)}
- <text x="452" y="397" textAnchor="middle" className="scatter-axis-title">成本（{currency} / {metric === "total" ? "百万输入 + 百万输出 Token" : "百万 Token"}）→</text>
- {entries.map(e=><g key={e.id} className="scatter-point" style={{opacity:!highlightVendor || highlightVendor === e.vendor ? 1 : .15}} role="button" tabIndex={0} aria-label={`${e.name}，推理强度 ${reasoningLabel(e)}，能力 ${e.rankings[domain].score}，原价 ${comparisonPrice(e,metric)} ${e.price.currency}`} aria-pressed={focused?.id===e.id} onMouseEnter={()=>setHover(e)} onMouseLeave={()=>setHover(null)} onFocus={()=>setHover(e)} onBlur={()=>setHover(null)} onClick={()=>onFocus(e)} onKeyDown={event=>{if(["Enter"," "].includes(event.key)){event.preventDefault();onFocus(e);}}}>
- <title>{`${e.vendor} · ${e.name} · ${reasoningLabel(e)} · ${cost(e).toFixed(2)} ${currency}`}</title><line x1={x(cost(e))} y1={y(e.rankings[domain].score)} x2={positions.get(e.id)!.x} y2={positions.get(e.id)!.y} className="scatter-grid"/><circle cx={positions.get(e.id)!.x} cy={positions.get(e.id)!.y} r="10" fill="transparent"/>{active?.id===e.id && <circle cx={positions.get(e.id)!.x} cy={positions.get(e.id)!.y} r="13" className="scatter-selection-ring"/>}<VendorMarker vendor={e.vendor} x={positions.get(e.id)!.x} y={positions.get(e.id)!.y} active={active?.id===e.id}/>
- {active?.id===e.id && <text x={x(cost(e)) > 620 ? x(cost(e))-12 : x(cost(e))+12} y={y(e.rankings[domain].score)-12} textAnchor={x(cost(e))>620?"end":"start"} className="scatter-count">{e.name}</text>}
- </g>)}
- </svg><div className="scatter-inspector" aria-live="polite">{active?<><b>{active.name}</b><span>推理强度：{reasoningLabel(active)} · 能力 {active.rankings[domain].score.toFixed(1)} 分</span><span>原价 {Number(comparisonPrice(active,metric)!.toPrecision(12))} {active.price.currency} · 图中 {cost(active).toFixed(2)} {currency}</span></>:<span className="hint">越靠左上越有优势。悬停看详情，点击固定型号；每个推理版本独立展示。</span>}</div></div>;
-}
-export function LadderChart({layout="combined",...props}:Props) {
- const [metric,setMetric]=useState<Metric>("total"), [effort,setEffort]=useState("all"), [ability,setAbility]=useState(false), [highlightVendor,setHighlightVendor]=useState("");
- const ranked=props.entries.filter(e=>Number.isFinite(e.rankings[props.domain]?.score)&&e.rankings[props.domain].score>=0&&e.rankings[props.domain].score<=100);
- const priced=props.entries.filter(e=>e.rankings[props.domain] && Number.isFinite(e.rankings[props.domain].score) && e.rankings[props.domain].score>=0 && e.rankings[props.domain].score<=100 && comparisonPrice(e,metric)!=null && Number.isFinite(comparisonPrice(e,metric)) && comparisonPrice(e,metric)!>=0 && e.verifiedAt);
- const effectiveEffort=ranked.some(e=>reasoningLabel(e)===effort)?effort:"all";
- const selected=priced.filter(e=>effectiveEffort==="all"||reasoningLabel(e)===effectiveEffort);
- const split=layout==="split"||!props.exchange;
- const groups=split?ladderCurrencyGroups(selected):[{currency:"CNY",entries:selected.filter(e=>e.price.currency==="CNY"||e.price.currency==="USD")}];
- return <section className="ladder-chart-block"><div className="chart-heading"><div><h3>{ability?"全部型号能力":"价格 × 性能"}</h3><p className="hint">独立评测型号包含推理强度；未标注时不推算。</p></div><div className="ladder-filters">
- {!ability&&<select className="select" aria-label="比较价格类型" value={metric} onChange={e=>setMetric(e.target.value as Metric)}><option value="total">输入 + 输出成本</option><option value="input">输入价格</option><option value="output">输出价格</option></select>}
- <select className="select" aria-label="推理强度" value={effectiveEffort} onChange={e=>setEffort(e.target.value)}><option value="all">全部推理强度</option>{[...new Set(ranked.map(reasoningLabel))].sort().map(v=><option key={v}>{v}</option>)}</select><button className="btn" onClick={()=>setAbility(v=>!v)}>{ability?"查看价格 × 性能":"全部型号能力图"}</button></div></div>
- {ability ? <div className="card scatter-chart"><p className="hint">所有有当前分类评测的型号，含暂无标准价型号；每个推理版本独立展示。</p><div className="ability-models">{ranked.filter(e=>effectiveEffort==="all"||reasoningLabel(e)===effectiveEffort).sort((a,b)=>b.rankings[props.domain].score-a.rankings[props.domain].score).map(e=><button key={e.id} className="ability-row" onClick={()=>props.onFocus(e)}><span>{e.name} · {reasoningLabel(e)}</span><progress max={100} value={e.rankings[props.domain].score} style={{accentColor:`var(--model-${Math.max(0,vendors.indexOf(e.vendor))+1})`}}/><b>{e.rankings[props.domain].score.toFixed(1)}</b></button>)}</div></div> : <>
- {layout==="combined"&&<p className="hint" role="status">{props.exchange?`统一人民币 · 1 USD = ${props.exchange.cnyPerUsd.toFixed(4)} CNY · ECB 参考日 ${props.exchange.date}${props.exchange.error?` · ${props.exchange.error}`:" · 每日同步"}`:"汇率暂不可用，已按原币种分图展示，美元型号不会被隐藏。"}</p>}
- <div className={split?"scatter-cards":""}>{groups.map(group=><div className="card scatter-chart" key={group.currency}>{split&&<h3>{currencyTitle(group.currency)}</h3>}{group.entries.length?<Canvas {...props} entries={group.entries} currency={group.currency} metric={metric} highlightVendor={highlightVendor}/>:<p className="hint">暂无同时具备评测分与已核实价格的型号。</p>}</div>)}</div>
- <div className="scatter-footer"><p className="hint">{groups.reduce((n,g)=>n+g.entries.length,0)} 个型号 · 圆点颜色区分厂商 · 点击图例突出厂商 · 相邻圆点展开，细线指向真实坐标 · 对数价格轴 · 汇率仅供比较，保留原币种，不修改官方价格。</p><div className="scatter-legend">{vendors.filter(v=>groups.some(g=>g.entries.some(e=>e.vendor===v))).map(v=><button type="button" key={v} aria-pressed={highlightVendor===v} onClick={()=>setHighlightVendor(current=>current===v?"":v)}><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><VendorMarker vendor={v}/></svg>{v}</button>)}</div></div>
- <details className="card scatter-chart"><summary>未进入价格图的型号（{props.entries.filter(e=>!groups.some(g=>g.entries.some(v=>v.id===e.id))).length}）</summary><div className="scatter-models">{props.entries.filter(e=>!groups.some(g=>g.entries.some(v=>v.id===e.id))).map(e=><button key={e.id} onClick={()=>props.onFocus(e)}>{e.name} · {reasoningLabel(e)} · {!e.rankings[props.domain]?"当前分类暂无评测":!e.verifiedAt||comparisonPrice(e,metric)==null?"暂无标准价":effectiveEffort!=="all"&&reasoningLabel(e)!==effectiveEffort?"推理强度筛选已排除":"等待可用汇率"}</button>)}</div></details></>}
- </section>;
+export function LadderChart(props: Props) {
+  const [chartCurrency,setChartCurrency]=useState("CNY");
+  const [metric, setMetric] = useState<LadderMetric>("total"), [effort, setEffort] = useState("all"), [highlightBrand, setHighlightBrand] = useState("");
+  const ranked = props.entries.filter(entry => Number.isFinite(entry.rankings[props.domain]?.score) && entry.rankings[props.domain].score >= 0 && entry.rankings[props.domain].score <= 100);
+  const priced = ranked.filter(entry => comparisonPrice(entry, metric) != null && entry.verifiedAt && entry.price.currency.trim());
+  const effectiveEffort = ranked.some(entry => reasoningLabel(entry) === effort) ? effort : "all";
+  const selected = priced.filter(entry => effectiveEffort === "all" || reasoningLabel(entry) === effectiveEffort);
+  const groups = [{ currency: chartCurrency, entries: selected.filter(entry => plotPrice(entry, metric, chartCurrency, props.exchange) != null) }];
+  const omitted = props.entries.filter(entry => !groups.some(group => group.entries.some(value => value.id === entry.id)));
+  return <section className="ladder-chart-block"><div className="chart-heading"><div><h3>价格 × 性能</h3></div><div className="ladder-filters">
+    {<select className="select" aria-label="比较价格类型" value={metric} onChange={event => setMetric(event.target.value as LadderMetric)}><option value="total">输入 + 输出成本</option><option value="input">输入价格</option><option value="output">输出价格</option></select>}
+    <select className="select" aria-label="推理强度" value={effectiveEffort} onChange={event => setEffort(event.target.value)}><option value="all">全部推理强度</option>{[...new Set(ranked.map(reasoningLabel))].sort().map(value => <option key={value}>{value}</option>)}</select>
+    <select className="select" aria-label="图表币种" value={chartCurrency} onChange={event=>setChartCurrency(event.target.value)}><option value="CNY">人民币</option><option value="USD">美元</option></select>
+
+  </div></div>
+    {<>
+      <p className="hint" role="status">{validExchange(props.exchange) ? `1 USD = ${props.exchange.cnyPerUsd.toFixed(4)} CNY · ECB ${props.exchange.date}${props.exchange.error ? ` · ${props.exchange.error}` : ""}` : "汇率暂不可用，仅显示所选原币种；可切换人民币或美元。"}</p>
+      <div>{groups.map(group => <div className="card scatter-chart" key={group.currency}>{group.entries.length ? <Canvas {...props} entries={group.entries} currency={group.currency} metric={metric} highlightBrand={highlightBrand} /> : <p className="hint">暂无同时具备评测分与已核实价格的型号。</p>}</div>)}</div>
+      <div className="scatter-footer"><p className="hint">区间自动适配当前模型 · 价格轴使用对数刻度 · 汇率仅供比较</p><div className="scatter-legend">{[...new Set(groups.flatMap(group => group.entries.map(entry => modelBrand(entry.name))))].sort().map(brand => <button type="button" key={brand} aria-pressed={highlightBrand === brand} onClick={() => setHighlightBrand(current => current === brand ? "" : brand)}><ModelLogo name={brand} size={20} />{brand}</button>)}</div></div>
+      <details className="card scatter-chart"><summary>未进入价格图的型号（{omitted.length}）</summary><div className="scatter-models">{omitted.map(entry => <button key={entry.id} onClick={() => props.onFocus(entry)}>{entry.name} · {reasoningLabel(entry)} · {!entry.rankings[props.domain] ? "当前分类暂无评测" : !entry.verifiedAt || comparisonPrice(entry, metric) == null ? "暂无可比较的标准 Token 价格" : effectiveEffort !== "all" && reasoningLabel(entry) !== effectiveEffort ? "推理强度筛选已排除" : "等待可用汇率"}</button>)}</div></details>
+    </>}
+  </section>;
 }

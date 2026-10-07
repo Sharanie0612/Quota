@@ -1,4 +1,4 @@
-import { ProviderLogo } from "./logos";
+import { ModelLogo } from "./ModelLogo";
 import { contextText, priceText } from "../lib/format";
 import { comparisonCost } from "../lib/modelComparison";
 import type { ModelCard as ModelCardType } from "../lib/types";
@@ -8,7 +8,6 @@ import { Badge, IconButton } from "./ui";
 /** 模型库的一行：logo + 名称 + 价格 + 动作（隐藏 / 恢复） */
 export function ModelRow({
   card,
-  provider,
   accountLabel,
   showBar,
   maxCost,
@@ -33,7 +32,7 @@ export function ModelRow({
 
   return (
     <div className="mrow">
-      <ProviderLogo provider={provider} size={28} />
+      <ModelLogo name={card.id} size={28} />
       <div className="mrow-name">
         <div className="mrow-title">
           {card.name}

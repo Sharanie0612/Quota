@@ -33,6 +33,11 @@ fn check_model_calendar_reports(root:&Path) {
  let filtered=|model:&str,days|activity::report_filtered(&dir,Some(aid.into()),Some("codex".into()),days,Some(model.into())).unwrap();
  let daily=activity::report_range(&dir,Some(aid.into()),Some("codex".into()),Some(7),Some("Alpha".into()),Some(first.to_string()),Some(first.to_string())).unwrap();
  assert_eq!(daily.totals.tokens.total,200);assert_eq!(daily.totals.sessions,1);assert_eq!(daily.totals.calls,0);
+ assert_eq!(daily.hourly.iter().map(|g|g.tokens.total).sum::<u64>(),daily.totals.tokens.total);
+ assert_eq!(daily.hourly.len(),2);assert!(daily.hourly[0].key.ends_with("T00"));assert!(daily.hourly[1].key.ends_with("T23"));
+ let vendor=activity::report_filtered(&dir,Some(aid.into()),Some("codex".into()),Some(7),Some("vendor:unknown".into())).unwrap();
+ assert_eq!(vendor.totals.tokens.total,550);assert_eq!(vendor.totals.calls,2);assert_eq!(vendor.models.len(),3);
+ for (model,vendor) in [("openai/gpt-6.1-sol","custom"),("GLM-5.3","zhipu"),("z-ai/model","zhipu"),("deepseek-flash","deepseek"),("moonshot-v1","moonshot"),("anthropic/claude-test","anthropic"),("xiaomi/mimo-test","mimo"),("google/gemini-test","google"),("qwen-test","alibaba"),("o4-mini","custom")] {assert_eq!(activity::model_vendor(model),vendor);}
  let period=activity::report_range(&dir,Some(aid.into()),Some("codex".into()),Some(7),Some("Alpha".into()),Some(first.to_string()),Some(today.to_string())).unwrap();assert_eq!(period.totals.tokens.total,240);assert_eq!(period.totals.sessions,1);
  assert!(activity::report_range(&dir,None,None,None,None,Some(today.to_string()),Some(first.to_string())).is_err());
  assert!(activity::report_range(&dir,None,None,None,None,Some("2026-02-30".into()),None).is_err());

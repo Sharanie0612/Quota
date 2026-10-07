@@ -42,7 +42,7 @@ console.log('PASS day/week/month totals conserved; cache remains a subset; heat 
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const { ActivityCharts } = load(path.resolve(__dirname, '../src/components/ActivityCharts.tsx'));
-const html = renderToStaticMarkup(React.createElement(ActivityCharts, { rows, days: 7, model: 'test-model', metric:'total', setMetric:()=>{}, range:null, onRange:()=>{} }));
+const html = renderToStaticMarkup(React.createElement(ActivityCharts, { rows, hourly:[], format:String, days: 7, model: 'test-model', metric:'total', setMetric:()=>{}, range:null, onRange:()=>{} }));
 assert.match(html, /test-model每日 Token 平滑曲线图/);
 assert.match(html, /Token 活动热力图/);
 assert.equal((html.match(/class="heatmap-cell /g) || []).length, 7);
@@ -52,7 +52,13 @@ console.log('PASS real React chart renders model scope, day line, seven keyboard
 
 const {smoothUsagePath}=load(path.resolve(__dirname, "../src/lib/activityCharts.ts"));
 assert.equal(smoothUsagePath([]), "");
-assert.match(smoothUsagePath([{x:0,y:10},{x:3,y:0},{x:6,y:20}]), /M 0 10 C 1 10, 2 0, 3 0 C 4 0, 5 20, 6 20/);
+// Sample cubic curves: interpolation must remain inside measured endpoints.
+for(const ys of [[10,0,20],[0,100,0,50],[0,0,20,20],[0,2,8,20]]) {
+ const points=ys.map((y,x)=>({x:x*3,y}));const path=smoothUsagePath(points);
+ const segments=[...path.matchAll(/ C ([\d.e+-]+) ([\d.e+-]+), ([\d.e+-]+) ([\d.e+-]+), ([\d.e+-]+) ([\d.e+-]+)/g)];
+ segments.forEach((m,i)=>{for(let n=0;n<=100;n++){const t=n/100,u=1-t;const y=u**3*ys[i]+3*u*u*t*Number(m[2])+3*u*t*t*Number(m[4])+t**3*Number(m[6]);assert.ok(y>=Math.min(ys[i],ys[i+1])-1e-8&&y<=Math.max(ys[i],ys[i+1])+1e-8);}});
+ assert.ok(!/NaN|Infinity/.test(path));
+}
 assert.match(html, /class="usage-area"/);
 
 const {periodRange}=load(path.resolve(__dirname,'../src/lib/activityCharts.ts'));
@@ -60,3 +66,16 @@ assert.deepEqual(periodRange('2026-09-28','week','2026-09-30','2026-10-04'),{fro
 assert.deepEqual(periodRange('2024-02-01','month','2024-01-01','2024-03-01'),{from:'2024-02-01',to:'2024-02-29'});
 assert.equal(periodRange('2026-02-30','day','2026-01-01','2026-12-31'),null);
 console.log('PASS selected period clips to visible range, leap-month and invalid date handling');
+const {periodLabel,metricValue}=load(path.resolve(__dirname,'../src/lib/activityCharts.ts'));
+assert.equal(periodLabel('2025-12-29','week'),'2026 年第 1 周');
+assert.equal(periodLabel('2021-01-01','week'),'2020 年第 53 周');
+assert.equal(periodLabel('2026-10-01','month'),'2026 年 10 月');
+assert.equal(metricValue({...emptyTokens(),input:100,cached:70},'uncached'),30);
+const hourly=Array.from({length:24},(_,i)=>row('2026-10-04T'+String(i).padStart(2,'0'),i*10));
+const hourHtml=renderToStaticMarkup(React.createElement(ActivityCharts,{rows:[row('2026-10-04',2760)],hourly,format:String,days:0,model:'vendor:zhipu',metric:'total',setMetric:()=>{},range:{from:'2026-10-04',to:'2026-10-04'},onRange:()=>{}}));
+assert.match(hourHtml,/每小时用量/);assert.match(hourHtml,/00:00/);assert.match(hourHtml,/23:00/);assert.match(hourHtml,/总 Token <b>230/);
+assert.match(hourHtml,/每小时 Token 平滑曲线图/);
+assert.match(hourHtml,/aria-label="小时趋势日期"/);
+assert.match(hourHtml,/返回总览/);
+assert.match(hourHtml,/06:00/);assert.match(hourHtml,/18:00/);
+console.log('PASS monotone smoothing, ISO week years, month labels, cache subtraction and 24-hour model scope');

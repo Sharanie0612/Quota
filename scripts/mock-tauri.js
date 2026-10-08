@@ -670,6 +670,8 @@
     }
   }
 
+  // Tauri 2 unlisten calls this hook before invoking the backend stub.
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
   window.__TAURI_INTERNALS__ = {
     metadata: {
       currentWindow: { label: WINDOW_LABEL },
@@ -845,7 +847,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1301",
+            version: "1.0.1400",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen":

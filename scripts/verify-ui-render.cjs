@@ -46,8 +46,8 @@ const balance = { total: 10, currency: 'CNY', source: 'api', usable: true, note:
 const account = { id: 'synthetic', provider: 'zhipu', providerName: 'GLM', label: 'Synthetic', balanceMode: 'auto', balanceSupported: false, low: false, needsApiKey: false, status: { balance, subscription: null, balanceError: 'synthetic failure', modelsError: null, models: [], lastChecked: null } };
 const cardProps = { account, busy: false, onRefresh: () => {}, onEdit: () => {}, onUseManual: () => {}, onShowModels: () => {} };
 const card = render(AccountCard, cardProps);
-assert.match(card, /累计消费/); assert.match(card, /synthetic failure/); assert.match(card, /改用手动余额/);
-assert.ok(card.includes('class="balance-spend"')); assert.ok(card.includes('<span>累计消费</span>')); assert.ok(!card.includes('<details open'));
+assert.ok(!card.includes("累计消费")); assert.match(card, /synthetic failure/); assert.match(card, /改用手动余额/);
+assert.ok(!card.includes('class="balance-spend"')); assert.ok(!card.includes('<details open'));
 assert.match(card, /0\.00/);
 const partialPlan = render(AccountCard, { ...cardProps, account: { ...account, provider: 'mimo-plan', status: { ...account.status, balanceError: null, balance: { ...balance, currency: 'Credits', amounts: [] } } } });
 assert.match(partialPlan, /已同步额度/); assert.ok(!partialPlan.includes('暂无订阅额度'));
@@ -104,10 +104,19 @@ assert.match(render(AbilityRadar,{entries:[completeEntry]}),/fill-opacity="0.08"
 const {CacheUsage}=load(path.resolve(__dirname,'../src/components/CacheUsage.tsx'));
 const cacheRows=['gpt-6.1-sol','GLM-5.3','deepseek-flash'].map(key=>({key,tokens:{input:100,cached:70},sessions:1,calls:0}));
 const cacheProps={rows:cacheRows,modelKeys:cacheRows.map(row=>row.key),format:String,onModel:()=>{}};
-const cacheHtml=render(CacheUsage,cacheProps);assert.match(cacheHtml,/70.0%/);assert.match(cacheHtml,/>30<\/td>/);
-const colors=[...cacheHtml.matchAll(/class="cache-color" style="background:([^\"]+)/g)].map(m=>m[1]);assert.equal(new Set(colors).size,3);
-const onlyOne=render(CacheUsage,{...cacheProps,rows:[cacheRows[1]]});assert.ok(onlyOne.includes(`background:${colors[1]}`));
-console.log('PASS six-dimensional radar never fills missing axes; cache ratios, miss counts and scoped model colors stay consistent');
+const cacheHtml=render(CacheUsage,cacheProps);
+assert.match(cacheHtml,/总体命中率/);assert.match(cacheHtml,/70.0%/);assert.match(cacheHtml,/命中 70 · 未命中 30/);assert.match(cacheHtml,/已命中 <b>210/);assert.match(cacheHtml,/未命中 <b>90/);
+assert.ok(!cacheHtml.includes('<table'));assert.equal((cacheHtml.match(/class="cache-model-row"/g)||[]).length,3);
+const emptyCache=render(CacheUsage,{...cacheProps,rows:[{key:'empty',tokens:{input:0,cached:0}}]});assert.ok(!/NaN|Infinity/.test(emptyCache));assert.match(emptyCache,/暂无输入记录/);
+const manyCache=render(CacheUsage,{...cacheProps,rows:Array.from({length:10},(_,i)=>({...cacheRows[0],key:'model-'+i}))});assert.equal((manyCache.match(/class="cache-model-row"/g)||[]).length,6);assert.match(manyCache,/展开全部 10 个模型/);
+console.log('PASS sparse radar, weighted cache hit summary, hit/miss values, zero-input handling and compact model list');
+const {modelFamilies,modelFamily,releaseDates,releasedWithin}=load(path.resolve(__dirname,'../src/lib/ladderModels.ts'));
+const variantEntries=[{...entry('gpt-high','USD',1),name:'GPT Example (High)',vendor:'OpenAI',releasedAt:'2026-10-02'},{...entry('gpt-low','USD',1),name:'GPT Example (Low)',vendor:'OpenAI'},{...entry('gemini','USD',1),name:'Gemini Example',vendor:'Google',releasedAt:'invalid'},{...entry('other','USD',1),name:'GPT Example (High)',vendor:'Other'}];
+const families=modelFamilies(variantEntries);assert.equal(families.length,3);assert.equal(families[0].vendor,'Google');assert.equal(modelFamilies(variantEntries,'name')[0].name,'Gemini Example');
+const dates=releaseDates(variantEntries);assert.equal(dates.get(modelFamily(variantEntries[1])),'2026-10-02');assert.ok(!dates.has(modelFamily(variantEntries[3])));
+const today=new Date(2026,9,8,12);assert.ok(releasedWithin('2026-10-02',7,today));assert.ok(!releasedWithin('2026-10-01',7,today));assert.ok(!releasedWithin('2026-10-09',7,today));assert.ok(!releasedWithin(undefined,7,today));
+assert.equal(families.find(g=>g.vendor==='OpenAI').variants.map(e=>e.id).join(','),'gpt-low,gpt-high');
+console.log('PASS exact vendor/model grouping, reasoning variants, release-date inheritance and seven-calendar-day boundaries');
 
 const {SettingsView}=load(path.resolve(__dirname,'../src/views/SettingsView.tsx'));
 const settingsHtml=render(SettingsView,{settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},info:null});

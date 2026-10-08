@@ -171,7 +171,6 @@ export function AccountCard({
           <div className="balance-content">
             <div className="balance-row"><div><span className="hint">{balance?.currency === "CREDITS" ? "剩余额度" : "总余额"}</span><div className="balance-value">{balance?.total == null ? "—" : money(balance.total, balance.currency)}</div></div><Sparkline points={trend?.points ?? []} low={account.low}/></div>
             <div className="balance-details">{breakdown.fields.map(({label,item}) => <div key={label} title={item?.label ?? "尚未取得该项数据"}><span>{label}{item?.kind === "manual_cumulative_recharge" ? " · 手动" : ""}</span><b>{item == null ? "—" : money(item.value,item.currency ?? balance?.currency ?? "CNY")}</b></div>)}</div>
-            <div className="balance-spend" title={breakdown.spend?.label ?? "官方接口未提供，可在高级设置手动补全；不根据余额推算"}><span>累计消费{breakdown.spend?.kind === "manual_cumulative_spend" ? " · 手动" : ""}</span><b>{breakdown.spend == null ? "—" : money(breakdown.spend.value, breakdown.spend.currency ?? balance?.currency ?? "CNY")}</b></div>
             {trend?.dailyBurn != null && trend.dailyBurn > 0 && balance ? <div className="trend-hint">日均消耗约 {money(trend.dailyBurn,balance.currency)}{trend.daysLeft != null ? " · " + daysLeftText(trend.daysLeft) : ""}</div> : null}
           </div>
         ) : balance?.total != null || (balance?.amounts.length ?? 0) > 0 ? (

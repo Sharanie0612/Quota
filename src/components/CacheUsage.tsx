@@ -1,12 +1,18 @@
+import { useState } from "react";
 import type { ActivityGroup } from "../lib/types";
 import { ModelLogo } from "./ModelLogo";
-import { modelColors } from "./AbilityRadar";
-export function CacheUsage({rows,modelKeys,format,onModel}: {rows:ActivityGroup[];modelKeys:string[];format:(n:number)=>string;onModel:(key:string)=>void}) {
-  const models=[...rows].sort((a,b)=>b.tokens.input-a.tokens.input);
-  const palette=[...modelColors,...modelColors.map((color,i)=>`color-mix(in srgb, ${color} 65%, ${modelColors[(i+1)%modelColors.length]})`)];
-  const colors=new Map([...new Set([...modelKeys,...rows.map(row=>row.key)])].sort().map((key,i)=>[key,palette[i%palette.length]]));
-  return <section className="card cache-usage"><div className="usage-heading"><h3>缓存命中</h3><span className="hint">命中率 = 缓存命中 / 输入</span></div><div className="cache-table-scroll"><table><thead><tr><th>模型</th><th>命中率</th><th>命中 Token</th><th>未命中 Token</th></tr></thead><tbody>{models.map(row=>{
-    const rate=row.tokens.input>0?Math.min(1,row.tokens.cached/row.tokens.input):0;
-    return <tr key={row.key}><td><button className="activity-model-link" onClick={()=>onModel(row.key)}><i className="cache-color" style={{background:colors.get(row.key)}}/><ModelLogo name={row.key} size={20}/>{row.key||"未知模型"}</button></td><td><div className="cache-rate"><div><span style={{width:`${rate*100}%`,background:colors.get(row.key)}}/></div><b>{row.tokens.input?`${(rate*100).toFixed(1)}%`:"—"}</b></div></td><td>{format(row.tokens.cached)}</td><td>{format(Math.max(0,row.tokens.input-row.tokens.cached))}</td></tr>;
-  })}</tbody></table></div>{!models.length&&<p className="hint">当前范围暂无缓存记录</p>}</section>;
+import { Button } from "./ui";
+export function CacheUsage({rows,format,onModel}: {rows:ActivityGroup[];format:(n:number)=>string;onModel:(key:string)=>void}) {
+  const [expanded,setExpanded] = useState(false);
+  const models = [...rows].filter(row=>row.tokens.input>0).sort((a,b)=>b.tokens.input-a.tokens.input);
+  const input = models.reduce((sum,row)=>sum+row.tokens.input,0);
+  const cached = models.reduce((sum,row)=>sum+Math.min(row.tokens.input,Math.max(0,row.tokens.cached)),0);
+  const rate = input ? cached/input : 0;
+  return <section className="card cache-usage"><div className="cache-heading"><h3>缓存命中</h3><span className="hint">占输入 Token 的比例</span></div>
+    <div className="cache-summary"><b>{input ? `${(rate*100).toFixed(1)}%` : "—"}<small>总体命中率</small></b><div className="cache-summary-detail"><div className="cache-bar" role="img" aria-label={`总体缓存命中率 ${(rate*100).toFixed(1)}%`}><span style={{width:`${rate*100}%`}}/></div><div><span>已命中 <b>{format(cached)}</b></span><span>未命中 <b>{format(Math.max(0,input-cached))}</b></span></div></div></div>
+    <div className="cache-model-list">{(expanded ? models : models.slice(0,6)).map(row=>{
+      const hit = Math.min(row.tokens.input,Math.max(0,row.tokens.cached));
+      const rate = hit/row.tokens.input;
+      return <button className="cache-model-row" key={row.key} title={`${row.key || "未知模型"} · 命中 ${format(hit)} · 未命中 ${format(row.tokens.input-hit)}`} onClick={()=>onModel(row.key)}><ModelLogo name={row.key} size={18}/><span className="cache-model-content"><span className="cache-model-label"><span>{row.key||"未知模型"}</span><b>{(rate*100).toFixed(1)}%</b></span><span className="cache-bar" aria-hidden="true"><span style={{width:`${rate*100}%`}}/></span><span className="cache-model-values">命中 {format(hit)} · 未命中 {format(row.tokens.input-hit)}</span></span></button>;
+    })}</div>{models.length>6&&<Button variant="quiet" size="sm" onClick={()=>setExpanded(value=>!value)}>{expanded ? "收起" : `展开全部 ${models.length} 个模型`}</Button>}{!models.length&&<p className="hint">当前范围暂无输入记录</p>}</section>;
 }

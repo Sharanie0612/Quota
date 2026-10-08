@@ -42,8 +42,6 @@ export function AccountSheet({
   );
   const [rechargeTotal,setRechargeTotal] = useState(initial?.manualRechargeTotal == null ? "" : String(initial.manualRechargeTotal));
   const [rechargeCurrency,setRechargeCurrency] = useState(initial?.manualRechargeCurrency ?? initial?.status.balance?.currency ?? "CNY");
-  const [spendTotal,setSpendTotal] = useState(initial?.manualSpendTotal == null ? "" : String(initial.manualSpendTotal));
-  const [spendCurrency,setSpendCurrency] = useState(initial?.manualSpendCurrency ?? initial?.status.balance?.currency ?? "CNY");
   const [manualCurrency, setManualCurrency] = useState(initial?.manualBalance != null
     ? initial.manualCurrency ?? "CNY" : ["custom", "mimo-plan"].includes(initial?.provider ?? "") ? "%" : "CNY");
   const [note, setNote] = useState(initial?.note ?? "");
@@ -178,7 +176,6 @@ export function AccountSheet({
     if (!provider) return;
     if (!Number.isFinite(Number(threshold)) || Number(threshold) < 0) { toast("提醒阈值须为有限非负数", "error"); return; }
     if (rechargeTotal.trim() !== "" && (!Number.isFinite(Number(rechargeTotal)) || Number(rechargeTotal) < 0)) { toast("累计充值须为非负金额", "error"); return; }
-    if (spendTotal.trim() !== "" && (!Number.isFinite(Number(spendTotal)) || Number(spendTotal) < 0)) { toast("累计消费须为非负金额", "error"); return; }
     if (manual.trim() !== "" && (!Number.isFinite(Number(manual)) || (manualCurrency === "%" && (Number(manual) < 0 || Number(manual) > 100)))) {
       toast(manualCurrency === "%" ? "剩余百分比须在 0–100 之间" : "手动余额须为有限数值", "error"); return;
     }
@@ -210,8 +207,8 @@ export function AccountSheet({
         manualCurrency,
         manualRechargeTotal: rechargeTotal.trim() === "" ? null : Number(rechargeTotal),
         manualRechargeCurrency: rechargeCurrency,
-        manualSpendTotal: spendTotal.trim() === "" ? null : Number(spendTotal),
-        manualSpendCurrency: spendCurrency,
+        manualSpendTotal: initial?.manualSpendTotal ?? null,
+        manualSpendCurrency: initial?.manualSpendCurrency ?? "CNY",
         note: note.trim(),
         balanceMode,
         customUrl: customUrl.trim(),
@@ -672,7 +669,6 @@ export function AccountSheet({
         ) : null}
 
         {!isSubscription && <Field label="累计充值（手动补全）" hint="官方接口未提供时可按账单填写；不会改变余额，接口有值时优先显示接口数据。"><div className="row-2"><input className="input" aria-label="手动累计充值" type="number" min="0" step="0.01" value={rechargeTotal} placeholder="未知请留空" onChange={e=>setRechargeTotal(e.target.value)}/><select className="select" aria-label="累计充值币种" value={rechargeCurrency} onChange={e=>setRechargeCurrency(e.target.value)}><option value="CNY">人民币</option><option value="USD">美元</option></select></div></Field>}
-        {!isSubscription && <Field label="累计消费（手动补全）" hint="官方接口未提供时可按账单填写；不会改变余额，接口有值时优先显示接口数据。"><div className="row-2"><input className="input" aria-label="手动累计消费" type="number" min="0" step="0.01" value={spendTotal} placeholder="未知请留空" onChange={e=>setSpendTotal(e.target.value)}/><select className="select" aria-label="累计消费币种" value={spendCurrency} onChange={e=>setSpendCurrency(e.target.value)}><option value="CNY">人民币</option><option value="USD">美元</option></select></div></Field>}
         <Field label="备注" >
           <input
             className="input"

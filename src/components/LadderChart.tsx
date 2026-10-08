@@ -6,11 +6,8 @@ import { ModelLogo, modelBrand } from "./ModelLogo";
 import "./ladder-chart.css";
 export { comparisonPrice } from "../lib/ladderPlot";
 export const currencyTitle = (currency: string) => currency === "CNY" ? "人民币" : currency === "USD" ? "美元" : currency;
-export const reasoningLabel = (entry: LadderEntry) => {
-  const named = entry.name.match(/[（(]([^）)]+)[）)]/)?.[1] ?? "";
-  const effort = /^(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:\b|,)/i.exec(named)?.[1] ?? /(?:^|-)(non-reasoning|xhigh|high|medium|low|max|minimal|reasoning)(?:-|$)/i.exec(entry.id)?.[1];
-  return effort ? effort.toLowerCase().replace(/^./, char => char.toUpperCase()) : "未标注";
-};
+import { reasoningLabel } from "../lib/ladderModels";
+export { reasoningLabel } from "../lib/ladderModels";
 
 type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null };
 function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency, highlightBrand }: Props & { metric: LadderMetric; currency: string; highlightBrand: string }) {

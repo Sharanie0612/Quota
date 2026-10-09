@@ -1,6 +1,6 @@
 [package]
 name = "quota"
-version = "1.0.1400"
+version = "1.0.1503"
 description = "A lightweight local-first dashboard for AI provider balances and quotas."
 edition = "2021"
 rust-version = "1.77.2"
@@ -15,7 +15,7 @@ crate-type = ["staticlib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-rusqlite = { version = "0.40.2", features = ["bundled"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "serialize"] }
 zstd = "0.13"
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
@@ -47,6 +47,7 @@ scraper = "0.24"
 
 # Windows 平台使用系统凭据管理器（Windows Credential Manager）加密保存 API Key
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Memory", "Win32_System_Threading"] }
 keyring = { version = "3", features = ["windows-native"] }
 
 # macOS / Linux 备用（跨平台编译时不至于失败）

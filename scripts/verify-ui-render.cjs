@@ -110,6 +110,38 @@ assert.ok(!cacheHtml.includes('<table'));assert.equal((cacheHtml.match(/class="c
 const emptyCache=render(CacheUsage,{...cacheProps,rows:[{key:'empty',tokens:{input:0,cached:0}}]});assert.ok(!/NaN|Infinity/.test(emptyCache));assert.match(emptyCache,/暂无输入记录/);
 const manyCache=render(CacheUsage,{...cacheProps,rows:Array.from({length:10},(_,i)=>({...cacheRows[0],key:'model-'+i}))});assert.equal((manyCache.match(/class="cache-model-row"/g)||[]).length,6);assert.match(manyCache,/展开全部 10 个模型/);
 console.log('PASS sparse radar, weighted cache hit summary, hit/miss values, zero-input handling and compact model list');
+
+// Trae usage channels: models Trae provides and models reached with the user's own key stay separate.
+const {activityModelName,activityModelChannel,activityChannelName,activityChannels,activityFilterLabel}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));
+const channelKey=(name,channel)=>name+'\u001f'+channel;
+assert.equal(activityModelName(channelKey('deepseek-v4-pro','api')),'deepseek-v4-pro');
+assert.equal(activityModelChannel(channelKey('deepseek-v4-pro','api')),'api');
+assert.equal(activityModelChannel('deepseek-v4-pro'),'');
+assert.equal(activityChannelName('trae'),'Trae 提供');
+assert.equal(activityChannelName('api'),'API 接入');
+assert.equal(activityChannelName('unknown'),'未鉴别');
+assert.equal(activityModelIdentity(channelKey('deepseek-v4-pro','api')).provider,'deepseek');
+assert.equal(activityModelIdentity(channelKey('GLM-5.3','trae')).provider,'zhipu');
+assert.deepEqual(activityChannels([{key:channelKey('a','api')},{key:'b'},{key:channelKey('c','trae')}]),['trae','api']);
+assert.equal(activityFilterLabel('channel:api'),'API 接入');
+assert.equal(activityFilterLabel(channelKey('glm-5.3','trae')),'glm-5.3 · Trae 提供');
+const channelRows=[{key:channelKey('deepseek-v4-pro','api'),tokens:{input:100,cached:70,total:100},sessions:1,calls:0},{key:channelKey('glm-5.3','trae'),tokens:{input:100,cached:70,total:50},sessions:1,calls:0}];
+assert.equal(activityModelChoices(channelRows,'API 接入').length,0);
+assert.equal(activityModelChoices(channelRows,'Trae 提供').length,0);
+const channelPicker=render(ActivityModelPicker,{rows:channelRows,value:'',onChange:()=>{},loading:false});
+assert.match(channelPicker,/Trae 用量通道/);assert.match(channelPicker,/channel:api/);
+assert.ok(!channelPicker.includes('deepseek-v4-pro · API 接入'));
+assert.ok(!channelPicker.includes('glm-5.3 · Trae 提供'));
+assert.ok(!channelPicker.includes('label="DeepSeek"'));
+assert.ok(!channelPicker.includes('label="智谱 GLM"'));
+const mixedPicker=render(ActivityModelPicker,{rows:[...channelRows,{...channelRows[0],key:'deepseek-v4-pro'}],value:'',onChange:()=>{},loading:false});
+assert.match(mixedPicker,/label="DeepSeek"/);assert.match(mixedPicker,/>deepseek-v4-pro<\/option>/);
+assert.ok(!mixedPicker.includes('deepseek-v4-pro · API 接入'));
+const selectedChannelPicker=render(ActivityModelPicker,{rows:channelRows,value:channelKey('glm-5.3','trae'),onChange:()=>{},loading:false});
+assert.match(selectedChannelPicker,/hidden=""/);
+const channelCache=render(CacheUsage,{rows:channelRows,format:String,onModel:()=>{}});
+assert.match(channelCache,/deepseek-v4-pro/);assert.match(channelCache,/API 接入/);assert.ok(!channelCache.includes('\u001f'));
+console.log('PASS Trae-provided and API-connected usage separated in labels, channel filter options, search and cache rows');
 const {modelFamilies,modelFamily,releaseDates,releasedWithin}=load(path.resolve(__dirname,'../src/lib/ladderModels.ts'));
 const variantEntries=[{...entry('gpt-high','USD',1),name:'GPT Example (High)',vendor:'OpenAI',releasedAt:'2026-10-02'},{...entry('gpt-low','USD',1),name:'GPT Example (Low)',vendor:'OpenAI'},{...entry('gemini','USD',1),name:'Gemini Example',vendor:'Google',releasedAt:'invalid'},{...entry('other','USD',1),name:'GPT Example (High)',vendor:'Other'}];
 const families=modelFamilies(variantEntries);assert.equal(families.length,3);assert.equal(families[0].vendor,'Google');assert.equal(modelFamilies(variantEntries,'name')[0].name,'Gemini Example');

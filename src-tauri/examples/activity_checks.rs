@@ -3,7 +3,7 @@ use std::{fs,io::Write,path::Path};
 use serde_json::json;
 use chrono::TimeZone;
 fn envelope(kind:&str,payload:serde_json::Value,ordinal:u64)->String{json!({"timestamp":"2026-10-04T00:00:00Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
-fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),sync_dir:sync.to_string_lossy().into()}).unwrap()}
+fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into()}).unwrap()}
 fn check_model_calendar_reports(root:&Path) {
  let dir=root.join("report-filters");fs::create_dir_all(&dir).unwrap();
  activity::report(&dir,None,None,None).unwrap();
@@ -12,7 +12,7 @@ fn check_model_calendar_reports(root:&Path) {
  let today=chrono::Local::now().date_naive();let first=today.checked_sub_days(chrono::Days::new(6)).unwrap();
  let at=|day:chrono::NaiveDate,hour,minute,second|chrono::Local.from_local_datetime(&day.and_hms_opt(hour,minute,second).unwrap()).earliest().unwrap().timestamp_millis();
  let token=|id:u64,model:&str,source:&str,device:&str,timestamp,total:u64,cached|activity::Metric {
-  id:format!("{id:064x}"),device:device.into(),source:source.into(),session:if model=="Alpha"{"shared".into()}else{model.into()},model:model.into(),agent:"主 Agent".into(),tool:String::new(),timestamp,kind:"tokens".into(),revision:0,
+  id:format!("{id:064x}"),device:device.into(),source:source.into(),session:if model=="Alpha"{"shared".into()}else{model.into()},model:model.into(),agent:"主 Agent".into(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),revision:0,
   tokens:activity::Tokens{input:total.saturating_sub(20),output:total.min(20),cached,reasoning:5,total,..Default::default()}
  };
  let samples=[

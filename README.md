@@ -127,14 +127,13 @@ npm run tauri dev
 
 ### Windows
 
-本仓库使用 `stable-x86_64-pc-windows-gnu` 工具链及 WebView2。打包前退出构建产物位置正在运行的 `quota.exe`，使用 rustup 自带 MinGW，避免系统中的旧 MinGW：
+准备好 Node.js、rustup 的 Windows GNU 工具链及 WebView2 后，双击根目录的 **build-installer.cmd**，或运行一条命令：
 
 ```powershell
-$env:Path = "$env:USERPROFILE\.rustup\toolchains\stable-x86_64-pc-windows-gnu\lib\rustlib\x86_64-pc-windows-gnu\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
-npm run tauri build
+npm run package:windows
 ```
 
-产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。
+入口自动同步锁定依赖、配置 GNU 路径、执行检查并保留构建缓存。打包前退出构建产物位置正在运行的 Quota。产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。
 
 ### macOS（Apple Silicon）
 

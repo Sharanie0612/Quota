@@ -35,11 +35,10 @@ cd ..
 node scripts/verify-logic.cjs        # 纯逻辑自检（签名/解析/定价页抽取），期望 7/7 通过
 ```
 
-打包（NSIS 工具链首次需代理下载，之后已缓存）：
+打包（也可双击根目录 build-installer.cmd；自动配置 GNU、同步依赖并执行检查）：
 
-```bash
-export PATH="$HOME/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu/bin:$HOME/.cargo/bin:$PATH"
-HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 npm run tauri build
+```powershell
+npm run package:windows
 ```
 
 打包前先退出正在运行的 quota.exe。产物：`src-tauri/target/release/quota.exe`（便携版）与 `src-tauri/target/release/bundle/nsis/*-setup.exe`（安装包）。

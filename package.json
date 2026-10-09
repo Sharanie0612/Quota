@@ -9,7 +9,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "tauri": "node scripts/tauri.cjs"
+    "tauri": "node scripts/tauri.cjs",
+    "package:windows": "node scripts/package-windows.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11",

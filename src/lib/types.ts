@@ -352,3 +352,5 @@ export interface ActivityTokens { input: number; cached: number; cacheWrite: num
 export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
 export interface ActivityOptions { deviceId: string; deviceName: string; autoCollect: boolean; collectIntervalSeconds: number; syncAccounts: boolean; codexHome: string; zcodeHome: string; harnessHome: string; traeHome: string; traeEnabled: boolean; syncDir: string }
 export interface ActivityReport { options: ActivityOptions; devices: {id: string; name: string}[]; totals: ActivityGroup; models: ActivityGroup[]; availableModels: ActivityGroup[]; tools: ActivityGroup[]; agents: ActivityGroup[]; daily: ActivityGroup[]; hourly: ActivityGroup[]; sources: ActivityGroup[]; channels: ActivityGroup[]; byDevice: ActivityGroup[]; updatedAt: number | null; errors: string[] }
+
+export interface AccountSyncCandidate { id: string; provider: string; label: string; createdAt: string; pending: boolean }

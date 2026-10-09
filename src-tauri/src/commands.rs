@@ -740,10 +740,7 @@ pub async fn delete_account(
     app: AppHandle,
     id: String,
 ) -> Result<(), String> {
-    {
-        let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
-        state.store.update_config(&mut cfg, |next| next.accounts.retain(|a| a.id != id))?;
-    }
+    crate::account_sync::remove_account(&state, &id)?;
     let _ = secrets::delete(&id);
     if let Ok(mut map) = state.statuses.lock() {
         map.remove(&id);

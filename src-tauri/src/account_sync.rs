@@ -1,4 +1,4 @@
-//! Shared-directory display data only. This module never reads the credential store.
+//! Shared exchange serializes display fields only. Local connection recovery is separate from exchange.
 use crate::{
     commands::AppState,
     model::{Account, AccountStatus, Balance, BalanceAmount},
@@ -292,6 +292,12 @@ struct Record {
 struct Local {
     records: BTreeMap<String, Record>,
     hidden: BTreeSet<String>,
+    #[serde(default)]
+    pending: BTreeSet<String>,
+    #[serde(default)]
+    independent: BTreeSet<String>,
+    #[serde(default)]
+    links: BTreeMap<String, String>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -348,6 +354,10 @@ fn write<T: Serialize>(p: &Path, v: &T) -> Result<(), String> {
 }
 
 pub fn sync(state: &AppState) -> Result<(), String> {
+    if let Err(error) = repair_connections(state) {
+        remember_connection_error(state, error.clone());
+        return Err(error);
+    }
     let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
     let options = crate::activity::options(state.store.dir());
     if options.sync_dir.is_empty() || !options.sync_accounts {
@@ -389,13 +399,16 @@ fn exchange(state: &AppState) -> Result<(), String> {
     let mut config = state.config.lock().map_err(|_| "读取账户失败")?;
     let mut statuses = state.statuses.lock().map_err(|_| "读取余额失败")?;
     let now = chrono::Utc::now().timestamp_millis();
-    let ids: BTreeSet<_> = config.accounts.iter().map(|a| a.id.clone()).collect();
+    // A persisted association also completes an interrupted config write on retry.
+    let mut base = config.clone();
+    base.accounts.retain(|a| !local.links.contains_key(&a.id));
+    let ids: BTreeSet<_> = base.accounts.iter().map(|a| a.id.clone()).collect();
     for id in local.records.keys() {
-        if !ids.contains(id) {
+        if !ids.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id) {
             local.hidden.insert(id.clone());
         }
     }
-    for account in &config.accounts {
+    for account in &base.accounts {
         local.hidden.remove(&account.id);
         let profile = Profile::from(account);
         if !profile.valid() {
@@ -454,7 +467,7 @@ fn exchange(state: &AppState) -> Result<(), String> {
         {
             return Err("账户同步格式无效".into());
         }
-        for remote in packet.records {
+        for mut remote in packet.records {
             if !remote.profile.valid()
                 || uuid::Uuid::parse_str(&remote.device).is_err()
                 || remote.edited < 0
@@ -462,6 +475,12 @@ fn exchange(state: &AppState) -> Result<(), String> {
                 || remote.snapshot.as_ref().is_some_and(|s| !s.valid())
             {
                 return Err("账户同步记录无效".into());
+            }
+            if let Some(target) = local.links.get(&remote.profile.id) {
+                remote.profile.id = target.clone();
+                if let Some(old) = local.records.get(target) {
+                    remote.profile.created_at = old.profile.created_at.clone();
+                }
             }
             if local.hidden.contains(&remote.profile.id) {
                 continue;
@@ -493,14 +512,22 @@ fn exchange(state: &AppState) -> Result<(), String> {
     if local.records.len() > 1000 {
         return Err("账户同步最多支持 1000 个账户".into());
     }
-    let mut next = config.clone();
+    let mut next = base;
     for (id, row) in &local.records {
-        if local.hidden.contains(id) {
+        if local.hidden.contains(id) || local.links.contains_key(id) {
             continue;
         }
         if let Some(account) = next.accounts.iter_mut().find(|a| &a.id == id) {
             row.profile.apply(account)
         } else {
+            // UUIDs created independently cannot identify the same provider login.
+            // Require explicit association rather than guessing from labels or balances.
+            if !local.independent.contains(id) && (next.accounts.iter().any(|a| a.provider == row.profile.provider)
+                || local.records.iter().any(|(other_id, other)| local.hidden.contains(other_id) && other.profile.provider == row.profile.provider)) {
+                local.pending.insert(id.clone());
+                continue;
+            }
+            local.pending.remove(id);
             // Construct from the whitelist only. All connection fields default to absent.
             let mut account:Account=serde_json::from_value(serde_json::json!({"id":id,"provider":row.profile.provider,"label":row.profile.label,"createdAt":row.profile.created_at})).map_err(|_|"创建共享账户失败")?;
             row.profile.apply(&mut account);
@@ -510,7 +537,7 @@ fn exchange(state: &AppState) -> Result<(), String> {
     state.store.save_config(&next)?;
     *config = next;
     for (id, row) in &local.records {
-        if !local.hidden.contains(id) {
+        if !local.hidden.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id) {
             if let Some(snapshot) = &row.snapshot {
                 let status = statuses.entry(id.clone()).or_default();
                 if status
@@ -530,7 +557,7 @@ fn exchange(state: &AppState) -> Result<(), String> {
         records: local
             .records
             .into_iter()
-            .filter(|(id, _)| !local.hidden.contains(id))
+            .filter(|(id, _)| !local.hidden.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id))
             .map(|(_, row)| row)
             .collect(),
     };
@@ -540,6 +567,188 @@ fn exchange(state: &AppState) -> Result<(), String> {
     }
     write(&own, &packet)
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncCandidate {
+    pub id: String,
+    pub provider: String,
+    pub label: String,
+    pub created_at: String,
+    pub pending: bool,
+}
+fn local_state(state: &AppState) -> Result<Local, String> {
+    let path = state.store.dir().join("account-sync-state.json");
+    if path.exists() { read(&path) } else { Ok(Local::default()) }
+}
+pub fn candidates(state: &AppState) -> Result<Vec<SyncCandidate>, String> {
+    let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
+    let local = local_state(state)?;
+    let config = state.config.lock().map_err(|_| "读取账户失败")?;
+    let mut profiles: BTreeMap<_, _> = config.accounts.iter().map(|a| (a.id.clone(), Profile::from(a))).collect();
+    for id in &local.pending {
+        if let Some(row) = local.records.get(id) { profiles.insert(id.clone(), row.profile.clone()); }
+    }
+    Ok(profiles.values().filter(|p| !local.hidden.contains(&p.id) && !local.independent.contains(&p.id) &&
+        !local.links.contains_key(&p.id) && (local.pending.contains(&p.id) || config.accounts.iter().any(|a| a.id != p.id && a.provider == p.provider)))
+        .map(|p| SyncCandidate { id: p.id.clone(), provider: p.provider.clone(), label: p.label.clone(),
+            created_at: p.created_at.clone(), pending: local.pending.contains(&p.id) }).collect())
+}
+// Persist deletion at the moment it happens, even before the first exchange.
+// An old shared packet must not reintroduce the deleted UUID after restart.
+pub fn remove_account(state: &AppState, id: &str) -> Result<(), String> {
+    let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
+    let mut local = local_state(state)?;
+    let mut config = state.config.lock().map_err(|_| "读取账户失败")?;
+    if let Some(account) = config.accounts.iter().find(|a| a.id == id) {
+        local.records.entry(id.into()).or_insert_with(|| Record { profile: Profile::from(account),
+            edited: chrono::Utc::now().timestamp_millis(), device: crate::activity::options(state.store.dir()).device_id, snapshot: None });
+    }
+    local.hidden.insert(id.into());
+    local.pending.remove(id);
+    write(&state.store.dir().join("account-sync-state.json"), &local)?;
+    state.store.update_config(&mut config, |next| next.accounts.retain(|a| a.id != id))
+}
+pub fn resolve(state: &AppState, source_id: &str, target_id: Option<&str>) -> Result<(), String> {
+    let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
+    resolve_locked(state, source_id, target_id)
+}
+fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) -> Result<(), String> {
+    let mut local = local_state(state)?;
+    let mut config = state.config.lock().map_err(|_| "读取账户失败")?;
+    state.store.ensure_config_writable()?;
+    let source_account = config.accounts.iter().find(|a| a.id == source_id).cloned();
+    let source = source_account.as_ref().map(Profile::from)
+        .or_else(|| local.records.get(source_id).filter(|_| local.pending.contains(source_id)).map(|r| r.profile.clone()))
+        .ok_or("待处理账户已变化，请重新加载")?;
+    if let Some(target_id) = target_id {
+        let target_index = config.accounts.iter().position(|a| a.id == target_id).ok_or("保留的账户不存在")?;
+        let mut target = config.accounts[target_index].clone();
+        if source_id == target_id || source.provider != target.provider { return Err("只能关联同平台的不同账户".into()); }
+        if local.links.contains_key(target_id) { return Err("该账户已关联，请重新加载".into()); }
+        // Persist and verify credentials BEFORE hiding the source. A failure leaves both cards.
+        // Only explicit local associations may inherit credentials; shared packets never do.
+        let transfer = crate::secrets::inherit_connection(source_id, target_id)?;
+        if transfer.use_source_config {
+            if let Some(original) = &source_account {
+                target.base_url = original.base_url.clone();
+                target.balance_mode = original.balance_mode.clone();
+                target.custom_url = original.custom_url.clone();
+                target.custom_headers = original.custom_headers.clone();
+                target.custom_body = original.custom_body.clone();
+                target.custom_method = original.custom_method.clone();
+                target.custom_json_path = original.custom_json_path.clone();
+                target.custom_currency = original.custom_currency.clone();
+            }
+        }
+        local.records.entry(source_id.into()).or_insert_with(|| Record { profile: source.clone(),
+            edited: chrono::Utc::now().timestamp_millis(), device: crate::activity::options(state.store.dir()).device_id, snapshot: None });
+        // Flatten associations before adding a new one; no cycles or dangling chains.
+        for mapped in local.links.values_mut() { if mapped == source_id { *mapped = target_id.into(); } }
+        local.links.insert(source_id.into(), target_id.into());
+        local.hidden.insert(source_id.into());
+        local.pending.remove(source_id);
+        local.independent.remove(source_id);
+        let mut target_record = Record { profile: Profile::from(&target), edited: chrono::Utc::now().timestamp_millis(),
+            device: crate::activity::options(state.store.dir()).device_id, snapshot: local.records.get(target_id).and_then(|r| r.snapshot.clone()) };
+        let mut statuses = state.statuses.lock().map_err(|_| "读取余额失败")?;
+        for id in [source_id, target_id] {
+            let snapshot = statuses.get(id).and_then(Snapshot::from).or_else(|| local.records.get(id).and_then(|r| r.snapshot.clone()));
+            if let Some(s) = snapshot {
+                if target_record.snapshot.as_ref().is_none_or(|old| newer_time(&s.at, &old.at)) { target_record.snapshot = Some(s); }
+            }
+        }
+        if let Some(s) = &target_record.snapshot { s.apply(statuses.entry(target_id.into()).or_default()); }
+        local.records.insert(target_id.into(), target_record);
+        // Source credentials and history remain available for rollback. Never sum balances.
+        // Save the inherited connection before making removal durable in the ledger.
+        // If ledger persistence fails, restore both cards; credentials remain additive.
+        let previous = config.clone();
+        state.store.update_config(&mut config, |next| {
+            next.accounts[target_index] = target;
+            next.accounts.retain(|a| a.id != source_id);
+        })?;
+        if let Err(error) = write(&state.store.dir().join("account-sync-state.json"), &local) {
+            state.store.save_config(&previous).map_err(|_| "关联台账保存失败；本机登录已保留，请稍后重试")?;
+            *config = previous;
+            return Err(error);
+        }
+    } else {
+        local.independent.insert(source_id.into());
+        local.pending.remove(source_id);
+        local.hidden.remove(source_id);
+        if !config.accounts.iter().any(|a| a.id == source_id) {
+            let mut account: Account = serde_json::from_value(serde_json::json!({"id":source_id,"provider":source.provider,"label":source.label,"createdAt":source.created_at})).map_err(|_| "账户显示资料无效")?;
+            source.apply(&mut account);
+            // Keep the decision pending until config is persisted, so a failed write
+            // cannot turn the retry into an inferred deletion.
+            local.pending.insert(source_id.into());
+            write(&state.store.dir().join("account-sync-state.json"), &local)?;
+            state.store.update_config(&mut config, |next| next.accounts.push(account))?;
+            local.pending.remove(source_id);
+        }
+        write(&state.store.dir().join("account-sync-state.json"), &local)?;
+    }
+    Ok(())
+}
+pub fn automatic_connection_pairs(
+    accounts: &[Account], connections: &BTreeMap<String, crate::secrets::SecretBlob>, independent: &BTreeSet<String>,
+) -> Vec<(String, String)> {
+    let mut ordered: Vec<_> = accounts.iter().filter(|a| !independent.contains(&a.id)).collect();
+    ordered.sort_by(|a,b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
+    let mut retained: Vec<&Account> = vec![];
+    let mut pairs = vec![];
+    for account in ordered {
+        let same = retained.iter().find(|other| {
+            account.provider == other.provider && account.base_url == other.base_url
+                && account.custom_url == other.custom_url && account.balance_mode == other.balance_mode
+                && connections.get(&account.id).zip(connections.get(&other.id)).is_some_and(|(a,b)| a.same_login(b))
+        });
+        if let Some(target) = same { pairs.push((account.id.clone(), target.id.clone())); }
+        else { retained.push(account); }
+    }
+    pairs
+}
+/// Local-only recovery for 1.0.1401 associations, including when directory sync is off.
+/// Unknown remote UUIDs are never used to discover or compare credentials.
+pub fn repair_connections(state: &AppState) -> Result<usize, String> {
+    let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
+    let local = local_state(state)?;
+    let accounts = state.config.lock().map_err(|_| "读取账户失败")?.accounts.clone();
+    let mut repaired = 0;
+    for (source, target) in &local.links {
+        if accounts.iter().any(|a| a.id == *target && local.records.get(source).is_some_and(|r| r.profile.provider == a.provider)) {
+            repaired += usize::from(crate::secrets::inherit_connection(source, target)?.changed);
+        }
+    }
+    let options = crate::activity::options(state.store.dir());
+    if options.sync_accounts && !options.sync_dir.is_empty() {
+        let connections = accounts.iter().map(|a| crate::secrets::get_secrets(&a.id).map(|secret| (a.id.clone(),secret))).collect::<Result<BTreeMap<_,_>,_>>()?;
+        for (source, target) in automatic_connection_pairs(&accounts, &connections, &local.independent) {
+            resolve_locked(state, &source, Some(&target))?;
+            repaired += 1;
+        }
+    }
+    Ok(repaired)
+}
+pub fn remember_connection_error(state: &AppState, error: String) {
+    let mut status: SyncStatus = read(&state.store.dir().join("account-sync-status.json")).unwrap_or_default();
+    status.error = Some(error);
+    let _ = write(&state.store.dir().join("account-sync-status.json"), &status);
+}
+#[tauri::command]
+pub fn get_account_sync_candidates(app: AppHandle) -> Result<Vec<SyncCandidate>, String> {
+    candidates(&app.state::<AppState>())
+}
+#[tauri::command]
+pub async fn resolve_account_sync(app: AppHandle, source_id: String, target_id: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = resolve(&app.state::<AppState>(), &source_id, target_id.as_deref());
+        let _ = app.emit("accounts-updated", ());
+        result
+    }).await.map_err(|_| "账户关联任务中断")?
+}
+
 #[tauri::command]
 pub fn get_account_sync_status(app: AppHandle) -> SyncStatus {
     read(

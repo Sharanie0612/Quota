@@ -38,7 +38,7 @@ pub use storage::Store;
 pub use proxy::system_proxy_url;
 pub use proxy::parse_macos_proxy;
 pub use providers::{fetch_balance, find, parse_zhipu_report};
-pub use secrets::get_secrets;
+pub use secrets::{get_secrets, SecretBlob, inherit_connection_with};
 pub use subscription::parse_usage as parse_subscription_usage;
 pub use ladder::parse_rankings as parse_ladder_rankings;
 pub use ladder::{load as load_ladder, with_overrides as ladder_with_overrides};
@@ -60,7 +60,9 @@ pub fn run() {
             })?;
             let config = store.load_config();
             let overrides = store.load_overrides();
-            app.manage(commands::AppState::new(store, config, overrides));
+            let state = commands::AppState::new(store, config, overrides);
+            if let Err(error) = account_sync::repair_connections(&state) { account_sync::remember_connection_error(&state, error); }
+            app.manage(state);
             tray::setup(app.handle())?;
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
@@ -118,6 +120,8 @@ pub fn run() {
             data_export::export_activity_sync,
             account_sync::get_account_sync_status,
             account_sync::sync_accounts,
+            account_sync::get_account_sync_candidates,
+            account_sync::resolve_account_sync,
             data_export::import_activity_sync,
             migration::preview_import,
             migration::import_data,

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  ActivityReport, ActivityOptions,
+  ActivityReport, ActivityOptions, AccountSyncCandidate,
   AccountInput,
   AccountTrend,
   AccountView,
@@ -21,6 +21,8 @@ import type {
 export const api = {
   getAccountSyncStatus: () => invoke<{lastSynced:string|null;error:string|null}>("get_account_sync_status"),
   syncAccounts: () => invoke<void>("sync_accounts"),
+  getAccountSyncCandidates: () => invoke<AccountSyncCandidate[]>("get_account_sync_candidates"),
+  resolveAccountSync: (sourceId: string, targetId: string | null) => invoke<void>("resolve_account_sync", { sourceId, targetId }),
   exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
   importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
   getActivityOptions: () => invoke<ActivityOptions>("get_activity_options"),

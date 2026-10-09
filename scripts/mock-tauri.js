@@ -4,6 +4,7 @@
 (function () {
   let seq = 1;
   const callbacks = {};
+  const eventHandlers = {};
   const activityCase = new URLSearchParams(location.search).get("activityCase");
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
@@ -664,6 +665,13 @@
     effectiveRechargeUrl: "https://chatgpt.com/#/settings/subscription", billingUrl: "https://chatgpt.com", status: { balance: null, subscription: { plan: "plus", windows: [{label:"5 小时额度",remaining:65,resetAt:Math.floor(Date.now()/1000)+7200},{label:"每周额度",remaining:82,resetAt:Math.floor(Date.now()/1000)+172800}] }, models: [], lastChecked: new Date().toISOString(), balanceError: null, modelsError: null }
   });
   let ladder;
+  let syncCandidates = new URLSearchParams(location.search).get('accountCase') === 'sync-duplicates'
+    ? [{id:'duplicate-pending',provider:'deepseek',label:'另一台设备的 DeepSeek',createdAt:'2026-10-01T00:00:00Z',pending:true}] : [];
+  let syncStatus = {lastSynced:null,error:new URLSearchParams(location.search).get('syncCase') === 'error' ? '账户同步格式无效，未覆盖本机数据' : null};
+  const emitAccountsUpdated = () => {
+    for (const [id, handler] of Object.entries(eventHandlers)) if (handler.event === 'accounts-updated') callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:null});
+  };
+  window.demoCompleteAccountSync = () => { syncStatus = {lastSynced:new Date().toISOString(),error:null}; emitAccountsUpdated(); };
   if (["balance-error", "retry-error", "save-error"].includes(accountCase)) {
     for (const a of ACCOUNTS.filter(a => ["a1", "a5", "demo-chatgpt"].includes(a.id))) {
       a.status.balanceError = "演示：余额接口暂时不可用，请重试或使用手动记录。";
@@ -671,6 +679,7 @@
   }
 
   // Tauri 2 unlisten calls this hook before invoking the backend stub.
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
   window.__TAURI_INTERNALS__ = {
     metadata: {
@@ -728,8 +737,15 @@
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
           return 0;
         case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:""};
-        case "get_account_sync_status": return {lastSynced:null,error:null};
-        case "sync_accounts": return null;
+        case "get_account_sync_candidates": return structuredClone(syncCandidates);
+        case "resolve_account_sync": {
+          const source = syncCandidates.find(row => row.id === args.sourceId);
+          syncCandidates = syncCandidates.filter(row => row.id !== args.sourceId);
+          if (source && !ACCOUNTS.some(a => a.id === source.id)) ACCOUNTS.push({...structuredClone(ACCOUNTS.find(a => a.provider === source.provider)),...source});
+          emitAccountsUpdated(); return null;
+        }
+        case "get_account_sync_status": return structuredClone(syncStatus);
+        case "sync_accounts": window.demoCompleteAccountSync(); return null;
         case "save_activity_options": window.demoActivityOptions=args.input;return null;
         case "get_exchange_rate": return { cnyPerUsd: 7, date: "2026-10-02", checkedAt: new Date().toISOString(), source: "synthetic UI demo", error: "演示汇率，非实际行情" };
         case "get_ladder":
@@ -848,17 +864,15 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1501",
+            version: "1.0.1504",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
-        case "plugin:event|listen":
-          return 1;
+        case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }
         case "plugin:dialog|message":
           return new URLSearchParams(location.search).get("traeConnect") === "cancel" ? "Cancel" : "Ok";
         case "plugin:dialog|open":
           return new URLSearchParams(location.search).has("migrationCase") ? "D:\\demo\\Quota-migration.json" : null;
-        case "plugin:event|unlisten":
-          return null;
+        case "plugin:event|unlisten": delete eventHandlers[args.eventId]; return null;
         default:
           return null;
       }

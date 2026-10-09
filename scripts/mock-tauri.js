@@ -699,13 +699,14 @@
           }
           if (activityCase === "error" && read === 1) throw new Error("演示：统计文件暂时不可读，请重试。");
           const tokens={input:2400000,cached:1700000,cacheWrite:50000,output:320000,reasoning:90000,total:2720000};
-          const sourceFactor = ({codex:.55,zcode:.3,harness:.15})[args.source] ?? 1;
+          const sourceFactor = ({codex:.5,zcode:.25,harness:.15,trae:.1})[args.source] ?? 1;
           const deviceFactor = args.device === "demo-a" ? .6 : args.device === "demo-b" ? .4 : 1;
           const factor = sourceFactor * deviceFactor * (activityCase === "empty" ? 0 : 1);
           const row=(key,f=1)=>({key,tokens:Object.fromEntries(Object.entries(tokens).map(([k,v])=>[k,Math.round(v*f*factor)])),calls:Math.round(326*f*factor),sessions:Math.round(38*f*factor)});
-          const availableModels = args.source ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.55),row("GLM-5.3",.3),row("deepseek-flash",.15)];
-          const models = args.model ? availableModels.filter(model => model.key === args.model || ({"gpt-6.1-sol":"vendor:custom","GLM-5.3":"vendor:zhipu","deepseek-flash":"vendor:deepseek"})[model.key] === args.model) : availableModels;
-          const selectedFactor = !args.model ? 1 : models.length ? (args.source ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.55,"GLM-5.3":.3,"deepseek-flash":.15})[row.key],0)) : 0;
+          const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("kimi-k2.6",.1)];
+          const vendorOf={"gpt-6.1-sol":"vendor:custom","GLM-5.3":"vendor:zhipu","deepseek-flash":"vendor:deepseek","kimi-k2.6":"vendor:moonshot"};
+          const models = args.model ? availableModels.filter(model => model.key === args.model || vendorOf[model.key] === args.model || (args.model === "channel:api" && model.key.endsWith("\u001fapi")) || (args.model === "channel:trae" && model.key.endsWith("\u001ftrae"))) : availableModels;
+          const selectedFactor = !args.model ? 1 : models.length ? (args.source ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.5,"GLM-5.3":.25,"deepseek-flash":.15,"kimi-k2.6":.1})[row.key],0)) : 0;
           const selectedRow=(key,f=1)=>row(key,f*selectedFactor);
           let totals=selectedRow("全部");
           const count=args.days===7?7:30;
@@ -721,12 +722,12 @@
           const rangeFactor = totals.tokens.total ? selectedDays.reduce((sum,row)=>sum+row.tokens.total,0)/totals.tokens.total : 0;
           if(args.from || args.to) { totals = selectedRow("全部",rangeFactor); for(const key of Object.keys(tokens))totals.tokens[key]=selectedDays.reduce((sum,row)=>sum+row.tokens[key],0); }
           document.documentElement.dataset.activityRead = String(read);
-          return {options:window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,codexHome:"C:\\Users\\demo\\.codex",zcodeHome:"C:\\Users\\demo\\.zcode",harnessHome:"",syncDir:""},devices:[{id:"demo-a",name:"工作电脑"},{id:"demo-b",name:"笔记本"}],totals,models:(args.from||args.to)?models.map(row=>({...row,tokens:Object.fromEntries(Object.entries(row.tokens).map(([k,v])=>[k,Math.round(v*rangeFactor)]))})):models,availableModels,tools:[selectedRow("exec_command",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("read",.4*((args.from||args.to)?rangeFactor:1))],agents:[selectedRow("主 Agent",.7*((args.from||args.to)?rangeFactor:1)),selectedRow("build",.3*((args.from||args.to)?rangeFactor:1))],byDevice:args.device?[selectedRow(args.device,(args.from||args.to)?rangeFactor:1)]:[selectedRow("demo-a",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("demo-b",.4*((args.from||args.to)?rangeFactor:1))],sources:args.source?[selectedRow(args.source,(args.from||args.to)?rangeFactor:1)]:[selectedRow("codex",.55*((args.from||args.to)?rangeFactor:1)),selectedRow("zcode",.3*((args.from||args.to)?rangeFactor:1)),selectedRow("harness",.15*((args.from||args.to)?rangeFactor:1))],hourly:selectedDays.flatMap(day=>{const weights=[0,0,0,0,0,0,1,2,4,6,9,7,5,3,4,8,12,11,8,5,3,2,1,1];const sum=weights.reduce((a,b)=>a+b,0);let previous=0;return weights.map((weight,hour)=>{const next=previous+weight;const result={...day,key:day.key+"T"+String(hour).padStart(2,"0"),tokens:Object.fromEntries(Object.entries(day.tokens).map(([k,v])=>[k,Math.floor(v*next/sum)-Math.floor(v*previous/sum)]))};previous=next;return result;});}),daily:selectedDays,updatedAt:Date.now(),errors:activityCase==="partial"?["演示：ZCode 数据库被其他程序占用。","演示：共享目录暂时离线。"]:[]};
+          return {options:window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,codexHome:"C:\\Users\\demo\\.codex",zcodeHome:"C:\\Users\\demo\\.zcode",harnessHome:"",traeHome:"",traeEnabled:false,collectIntervalSeconds:30,syncAccounts:true,syncDir:""},devices:[{id:"demo-a",name:"工作电脑"},{id:"demo-b",name:"笔记本"}],totals,models:(args.from||args.to)?models.map(row=>({...row,tokens:Object.fromEntries(Object.entries(row.tokens).map(([k,v])=>[k,Math.round(v*rangeFactor)]))})):models,availableModels,tools:[selectedRow("exec_command",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("read",.4*((args.from||args.to)?rangeFactor:1))],agents:[selectedRow("主 Agent",.7*((args.from||args.to)?rangeFactor:1)),selectedRow("build",.3*((args.from||args.to)?rangeFactor:1))],byDevice:args.device?[selectedRow(args.device,(args.from||args.to)?rangeFactor:1)]:[selectedRow("demo-a",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("demo-b",.4*((args.from||args.to)?rangeFactor:1))],sources:args.source?[selectedRow(args.source,(args.from||args.to)?rangeFactor:1)]:[selectedRow("codex",.5*((args.from||args.to)?rangeFactor:1)),selectedRow("zcode",.25*((args.from||args.to)?rangeFactor:1)),selectedRow("harness",.15*((args.from||args.to)?rangeFactor:1)),selectedRow("trae",.1*((args.from||args.to)?rangeFactor:1))],channels:(!args.source||args.source==="trae")?[selectedRow("trae",.8*((args.from||args.to)?rangeFactor:1)*(args.source?1:.1)),selectedRow("api",.2*((args.from||args.to)?rangeFactor:1)*(args.source?1:.1))]:[],hourly:selectedDays.flatMap(day=>{const weights=[0,0,0,0,0,0,1,2,4,6,9,7,5,3,4,8,12,11,8,5,3,2,1,1];const sum=weights.reduce((a,b)=>a+b,0);let previous=0;return weights.map((weight,hour)=>{const next=previous+weight;const result={...day,key:day.key+"T"+String(hour).padStart(2,"0"),tokens:Object.fromEntries(Object.entries(day.tokens).map(([k,v])=>[k,Math.floor(v*next/sum)-Math.floor(v*previous/sum)]))};previous=next;return result;});}),daily:selectedDays,updatedAt:Date.now(),errors:activityCase==="partial"?["Harness 会话版本暂不支持", "Harness 会话版本暂不支持"]:[]};
         }
         case "refresh_activity":
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
           return 0;
-        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",syncDir:""};
+        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:""};
         case "get_account_sync_status": return {lastSynced:null,error:null};
         case "sync_accounts": return null;
         case "save_activity_options": window.demoActivityOptions=args.input;return null;
@@ -847,11 +848,13 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1400",
+            version: "1.0.1501",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen":
           return 1;
+        case "plugin:dialog|message":
+          return new URLSearchParams(location.search).get("traeConnect") === "cancel" ? "Cancel" : "Ok";
         case "plugin:dialog|open":
           return new URLSearchParams(location.search).has("migrationCase") ? "D:\\demo\\Quota-migration.json" : null;
         case "plugin:event|unlisten":

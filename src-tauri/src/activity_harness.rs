@@ -115,11 +115,11 @@ pub(super) fn parse(bytes: &[u8], version: u32, device: &str) -> Result<Vec<Metr
             last_slot = Some(slot);
             let route = data.pointer("/message/source/model").and_then(Value::as_str).map(label).unwrap_or_else(|| model.clone());
             let id = hash(&format!("harness:tokens:{session}:{turn}:{step}:{}",slot.2));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), tokens, revision:seq });
+            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), channel:String::new(), tokens, revision:seq });
         } else if kind == "tool/call" {
             let call = data.get("callId").and_then(Value::as_str).ok_or("Harness 工具编号无效")?;
             let id = hash(&format!("harness:tool:{session}:{call}"));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), tokens:Tokens::default(), revision:seq });
+            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), channel:String::new(), tokens:Tokens::default(), revision:seq });
         }
     }
     Ok(metrics.into_values().collect())

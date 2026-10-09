@@ -31,6 +31,8 @@
 .activity-model-selector button:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
 .activity-model-selector small { color:var(--text-2); }
 .activity-model-link { display:inline-flex; align-items:center; gap:8px; max-width:100%; border:0; background:none; color:var(--blue); padding:0; text-align:left; cursor:pointer; font:inherit; overflow-wrap:anywhere; }
+/* Trae usage channel: which side paid for the tokens. */
+.activity-channel-tag { flex-shrink:0; border:1px solid var(--border); border-radius:999px; background:var(--surface-2); color:var(--text-2); padding:1px 8px; font-size:11px; font-weight:400; white-space:nowrap; }
 
 .usage-area { fill:var(--blue-soft); stroke:none; }
 .usage-crosshair { stroke:var(--text-3); stroke-dasharray:3 4; pointer-events:none; }

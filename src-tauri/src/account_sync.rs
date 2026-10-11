@@ -82,13 +82,12 @@ impl Profile {
             .all(|v| v.is_finite())
             && self.manual_currency.as_deref().is_none_or(balance_unit)
             && (self.manual_currency.as_deref() != Some("%")
-                || self.manual_balance.is_none_or(|v| (0.0..=100.0).contains(&v)))
-            && [
-                &self.manual_recharge_currency,
-                &self.manual_spend_currency,
-            ]
-            .iter()
-            .all(|c| c.as_deref().is_none_or(currency))
+                || self
+                    .manual_balance
+                    .is_none_or(|v| (0.0..=100.0).contains(&v)))
+            && [&self.manual_recharge_currency, &self.manual_spend_currency]
+                .iter()
+                .all(|c| c.as_deref().is_none_or(currency))
     }
 }
 fn currency(c: &str) -> bool {
@@ -298,6 +297,11 @@ struct Local {
     independent: BTreeSet<String>,
     #[serde(default)]
     links: BTreeMap<String, String>,
+    // Display routing learned from other devices; NEVER used for credential recovery.
+    #[serde(default)]
+    shared_links: BTreeMap<String, String>,
+    #[serde(default)]
+    associations: Vec<Association>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -353,6 +357,265 @@ fn write<T: Serialize>(p: &Path, v: &T) -> Result<(), String> {
     result.map_err(|_| "保存账户同步数据失败，稍后可重试".into())
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Association {
+    source: String,
+    target: String,
+    provider: String,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AssociationPacket {
+    schema: u32,
+    device: String,
+    associations: Vec<Association>,
+}
+fn own_associations(local: &Local) -> Result<Vec<Association>, String> {
+    let mut edges = local.associations.clone();
+    edges.extend(
+        local
+            .links
+            .iter()
+            .map(|(source, target)| {
+                let profile = &local
+                    .records
+                    .get(source)
+                    .ok_or("账户关联缺少来源资料")?
+                    .profile;
+                if local
+                    .records
+                    .get(target)
+                    .is_none_or(|r| r.profile.provider != profile.provider)
+                {
+                    return Err("账户关联的平台不一致".into());
+                }
+                Ok(Association {
+                    source: source.clone(),
+                    target: target.clone(),
+                    provider: profile.provider.clone(),
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?,
+    );
+    let mut unique = BTreeMap::new();
+    for mut edge in edges {
+        if edge.source > edge.target {
+            std::mem::swap(&mut edge.source, &mut edge.target);
+        }
+        unique.insert(
+            (
+                edge.source.clone(),
+                edge.target.clone(),
+                edge.provider.clone(),
+            ),
+            edge,
+        );
+    }
+    if unique.len() > 1000 {
+        return Err("共享账户关联记录过多".into());
+    }
+    Ok(unique.into_values().collect())
+}
+fn association_root(shared: &str) -> Result<std::path::PathBuf, String> {
+    let root = Path::new(shared).join("quota-account-links-v1");
+    if fs::symlink_metadata(&root).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err("账户关联目录不能是符号链接".into());
+    }
+    fs::create_dir_all(&root).map_err(|_| "共享账户关联目录不可用")?;
+    Ok(root)
+}
+fn apply_shared_associations(
+    local: &mut Local,
+    accounts: &[Account],
+    shared: &str,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut edges = own_associations(local)?;
+    let root = association_root(shared)?;
+    let mut files = 0;
+    for entry in fs::read_dir(root).map_err(|_| "共享账户关联目录暂不可用")? {
+        let entry = entry.map_err(|_| "共享账户关联目录暂不可用")?;
+        if entry.path().extension().is_none_or(|e| e != "json") {
+            continue;
+        }
+        if entry.file_type().is_ok_and(|t| t.is_symlink()) {
+            return Err("不读取符号链接的账户关联".into());
+        }
+        if !entry.file_type().is_ok_and(|t| t.is_file()) {
+            continue;
+        }
+        files += 1;
+        if files > 100 {
+            return Err("账户关联设备文件过多".into());
+        }
+        let packet: AssociationPacket = read(&entry.path())?;
+        if packet.schema != 1
+            || uuid::Uuid::parse_str(&packet.device).is_err()
+            || packet.associations.len() > 1000
+        {
+            return Err("共享账户关联格式无效".into());
+        }
+        edges.extend(packet.associations);
+    }
+    let mut unique = BTreeMap::new();
+    for mut edge in edges {
+        if edge.source > edge.target {
+            std::mem::swap(&mut edge.source, &mut edge.target);
+        }
+        unique.insert(
+            (
+                edge.source.clone(),
+                edge.target.clone(),
+                edge.provider.clone(),
+            ),
+            edge,
+        );
+    }
+    if unique.len() > 1000 {
+        return Err("共享账户关联记录过多".into());
+    }
+    let learned: Vec<_> = unique.into_values().collect();
+    let mut parents: BTreeMap<String, String> = BTreeMap::new();
+    let mut providers: BTreeMap<String, String> = BTreeMap::new();
+    fn canonical(parents: &BTreeMap<String, String>, id: &str) -> String {
+        let mut current = id.to_string();
+        while let Some(next) = parents.get(&current) {
+            if next == &current {
+                break;
+            }
+            current = next.clone();
+        }
+        current
+    }
+    for edge in &learned {
+        if edge.source == edge.target
+            || uuid::Uuid::parse_str(&edge.source).is_err()
+            || uuid::Uuid::parse_str(&edge.target).is_err()
+            || crate::providers::find(&edge.provider).is_none()
+        {
+            return Err("共享账户关联记录无效".into());
+        }
+        for id in [&edge.source, &edge.target] {
+            if providers.get(id).is_some_and(|p| p != &edge.provider)
+                || local
+                    .records
+                    .get(id)
+                    .is_some_and(|r| r.profile.provider != edge.provider)
+                || accounts
+                    .iter()
+                    .any(|a| &a.id == id && a.provider != edge.provider)
+            {
+                return Err("共享账户关联的平台冲突".into());
+            }
+            providers.insert(id.clone(), edge.provider.clone());
+            parents.entry(id.clone()).or_insert_with(|| id.clone());
+        }
+        if parents.len() > 1000 {
+            return Err("共享账户关联最多支持 1000 个账户".into());
+        }
+        let a = canonical(&parents, &edge.source);
+        let b = canonical(&parents, &edge.target);
+        if a != b {
+            let (first, last) = if a < b { (a, b) } else { (b, a) };
+            parents.insert(last, first);
+        }
+    }
+    let mut groups: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for id in parents.keys() {
+        groups
+            .entry(canonical(&parents, id))
+            .or_default()
+            .push(id.clone());
+    }
+    let previous = local.shared_links.clone();
+    let mut routing = BTreeMap::new();
+    for (canonical, members) in groups {
+        let mut existing: Vec<_> = accounts
+            .iter()
+            .filter(|a| members.contains(&a.id) && !local.links.contains_key(&a.id))
+            .collect();
+        // Only known LOCAL accounts may be inspected. Unknown remote UUIDs never access keyring.
+        let connections = existing
+            .iter()
+            .map(|a| crate::secrets::get_secrets(&a.id).map(|s| (a.id.clone(), s)))
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        let connected: Vec<_> = connections
+            .values()
+            .filter(|s| s.has_connection())
+            .collect();
+        if connected
+            .iter()
+            .skip(1)
+            .any(|s| !connected[0].same_login(s))
+        {
+            return Err("共享关联与本机登录冲突，已保留账户；请检查同平台的不同账号".into());
+        }
+        if members.iter().any(|id| local.independent.contains(id)) {
+            return Err("共享关联与本机独立账户决定冲突，已保留账户".into());
+        }
+        existing.sort_by_key(|a| {
+            (
+                !connections.get(&a.id).is_some_and(|s| s.has_connection()),
+                &a.created_at,
+                &a.id,
+            )
+        });
+        let target = existing
+            .first()
+            .map(|a| a.id.clone())
+            .or_else(|| {
+                members
+                    .iter()
+                    .filter_map(|id| local.links.get(id).or_else(|| previous.get(id)))
+                    .find(|id| members.contains(id))
+                    .cloned()
+            })
+            .unwrap_or(canonical);
+        for id in members {
+            if id != target {
+                routing.insert(id, target.clone());
+            }
+        }
+    }
+    local.shared_links = routing;
+    local.associations = learned;
+    Ok(providers)
+}
+fn normalize_associated_observations(local: &mut Local) {
+    // Merge display observations once per group. Preserve source records and credentials for rollback.
+    let observations: Vec<_> = local.records.values().cloned().collect();
+    for mut row in observations {
+        if let Some(target) = local
+            .shared_links
+            .get(&row.profile.id)
+            .or_else(|| local.links.get(&row.profile.id))
+        {
+            row.profile.id = target.clone();
+            if let Some(old) = local.records.get(target) {
+                row.profile.created_at = old.profile.created_at.clone();
+            }
+            if let Some(old) = local.records.get_mut(target) {
+                if (row.edited, &row.device) > (old.edited, &old.device) {
+                    old.profile = row.profile;
+                    old.edited = row.edited;
+                    old.device = row.device;
+                }
+                if let Some(snapshot) = row.snapshot {
+                    if old
+                        .snapshot
+                        .as_ref()
+                        .is_none_or(|s| newer_time(&snapshot.at, &s.at))
+                    {
+                        old.snapshot = Some(snapshot);
+                    }
+                }
+            } else {
+                local.records.insert(target.clone(), row);
+            }
+        }
+    }
+}
+
 pub fn sync(state: &AppState) -> Result<(), String> {
     if let Err(error) = repair_connections(state) {
         remember_connection_error(state, error.clone());
@@ -404,7 +667,11 @@ fn exchange(state: &AppState) -> Result<(), String> {
     base.accounts.retain(|a| !local.links.contains_key(&a.id));
     let ids: BTreeSet<_> = base.accounts.iter().map(|a| a.id.clone()).collect();
     for id in local.records.keys() {
-        if !ids.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id) {
+        if !ids.contains(id)
+            && !local.pending.contains(id)
+            && !local.links.contains_key(id)
+            && !local.shared_links.contains_key(id)
+        {
             local.hidden.insert(id.clone());
         }
     }
@@ -446,6 +713,11 @@ fn exchange(state: &AppState) -> Result<(), String> {
     if local.records.len() > 1000 {
         return Err("账户同步最多支持 1000 个账户".into());
     }
+    let associated_providers =
+        apply_shared_associations(&mut local, &config.accounts, &options.sync_dir)?;
+    normalize_associated_observations(&mut local);
+    base.accounts
+        .retain(|a| !local.shared_links.contains_key(&a.id));
     // Persist observed local edits before network-directory IO; retry never loses them.
     write(&path, &local)?;
     let mut files = 0;
@@ -476,11 +748,25 @@ fn exchange(state: &AppState) -> Result<(), String> {
             {
                 return Err("账户同步记录无效".into());
             }
-            if let Some(target) = local.links.get(&remote.profile.id) {
+            if associated_providers
+                .get(&remote.profile.id)
+                .is_some_and(|p| p != &remote.profile.provider)
+            {
+                return Err("共享账户关联的平台冲突".into());
+            }
+            if let Some(target) = local
+                .shared_links
+                .get(&remote.profile.id)
+                .or_else(|| local.links.get(&remote.profile.id))
+            {
                 remote.profile.id = target.clone();
                 if let Some(old) = local.records.get(target) {
                     remote.profile.created_at = old.profile.created_at.clone();
                 }
+            }
+            // Keep retained local creation metadata even when the UUID arrived via an alias.
+            if let Some(account) = base.accounts.iter().find(|a| a.id == remote.profile.id) {
+                remote.profile.created_at = account.created_at.clone();
             }
             if local.hidden.contains(&remote.profile.id) {
                 continue;
@@ -514,7 +800,10 @@ fn exchange(state: &AppState) -> Result<(), String> {
     }
     let mut next = base;
     for (id, row) in &local.records {
-        if local.hidden.contains(id) || local.links.contains_key(id) {
+        if local.hidden.contains(id)
+            || local.links.contains_key(id)
+            || local.shared_links.contains_key(id)
+        {
             continue;
         }
         if let Some(account) = next.accounts.iter_mut().find(|a| &a.id == id) {
@@ -522,8 +811,16 @@ fn exchange(state: &AppState) -> Result<(), String> {
         } else {
             // UUIDs created independently cannot identify the same provider login.
             // Require explicit association rather than guessing from labels or balances.
-            if !local.independent.contains(id) && (next.accounts.iter().any(|a| a.provider == row.profile.provider)
-                || local.records.iter().any(|(other_id, other)| local.hidden.contains(other_id) && other.profile.provider == row.profile.provider)) {
+            if !local.independent.contains(id)
+                && (next
+                    .accounts
+                    .iter()
+                    .any(|a| a.provider == row.profile.provider)
+                    || local.records.iter().any(|(other_id, other)| {
+                        local.hidden.contains(other_id)
+                            && other.profile.provider == row.profile.provider
+                    }))
+            {
                 local.pending.insert(id.clone());
                 continue;
             }
@@ -537,7 +834,11 @@ fn exchange(state: &AppState) -> Result<(), String> {
     state.store.save_config(&next)?;
     *config = next;
     for (id, row) in &local.records {
-        if !local.hidden.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id) {
+        if !local.hidden.contains(id)
+            && !local.pending.contains(id)
+            && !local.links.contains_key(id)
+            && !local.shared_links.contains_key(id)
+        {
             if let Some(snapshot) = &row.snapshot {
                 let status = statuses.entry(id.clone()).or_default();
                 if status
@@ -551,13 +852,29 @@ fn exchange(state: &AppState) -> Result<(), String> {
         }
     }
     write(&path, &local)?;
+    let associations = AssociationPacket {
+        schema: 1,
+        device: options.device_id.clone(),
+        associations: own_associations(&local)?,
+    };
+    let links_file =
+        association_root(&options.sync_dir)?.join(format!("{}.json", options.device_id));
+    if fs::symlink_metadata(&links_file).is_ok_and(|m| m.file_type().is_symlink()) {
+        return Err("账户关联文件不能是符号链接".into());
+    }
+    write(&links_file, &associations)?;
     let packet = Packet {
         schema: 1,
         device: options.device_id.clone(),
         records: local
             .records
             .into_iter()
-            .filter(|(id, _)| !local.hidden.contains(id) && !local.pending.contains(id) && !local.links.contains_key(id))
+            .filter(|(id, _)| {
+                !local.hidden.contains(id)
+                    && !local.pending.contains(id)
+                    && !local.links.contains_key(id)
+                    && !local.shared_links.contains_key(id)
+            })
             .map(|(_, row)| row)
             .collect(),
     };
@@ -579,20 +896,47 @@ pub struct SyncCandidate {
 }
 fn local_state(state: &AppState) -> Result<Local, String> {
     let path = state.store.dir().join("account-sync-state.json");
-    if path.exists() { read(&path) } else { Ok(Local::default()) }
+    if path.exists() {
+        read(&path)
+    } else {
+        Ok(Local::default())
+    }
 }
 pub fn candidates(state: &AppState) -> Result<Vec<SyncCandidate>, String> {
     let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
     let local = local_state(state)?;
     let config = state.config.lock().map_err(|_| "读取账户失败")?;
-    let mut profiles: BTreeMap<_, _> = config.accounts.iter().map(|a| (a.id.clone(), Profile::from(a))).collect();
+    let mut profiles: BTreeMap<_, _> = config
+        .accounts
+        .iter()
+        .map(|a| (a.id.clone(), Profile::from(a)))
+        .collect();
     for id in &local.pending {
-        if let Some(row) = local.records.get(id) { profiles.insert(id.clone(), row.profile.clone()); }
+        if let Some(row) = local.records.get(id) {
+            profiles.insert(id.clone(), row.profile.clone());
+        }
     }
-    Ok(profiles.values().filter(|p| !local.hidden.contains(&p.id) && !local.independent.contains(&p.id) &&
-        !local.links.contains_key(&p.id) && (local.pending.contains(&p.id) || config.accounts.iter().any(|a| a.id != p.id && a.provider == p.provider)))
-        .map(|p| SyncCandidate { id: p.id.clone(), provider: p.provider.clone(), label: p.label.clone(),
-            created_at: p.created_at.clone(), pending: local.pending.contains(&p.id) }).collect())
+    Ok(profiles
+        .values()
+        .filter(|p| {
+            !local.hidden.contains(&p.id)
+                && !local.independent.contains(&p.id)
+                && !local.links.contains_key(&p.id)
+                && !local.shared_links.contains_key(&p.id)
+                && (local.pending.contains(&p.id)
+                    || config
+                        .accounts
+                        .iter()
+                        .any(|a| a.id != p.id && a.provider == p.provider))
+        })
+        .map(|p| SyncCandidate {
+            id: p.id.clone(),
+            provider: p.provider.clone(),
+            label: p.label.clone(),
+            created_at: p.created_at.clone(),
+            pending: local.pending.contains(&p.id),
+        })
+        .collect())
 }
 // Persist deletion at the moment it happens, even before the first exchange.
 // An old shared packet must not reintroduce the deleted UUID after restart.
@@ -601,31 +945,57 @@ pub fn remove_account(state: &AppState, id: &str) -> Result<(), String> {
     let mut local = local_state(state)?;
     let mut config = state.config.lock().map_err(|_| "读取账户失败")?;
     if let Some(account) = config.accounts.iter().find(|a| a.id == id) {
-        local.records.entry(id.into()).or_insert_with(|| Record { profile: Profile::from(account),
-            edited: chrono::Utc::now().timestamp_millis(), device: crate::activity::options(state.store.dir()).device_id, snapshot: None });
+        local.records.entry(id.into()).or_insert_with(|| Record {
+            profile: Profile::from(account),
+            edited: chrono::Utc::now().timestamp_millis(),
+            device: crate::activity::options(state.store.dir()).device_id,
+            snapshot: None,
+        });
     }
     local.hidden.insert(id.into());
     local.pending.remove(id);
     write(&state.store.dir().join("account-sync-state.json"), &local)?;
-    state.store.update_config(&mut config, |next| next.accounts.retain(|a| a.id != id))
+    state
+        .store
+        .update_config(&mut config, |next| next.accounts.retain(|a| a.id != id))
 }
 pub fn resolve(state: &AppState, source_id: &str, target_id: Option<&str>) -> Result<(), String> {
     let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
     resolve_locked(state, source_id, target_id)
 }
-fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) -> Result<(), String> {
+fn resolve_locked(
+    state: &AppState,
+    source_id: &str,
+    target_id: Option<&str>,
+) -> Result<(), String> {
     let mut local = local_state(state)?;
     let mut config = state.config.lock().map_err(|_| "读取账户失败")?;
     state.store.ensure_config_writable()?;
     let source_account = config.accounts.iter().find(|a| a.id == source_id).cloned();
-    let source = source_account.as_ref().map(Profile::from)
-        .or_else(|| local.records.get(source_id).filter(|_| local.pending.contains(source_id)).map(|r| r.profile.clone()))
+    let source = source_account
+        .as_ref()
+        .map(Profile::from)
+        .or_else(|| {
+            local
+                .records
+                .get(source_id)
+                .filter(|_| local.pending.contains(source_id))
+                .map(|r| r.profile.clone())
+        })
         .ok_or("待处理账户已变化，请重新加载")?;
     if let Some(target_id) = target_id {
-        let target_index = config.accounts.iter().position(|a| a.id == target_id).ok_or("保留的账户不存在")?;
+        let target_index = config
+            .accounts
+            .iter()
+            .position(|a| a.id == target_id)
+            .ok_or("保留的账户不存在")?;
         let mut target = config.accounts[target_index].clone();
-        if source_id == target_id || source.provider != target.provider { return Err("只能关联同平台的不同账户".into()); }
-        if local.links.contains_key(target_id) { return Err("该账户已关联，请重新加载".into()); }
+        if source_id == target_id || source.provider != target.provider {
+            return Err("只能关联同平台的不同账户".into());
+        }
+        if local.links.contains_key(target_id) {
+            return Err("该账户已关联，请重新加载".into());
+        }
         // Persist and verify credentials BEFORE hiding the source. A failure leaves both cards.
         // Only explicit local associations may inherit credentials; shared packets never do.
         let transfer = crate::secrets::inherit_connection(source_id, target_id)?;
@@ -641,24 +1011,54 @@ fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) ->
                 target.custom_currency = original.custom_currency.clone();
             }
         }
-        local.records.entry(source_id.into()).or_insert_with(|| Record { profile: source.clone(),
-            edited: chrono::Utc::now().timestamp_millis(), device: crate::activity::options(state.store.dir()).device_id, snapshot: None });
+        local
+            .records
+            .entry(source_id.into())
+            .or_insert_with(|| Record {
+                profile: source.clone(),
+                edited: chrono::Utc::now().timestamp_millis(),
+                device: crate::activity::options(state.store.dir()).device_id,
+                snapshot: None,
+            });
         // Flatten associations before adding a new one; no cycles or dangling chains.
-        for mapped in local.links.values_mut() { if mapped == source_id { *mapped = target_id.into(); } }
+        for mapped in local.links.values_mut() {
+            if mapped == source_id {
+                *mapped = target_id.into();
+            }
+        }
         local.links.insert(source_id.into(), target_id.into());
         local.hidden.insert(source_id.into());
         local.pending.remove(source_id);
         local.independent.remove(source_id);
-        let mut target_record = Record { profile: Profile::from(&target), edited: chrono::Utc::now().timestamp_millis(),
-            device: crate::activity::options(state.store.dir()).device_id, snapshot: local.records.get(target_id).and_then(|r| r.snapshot.clone()) };
+        local.independent.remove(target_id);
+        let mut target_record = Record {
+            profile: Profile::from(&target),
+            edited: chrono::Utc::now().timestamp_millis(),
+            device: crate::activity::options(state.store.dir()).device_id,
+            snapshot: local
+                .records
+                .get(target_id)
+                .and_then(|r| r.snapshot.clone()),
+        };
         let mut statuses = state.statuses.lock().map_err(|_| "读取余额失败")?;
         for id in [source_id, target_id] {
-            let snapshot = statuses.get(id).and_then(Snapshot::from).or_else(|| local.records.get(id).and_then(|r| r.snapshot.clone()));
+            let snapshot = statuses
+                .get(id)
+                .and_then(Snapshot::from)
+                .or_else(|| local.records.get(id).and_then(|r| r.snapshot.clone()));
             if let Some(s) = snapshot {
-                if target_record.snapshot.as_ref().is_none_or(|old| newer_time(&s.at, &old.at)) { target_record.snapshot = Some(s); }
+                if target_record
+                    .snapshot
+                    .as_ref()
+                    .is_none_or(|old| newer_time(&s.at, &old.at))
+                {
+                    target_record.snapshot = Some(s);
+                }
             }
         }
-        if let Some(s) = &target_record.snapshot { s.apply(statuses.entry(target_id.into()).or_default()); }
+        if let Some(s) = &target_record.snapshot {
+            s.apply(statuses.entry(target_id.into()).or_default());
+        }
         local.records.insert(target_id.into(), target_record);
         // Source credentials and history remain available for rollback. Never sum balances.
         // Save the inherited connection before making removal durable in the ledger.
@@ -669,7 +1069,10 @@ fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) ->
             next.accounts.retain(|a| a.id != source_id);
         })?;
         if let Err(error) = write(&state.store.dir().join("account-sync-state.json"), &local) {
-            state.store.save_config(&previous).map_err(|_| "关联台账保存失败；本机登录已保留，请稍后重试")?;
+            state
+                .store
+                .save_config(&previous)
+                .map_err(|_| "关联台账保存失败；本机登录已保留，请稍后重试")?;
             *config = previous;
             return Err(error);
         }
@@ -684,7 +1087,9 @@ fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) ->
             // cannot turn the retry into an inferred deletion.
             local.pending.insert(source_id.into());
             write(&state.store.dir().join("account-sync-state.json"), &local)?;
-            state.store.update_config(&mut config, |next| next.accounts.push(account))?;
+            state
+                .store
+                .update_config(&mut config, |next| next.accounts.push(account))?;
             local.pending.remove(source_id);
         }
         write(&state.store.dir().join("account-sync-state.json"), &local)?;
@@ -692,20 +1097,33 @@ fn resolve_locked(state: &AppState, source_id: &str, target_id: Option<&str>) ->
     Ok(())
 }
 pub fn automatic_connection_pairs(
-    accounts: &[Account], connections: &BTreeMap<String, crate::secrets::SecretBlob>, independent: &BTreeSet<String>,
+    accounts: &[Account],
+    connections: &BTreeMap<String, crate::secrets::SecretBlob>,
+    independent: &BTreeSet<String>,
 ) -> Vec<(String, String)> {
-    let mut ordered: Vec<_> = accounts.iter().filter(|a| !independent.contains(&a.id)).collect();
-    ordered.sort_by(|a,b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
+    let mut ordered: Vec<_> = accounts
+        .iter()
+        .filter(|a| !independent.contains(&a.id))
+        .collect();
+    ordered.sort_by(|a, b| (&a.created_at, &a.id).cmp(&(&b.created_at, &b.id)));
     let mut retained: Vec<&Account> = vec![];
     let mut pairs = vec![];
     for account in ordered {
         let same = retained.iter().find(|other| {
-            account.provider == other.provider && account.base_url == other.base_url
-                && account.custom_url == other.custom_url && account.balance_mode == other.balance_mode
-                && connections.get(&account.id).zip(connections.get(&other.id)).is_some_and(|(a,b)| a.same_login(b))
+            account.provider == other.provider
+                && account.base_url == other.base_url
+                && account.custom_url == other.custom_url
+                && account.balance_mode == other.balance_mode
+                && connections
+                    .get(&account.id)
+                    .zip(connections.get(&other.id))
+                    .is_some_and(|(a, b)| a.same_login(b))
         });
-        if let Some(target) = same { pairs.push((account.id.clone(), target.id.clone())); }
-        else { retained.push(account); }
+        if let Some(target) = same {
+            pairs.push((account.id.clone(), target.id.clone()));
+        } else {
+            retained.push(account);
+        }
     }
     pairs
 }
@@ -714,17 +1132,33 @@ pub fn automatic_connection_pairs(
 pub fn repair_connections(state: &AppState) -> Result<usize, String> {
     let _guard = state.account_sync_lock.lock().map_err(|_| "账户同步忙碌")?;
     let local = local_state(state)?;
-    let accounts = state.config.lock().map_err(|_| "读取账户失败")?.accounts.clone();
+    let accounts = state
+        .config
+        .lock()
+        .map_err(|_| "读取账户失败")?
+        .accounts
+        .clone();
     let mut repaired = 0;
     for (source, target) in &local.links {
-        if accounts.iter().any(|a| a.id == *target && local.records.get(source).is_some_and(|r| r.profile.provider == a.provider)) {
+        if accounts.iter().any(|a| {
+            a.id == *target
+                && local
+                    .records
+                    .get(source)
+                    .is_some_and(|r| r.profile.provider == a.provider)
+        }) {
             repaired += usize::from(crate::secrets::inherit_connection(source, target)?.changed);
         }
     }
     let options = crate::activity::options(state.store.dir());
     if options.sync_accounts && !options.sync_dir.is_empty() {
-        let connections = accounts.iter().map(|a| crate::secrets::get_secrets(&a.id).map(|secret| (a.id.clone(),secret))).collect::<Result<BTreeMap<_,_>,_>>()?;
-        for (source, target) in automatic_connection_pairs(&accounts, &connections, &local.independent) {
+        let connections = accounts
+            .iter()
+            .map(|a| crate::secrets::get_secrets(&a.id).map(|secret| (a.id.clone(), secret)))
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        for (source, target) in
+            automatic_connection_pairs(&accounts, &connections, &local.independent)
+        {
             resolve_locked(state, &source, Some(&target))?;
             repaired += 1;
         }
@@ -732,7 +1166,8 @@ pub fn repair_connections(state: &AppState) -> Result<usize, String> {
     Ok(repaired)
 }
 pub fn remember_connection_error(state: &AppState, error: String) {
-    let mut status: SyncStatus = read(&state.store.dir().join("account-sync-status.json")).unwrap_or_default();
+    let mut status: SyncStatus =
+        read(&state.store.dir().join("account-sync-status.json")).unwrap_or_default();
     status.error = Some(error);
     let _ = write(&state.store.dir().join("account-sync-status.json"), &status);
 }
@@ -741,12 +1176,19 @@ pub fn get_account_sync_candidates(app: AppHandle) -> Result<Vec<SyncCandidate>,
     candidates(&app.state::<AppState>())
 }
 #[tauri::command]
-pub async fn resolve_account_sync(app: AppHandle, source_id: String, target_id: Option<String>) -> Result<(), String> {
+pub async fn resolve_account_sync(
+    app: AppHandle,
+    source_id: String,
+    target_id: Option<String>,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let result = resolve(&app.state::<AppState>(), &source_id, target_id.as_deref());
+        let result = resolve(&app.state::<AppState>(), &source_id, target_id.as_deref())
+            .and_then(|_| sync(&app.state::<AppState>()));
         let _ = app.emit("accounts-updated", ());
         result
-    }).await.map_err(|_| "账户关联任务中断")?
+    })
+    .await
+    .map_err(|_| "账户关联任务中断")?
 }
 
 #[tauri::command]

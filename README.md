@@ -67,7 +67,7 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 
 ### 当前版本与安装包
 
-当前源码版本为 **1.0.1504**，已生成 Windows NSIS 本地安装包。版本、WebView2Loader.dll 哈希及解包后的隔离配置启动检查通过；**实际覆盖升级未验证**。本轮 macOS 安装包未构建。
+当前源码版本为 **1.0.1600**，已生成 Windows NSIS 本地安装包。版本、WebView2Loader.dll 哈希及解包后的隔离配置启动检查通过；**实际覆盖升级未验证**。本轮 macOS 安装包未构建。
 
 安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
 

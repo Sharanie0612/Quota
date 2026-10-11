@@ -16,6 +16,7 @@ mod ladder;
 mod custom;
 mod history;
 mod mimo;
+pub mod mimo_session;
 mod model;
 mod pricing;
 mod proxy;
@@ -38,7 +39,7 @@ pub use storage::Store;
 pub use proxy::system_proxy_url;
 pub use proxy::parse_macos_proxy;
 pub use providers::{fetch_balance, find, parse_zhipu_report};
-pub use secrets::{get_secrets, SecretBlob, inherit_connection_with};
+pub use secrets::{get_secrets, SecretBlob, inherit_connection_with, save_mimo_session, get_mimo_session};
 pub use subscription::parse_usage as parse_subscription_usage;
 pub use ladder::parse_rankings as parse_ladder_rankings;
 pub use ladder::{load as load_ladder, with_overrides as ladder_with_overrides};
@@ -62,6 +63,7 @@ pub fn run() {
             let overrides = store.load_overrides();
             let state = commands::AppState::new(store, config, overrides);
             if let Err(error) = account_sync::repair_connections(&state) { account_sync::remember_connection_error(&state, error); }
+            connections::set_app_handle(app.handle().clone());
             app.manage(state);
             tray::setup(app.handle())?;
             refresh::spawn(app.handle().clone());

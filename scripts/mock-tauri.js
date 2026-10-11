@@ -741,7 +741,8 @@
         case "resolve_account_sync": {
           const source = syncCandidates.find(row => row.id === args.sourceId);
           syncCandidates = syncCandidates.filter(row => row.id !== args.sourceId);
-          if (source && !ACCOUNTS.some(a => a.id === source.id)) ACCOUNTS.push({...structuredClone(ACCOUNTS.find(a => a.provider === source.provider)),...source});
+          if (args.targetId) { window.demoLastAssociation={sourceId:args.sourceId,targetId:args.targetId}; }
+          if (source && !args.targetId && !ACCOUNTS.some(a => a.id === source.id)) ACCOUNTS.push({...structuredClone(ACCOUNTS.find(a => a.provider === source.provider)),...source});
           emitAccountsUpdated(); return null;
         }
         case "get_account_sync_status": return structuredClone(syncStatus);
@@ -864,7 +865,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1504",
+            version: "1.0.1600",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

@@ -267,8 +267,10 @@ fn main() {
     bb.statuses.lock().unwrap().insert(bid.clone(), snapshot("2026-10-07T00:00:00Z", 99.0));
     account_sync::resolve(&bb, &aid, Some(&bid)).unwrap();
     assert_eq!(bb.statuses.lock().unwrap()[&bid].balance.as_ref().unwrap().total, Some(10.0));
+    // Pure Rust resolve persists locally; publish just as the UI command does.
+    account_sync::sync(&bb).unwrap();
     account_sync::sync(&aa).unwrap();
-    account_sync::resolve(&aa, &bid, Some(&aid)).unwrap();
+    assert!(account_sync::candidates(&aa).unwrap().is_empty());
     for _ in 0..20 { account_sync::sync(&aa).unwrap(); account_sync::sync(&bb).unwrap(); }
     assert_eq!(bb.config.lock().unwrap().accounts.len(), 1);
     assert_eq!(bb.config.lock().unwrap().accounts[0].base_url, before.base_url);
@@ -304,7 +306,7 @@ fn main() {
     assert!(existing.config.lock().unwrap().accounts.is_empty());
     println!("PASS existing duplicate recovery and deletion of linked account blocks all associated remote IDs");
 
-    let multiple = state(&root.join("real-multiple"), &duplicate_shared, vec![make(&aid)]);
+    let multiple = state(&root.join("real-multiple"), &root.join("real-multiple-shared"), vec![make(&aid),make(&bid)]);
     account_sync::sync(&multiple).unwrap();
     account_sync::resolve(&multiple, &bid, None).unwrap();
     for _ in 0..5 { account_sync::sync(&multiple).unwrap(); }

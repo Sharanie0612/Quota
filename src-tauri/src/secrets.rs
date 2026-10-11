@@ -29,6 +29,9 @@ pub struct SecretBlob {
     /// MiMo 控制台 Cookie（浏览器小米账号 SSO 会话）
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub console_cookie: Option<String>,
+    /// Opaque reference to chunked OS-credential entries; never a filesystem session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mimo_session: Option<String>,
 }
 
 fn entry(service: &str, account_id: &str) -> Result<keyring::Entry, String> {
@@ -153,7 +156,11 @@ pub fn set_access_key(account_id: &str, id: &str, secret: &str) -> Result<(), St
 
 pub fn has_console_cookie(account_id: &str) -> bool {
     get_secrets(account_id)
-        .map(|b| b.console_cookie.map(|c| !c.trim().is_empty()).unwrap_or(false))
+        .map(|b| {
+            b.console_cookie
+                .map(|c| !c.trim().is_empty())
+                .unwrap_or(false)
+        })
         .unwrap_or(false)
 }
 
@@ -206,31 +213,54 @@ pub fn delete(account_id: &str) -> Result<(), String> {
     write(account_id, &SecretBlob::default())
 }
 
-fn present(value: &Option<String>) -> bool { value.as_ref().is_some_and(|v| !v.trim().is_empty()) }
+fn present(value: &Option<String>) -> bool {
+    value.as_ref().is_some_and(|v| !v.trim().is_empty())
+}
 impl SecretBlob {
     pub fn has_connection(&self) -> bool {
-        present(&self.api_key) || present(&self.admin_key) || present(&self.console_cookie)
-            || present(&self.subscription_account) || (present(&self.access_key_id) && present(&self.access_key_secret))
+        present(&self.api_key)
+            || present(&self.admin_key)
+            || present(&self.console_cookie)
+            || present(&self.subscription_account)
+            || (present(&self.access_key_id) && present(&self.access_key_secret))
     }
     pub fn compatible(&self, other: &Self) -> bool {
-        [(&self.api_key, &other.api_key), (&self.admin_key, &other.admin_key),
-         (&self.console_cookie, &other.console_cookie), (&self.subscription_account, &other.subscription_account),
-         (&self.access_key_id, &other.access_key_id), (&self.access_key_secret, &other.access_key_secret)]
-            .iter().all(|(a,b)| !present(a) || !present(b) || a == b)
+        [
+            (&self.api_key, &other.api_key),
+            (&self.admin_key, &other.admin_key),
+            (&self.console_cookie, &other.console_cookie),
+            (&self.subscription_account, &other.subscription_account),
+            (&self.access_key_id, &other.access_key_id),
+            (&self.access_key_secret, &other.access_key_secret),
+        ]
+        .iter()
+        .all(|(a, b)| !present(a) || !present(b) || a == b)
     }
     // Equality is evaluated in memory only; no credential or credential-derived ID is shared.
     pub fn same_login(&self, other: &Self) -> bool {
-        self.compatible(other) && (([(&self.api_key, &other.api_key), (&self.console_cookie, &other.console_cookie),
-            (&self.subscription_account, &other.subscription_account)].iter().any(|(a,b)| present(a) && a == b)
-            || (present(&self.access_key_id) && present(&self.access_key_secret)
-                && self.access_key_id == other.access_key_id && self.access_key_secret == other.access_key_secret)))
+        self.compatible(other)
+            && ([
+                (&self.api_key, &other.api_key),
+                (&self.console_cookie, &other.console_cookie),
+                (&self.subscription_account, &other.subscription_account),
+            ]
+            .iter()
+            .any(|(a, b)| present(a) && a == b)
+                || (present(&self.access_key_id)
+                    && present(&self.access_key_secret)
+                    && self.access_key_id == other.access_key_id
+                    && self.access_key_secret == other.access_key_secret))
     }
 }
-pub struct ConnectionTransfer { pub changed: bool, pub use_source_config: bool }
+pub struct ConnectionTransfer {
+    pub changed: bool,
+    pub use_source_config: bool,
+}
 /// Local-only, additive transfer. Original entries are never deleted, and an existing
 /// target connection always wins. AccessKey pairs are copied together, never spliced.
 pub fn inherit_connection_with(
-    source: &str, target: &str,
+    source: &str,
+    target: &str,
     read: impl Fn(&str) -> Result<SecretBlob, String>,
     save: impl Fn(&str, &SecretBlob) -> Result<(), String>,
 ) -> Result<ConnectionTransfer, String> {
@@ -239,22 +269,138 @@ pub fn inherit_connection_with(
     let use_source_config = !before.has_connection() && from.has_connection();
     let mut next = before.clone();
     if before.compatible(&from) {
-        for (dst, src) in [(&mut next.api_key, &from.api_key), (&mut next.admin_key, &from.admin_key),
-            (&mut next.console_cookie, &from.console_cookie), (&mut next.subscription_account, &from.subscription_account)] {
-            if !present(dst) && present(src) { *dst = src.clone(); }
+        for (dst, src) in [
+            (&mut next.api_key, &from.api_key),
+            (&mut next.admin_key, &from.admin_key),
+            (&mut next.console_cookie, &from.console_cookie),
+            (&mut next.subscription_account, &from.subscription_account),
+        ] {
+            if !present(dst) && present(src) {
+                *dst = src.clone();
+            }
         }
         if (!present(&next.access_key_id) || !present(&next.access_key_secret))
-            && present(&from.access_key_id) && present(&from.access_key_secret) {
-            next.access_key_id = from.access_key_id.clone(); next.access_key_secret = from.access_key_secret.clone();
+            && present(&from.access_key_id)
+            && present(&from.access_key_secret)
+        {
+            next.access_key_id = from.access_key_id.clone();
+            next.access_key_secret = from.access_key_secret.clone();
         }
+    }
+    if next.mimo_session.is_none() && next.console_cookie == from.console_cookie {
+        next.mimo_session = from.mimo_session.clone();
     }
     let changed = next != before;
     if changed {
         save(target, &next)?;
-        if read(target)? != next { return Err("凭据继承核验失败，原账户及凭据保留".into()); }
+        if read(target)? != next {
+            return Err("凭据继承核验失败，原账户及凭据保留".into());
+        }
     }
-    Ok(ConnectionTransfer { changed, use_source_config: use_source_config && changed })
+    Ok(ConnectionTransfer {
+        changed,
+        use_source_config: use_source_config && changed,
+    })
 }
 pub fn inherit_connection(source: &str, target: &str) -> Result<ConnectionTransfer, String> {
     inherit_connection_with(source, target, get_secrets, restore)
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SessionManifest {
+    schema: u32,
+    generation: String,
+    chunks: usize,
+}
+fn session_entry(reference: &str, part: Option<usize>) -> String {
+    match part {
+        Some(n) => format!("mimo-session:{reference}:{n}"),
+        None => format!("mimo-session:{reference}"),
+    }
+}
+/// Chunk to stay below Windows' per-credential blob limit, including UTF-16 passwords.
+/// Commit an opaque reference only after all parts have been written and read back.
+pub fn save_mimo_session(account_id: &str, payload: &str) -> Result<(), String> {
+    if payload.len() > 65536 {
+        return Err("小米会话过大，未保存登录信息".into());
+    }
+    let mut blob = get_secrets(account_id)?;
+    let reference = blob
+        .mimo_session
+        .clone()
+        .filter(|r| uuid::Uuid::parse_str(r).is_ok())
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let previous = read_service(SERVICE, &session_entry(&reference, None))?
+        .and_then(|raw| serde_json::from_str::<SessionManifest>(&raw).ok());
+    let generation = uuid::Uuid::new_v4().to_string();
+    let mut parts = Vec::new();
+    let mut part = String::new();
+    for c in payload.chars() {
+        if part.len() + c.len_utf8() > 800 {
+            parts.push(std::mem::take(&mut part));
+        }
+        part.push(c);
+    }
+    if !part.is_empty() {
+        parts.push(part);
+    }
+    for (i, part) in parts.iter().enumerate() {
+        entry(SERVICE, &session_entry(&generation, Some(i)))?
+            .set_password(part)
+            .map_err(|_| "无法安全保存小米会话")?;
+        if read_service(SERVICE, &session_entry(&generation, Some(i)))?.as_deref()
+            != Some(part.as_str())
+        {
+            return Err("小米会话保存核验失败".into());
+        }
+    }
+    let manifest = serde_json::to_string(&SessionManifest {
+        schema: 1,
+        generation: generation.clone(),
+        chunks: parts.len(),
+    })
+    .map_err(|_| "小米会话编码失败")?;
+    entry(SERVICE, &session_entry(&reference, None))?
+        .set_password(&manifest)
+        .map_err(|_| "无法安全保存小米会话")?;
+    blob.mimo_session = Some(reference);
+    write(account_id, &blob)?;
+    if let Some(old) =
+        previous.filter(|old| old.chunks <= 100 && uuid::Uuid::parse_str(&old.generation).is_ok())
+    {
+        for i in 0..old.chunks {
+            let _ = entry(SERVICE, &session_entry(&old.generation, Some(i)))?.delete_credential();
+        }
+    }
+    Ok(())
+}
+pub fn get_mimo_session(account_id: &str) -> Result<Option<String>, String> {
+    let Some(reference) = get_secrets(account_id)?.mimo_session else {
+        return Ok(None);
+    };
+    if uuid::Uuid::parse_str(&reference).is_err() {
+        return Err("小米会话引用无效".into());
+    }
+    let Some(raw) = read_service(SERVICE, &session_entry(&reference, None))? else {
+        return Ok(None);
+    };
+    let manifest: SessionManifest = serde_json::from_str(&raw).map_err(|_| "小米会话格式无效")?;
+    if manifest.schema != 1
+        || manifest.chunks > 100
+        || uuid::Uuid::parse_str(&manifest.generation).is_err()
+    {
+        return Err("小米会话格式无效".into());
+    }
+    let mut payload = String::new();
+    for i in 0..manifest.chunks {
+        payload.push_str(
+            &read_service(SERVICE, &session_entry(&manifest.generation, Some(i)))?
+                .ok_or("小米会话尚未完整保存")?,
+        );
+    }
+    if payload.len() > 65536 {
+        return Err("小米会话格式无效".into());
+    }
+    Ok(Some(payload))
 }

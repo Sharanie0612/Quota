@@ -96,7 +96,7 @@ export function AccountSheet({
   const connect = async (finish = false) => {
     setConnecting(true);
     try {
-      if (isMimo && !finish) { await api.startMimoLogin(); setLoginOpened(true); return; }
+      if (isMimo && !finish) { await api.startMimoLogin(initial?.id); setLoginOpened(true); return; }
       const id = isMimo ? await api.finishMimoLogin(providerId) : await api.connectChatgpt();
       if (staged.current) await api.discardConnection(staged.current);
       staged.current = id;
@@ -399,7 +399,7 @@ export function AccountSheet({
       {(isMimo && balanceMode === "console") || (isChatgpt && balanceMode !== "manual") ? (
         <div className="connection-panel">
           <h3>{isMimo ? "连接小米账户" : "连接 ChatGPT"}</h3>
-          <p>{connectionId ? "已连接，保存后开始同步" : isMimo ? "在官方窗口登录后，返回这里完成连接。" : "使用本机已登录的 Codex，查看订阅内的 Codex 额度。"}</p>
+          <p>{connectionId ? "已连接，保存后开始同步" : isMimo ? "登录信息安全保存在本机，后续自动复用；需要验证时才重新扫码。" : "使用本机已登录的 Codex，查看订阅内的 Codex 额度。"}</p>
           {isMimo && mimoConnections.length > 0 ? <Field label="使用已连接的小米账户" hint="余额和订阅可共用一次登录；多个小米账号请按名称选择。">
             <div className="tag-row">
               <select className="select" aria-label="已连接的小米账户" value={mimoSource} onChange={e => setMimoSource(e.target.value)} disabled={connecting}>

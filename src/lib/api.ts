@@ -36,7 +36,7 @@ export const api = {
   checkLadderPrice: (id: string) => invoke<LadderPriceCheck>("check_ladder_price", { id }),
   adoptLadderPrice: (id: string, input: number, output: number, currency: string, cachedInput: number | null = null, cacheWrite: number | null = null, cacheWriteLong: number | null = null) =>
     invoke<void>("adopt_ladder_price", { id, input, output, currency, cachedInput, cacheWrite, cacheWriteLong }),
-  startMimoLogin: () => invoke<void>("start_mimo_login"),
+  startMimoLogin: (accountId?: string) => invoke<void>("start_mimo_login", {accountId: accountId ?? null}),
   listMimoConnections: () => invoke<{id: string; label: string}[]>("list_mimo_connections"),
   reuseMimoConnection: (accountId: string, provider: string) => invoke<string>("reuse_mimo_connection", {accountId, provider}),
   finishMimoLogin: (provider: string) => invoke<string>("finish_mimo_login", { provider }),

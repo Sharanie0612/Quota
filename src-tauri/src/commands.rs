@@ -5,7 +5,6 @@ use crate::backup;
 use crate::catalog;
 use crate::custom;
 use crate::history::{self, HistoryStore};
-use crate::mimo;
 use crate::model::*;
 use crate::pricing;
 use crate::proxy;
@@ -21,6 +20,8 @@ use uuid::Uuid;
 
 pub struct AppState {
     pub account_sync_lock: Mutex<()>,
+    pub mimo_refresh_lock: tokio::sync::Mutex<()>,
+    pub mimo_recovery_attempts: Mutex<HashMap<String,std::time::Instant>>,
     pub activity_lock: Mutex<()>,
     pub ladder: Mutex<crate::ladder::Snapshot>,
     pub ladder_refreshing: Mutex<bool>,
@@ -71,6 +72,8 @@ impl AppState {
         };
         Self {
             account_sync_lock: Mutex::new(()),
+            mimo_refresh_lock: tokio::sync::Mutex::new(()),
+            mimo_recovery_attempts: Mutex::new(HashMap::new()),
             activity_lock: Mutex::new(()),
             ladder: Mutex::new(crate::ladder::load(store.dir())),
             ladder_refreshing: Mutex::new(false),
@@ -207,10 +210,7 @@ async fn fetch_mimo_balance(
     account_id: &str,
     provider_id: &str,
 ) -> Result<Balance, String> {
-    match secrets::get_console_cookie(account_id) {
-        Some(cookie) => mimo::fetch_console(&state.http, &cookie, provider_id).await,
-        None => Err("还没有保存 MiMo 控制台 Cookie：在浏览器登录 platform.xiaomimimo.com 后复制 Cookie，填到「编辑」里即可自动查。".into()),
-    }
+    crate::connections::query_mimo(state, account_id, provider_id).await
 }
 
 /// 查询单个账户的余额与模型列表。
@@ -613,13 +613,15 @@ pub async fn save_account(
     let is_new = input.id.is_none();
     let id = input.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
     if let Some(connection_id) = &input.connection_id {
+        let _mimo_guard = state.mimo_refresh_lock.lock().await;
         let pending = state.pending_connections.lock().map_err(|_| "连接状态不可用")?;
         if pending.get(connection_id) != Some(&input.provider) { return Err("连接已失效，请重新连接".into()); }
         let staged = secrets::get_secrets(connection_id)?;
         let mut target = secrets::get_secrets(&id)?;
         if let Some(cookie) = staged.console_cookie {
-            crate::connections::update_mimo_cookie(&state, &id, &cookie)?;
+            crate::connections::update_mimo_connection(&state, &id, &cookie, staged.mimo_session.as_deref())?;
             target.console_cookie = Some(cookie);
+            target.mimo_session = staged.mimo_session;
         }
         if staged.subscription_account.is_some() { target.subscription_account = staged.subscription_account; }
         secrets::restore(&id, &target)?;

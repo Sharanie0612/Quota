@@ -17,6 +17,7 @@ fn state(dir: &Path, shared: &Path, accounts: Vec<Account>) -> AppState {
     state
 }
 fn main() {
+    keyring::set_default_credential_builder(keyring::mock::default_credential_builder());
     let root =
         std::env::temp_dir().join(format!("quota-account-sync-check-{}", uuid::Uuid::new_v4()));
     fs::create_dir_all(&root).unwrap();
@@ -211,6 +212,10 @@ fn main() {
     account_sync::sync(&percent_b).unwrap();
     account_sync::sync(&percent_a).unwrap();
     account_sync::sync(&percent_b).unwrap();
+    for row in account_sync::candidates(&percent_b).unwrap() {
+        if row.pending { account_sync::resolve(&percent_b, &row.id, None).unwrap(); }
+    }
+    account_sync::sync(&percent_b).unwrap();
     let imported = percent_b.config.lock().unwrap();
     assert_eq!(imported.accounts.len(), percent_accounts.len());
     for original in &percent_accounts {
@@ -241,5 +246,72 @@ fn main() {
         assert!(account_sync::sync(&invalid_state).is_err());
     }
     println!("PASS percentages outside 0..100, percentages used as spend/recharge currencies and unknown units are rejected");
+    // Independently created IDs for the same login must be quarantined, not duplicated.
+    let duplicate_shared = root.join("duplicate-shared");
+    let make = |id: &str| serde_json::from_value::<Account>(json!({"id":id,"provider":"deepseek","label":"Same login","createdAt":"2026-10-05T00:00:00Z","baseUrl":"LOCAL-CONNECTION"})).unwrap();
+    let aid = uuid::Uuid::new_v4().to_string();
+    let bid = uuid::Uuid::new_v4().to_string();
+    let mut account_a = make(&aid); account_a.base_url = Some("LOCAL-A".into());
+    let mut account_b = make(&bid); account_b.base_url = Some("LOCAL-B".into()); account_b.created_at = "2026-10-06T00:00:00Z".into();
+    let aa = state(&root.join("duplicate-a"), &duplicate_shared, vec![account_a]);
+    let bb = state(&root.join("duplicate-b"), &duplicate_shared, vec![account_b]);
+    for _ in 0..8 { account_sync::sync(&aa).unwrap(); account_sync::sync(&bb).unwrap(); }
+    assert_eq!(aa.config.lock().unwrap().accounts.len(), 1);
+    assert_eq!(bb.config.lock().unwrap().accounts.len(), 1);
+    assert!(account_sync::candidates(&bb).unwrap().iter().any(|r| r.id == aid && r.pending));
+    let before = bb.config.lock().unwrap().accounts[0].clone();
+    assert!(account_sync::resolve(&bb, &aid, Some(&aid)).is_err());
+    let snapshot = |at: &str, total| AccountStatus {last_checked:Some(at.into()), balance:Some(Balance {
+        currency:"CNY".into(), total:Some(total), source:"manual".into(), usable:None, note:None, raw:None, amounts:vec![]}), ..Default::default()};
+    bb.statuses.lock().unwrap().insert(aid.clone(), snapshot("2026-10-08T00:00:00Z", 10.0));
+    bb.statuses.lock().unwrap().insert(bid.clone(), snapshot("2026-10-07T00:00:00Z", 99.0));
+    account_sync::resolve(&bb, &aid, Some(&bid)).unwrap();
+    assert_eq!(bb.statuses.lock().unwrap()[&bid].balance.as_ref().unwrap().total, Some(10.0));
+    // Pure Rust resolve persists locally; publish just as the UI command does.
+    account_sync::sync(&bb).unwrap();
+    account_sync::sync(&aa).unwrap();
+    assert!(account_sync::candidates(&aa).unwrap().is_empty());
+    for _ in 0..20 { account_sync::sync(&aa).unwrap(); account_sync::sync(&bb).unwrap(); }
+    assert_eq!(bb.config.lock().unwrap().accounts.len(), 1);
+    assert_eq!(bb.config.lock().unwrap().accounts[0].base_url, before.base_url);
+    assert_eq!(aa.config.lock().unwrap().accounts[0].id, aid);
+    assert_eq!(bb.config.lock().unwrap().accounts[0].id, bid);
+    assert!(account_sync::candidates(&bb).unwrap().is_empty());
+    let restarted = state(&root.join("duplicate-b"), &duplicate_shared, bb.config.lock().unwrap().accounts.clone());
+    for _ in 0..8 { account_sync::sync(&aa).unwrap(); account_sync::sync(&restarted).unwrap(); }
+    assert_eq!(restarted.config.lock().unwrap().accounts.len(), 1);
+    let stable = fs::read_to_string(restarted.store.dir().join("account-sync-state.json")).unwrap();
+    account_sync::sync(&aa).unwrap(); account_sync::sync(&restarted).unwrap();
+    assert_eq!(fs::read_to_string(restarted.store.dir().join("account-sync-state.json")).unwrap(), stable);
+    println!("PASS separate UUIDs quarantine, explicit association, preserved local IDs/connections, newest snapshot without summation, repeated exchange and restart; different creation dates converge without edit churn");
+
+    // Deletion before this device has ever observed a record used to lose its tombstone.
+    let deletion = state(&root.join("delete-before-sync"), &duplicate_shared, vec![make(&aid)]);
+    account_sync::remove_account(&deletion, &aid).unwrap();
+    account_sync::sync(&deletion).unwrap();
+    assert!(deletion.config.lock().unwrap().accounts.is_empty());
+    let deleted_restart = state(&root.join("delete-before-sync"), &duplicate_shared, deletion.config.lock().unwrap().accounts.clone());
+    account_sync::sync(&deleted_restart).unwrap();
+    assert!(deleted_restart.config.lock().unwrap().accounts.is_empty());
+    println!("PASS deletion before first sync survives restart and stale shared packets");
+
+    // Existing duplicate cards can be linked; a stale file cannot restore the removed card.
+    let existing = state(&root.join("existing-duplicates"), &duplicate_shared, vec![make(&aid), make(&bid)]);
+    account_sync::resolve(&existing, &aid, Some(&bid)).unwrap();
+    for _ in 0..8 { account_sync::sync(&existing).unwrap(); }
+    assert_eq!(existing.config.lock().unwrap().accounts.len(), 1);
+    assert_eq!(existing.config.lock().unwrap().accounts[0].id, bid);
+    account_sync::remove_account(&existing, &bid).unwrap();
+    for _ in 0..3 { account_sync::sync(&existing).unwrap(); }
+    assert!(existing.config.lock().unwrap().accounts.is_empty());
+    println!("PASS existing duplicate recovery and deletion of linked account blocks all associated remote IDs");
+
+    let multiple = state(&root.join("real-multiple"), &root.join("real-multiple-shared"), vec![make(&aid),make(&bid)]);
+    account_sync::sync(&multiple).unwrap();
+    account_sync::resolve(&multiple, &bid, None).unwrap();
+    for _ in 0..5 { account_sync::sync(&multiple).unwrap(); }
+    assert_eq!(multiple.config.lock().unwrap().accounts.len(), 2);
+    assert!(!account_sync::candidates(&multiple).unwrap().iter().any(|r| r.id == bid));
+    println!("PASS explicitly distinct same-provider accounts remain separate");
     fs::remove_dir_all(root).unwrap();
 }

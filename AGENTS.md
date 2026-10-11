@@ -33,13 +33,13 @@ cargo check                 # 类型检查 Rust（改动 Rust 后必跑；本机
 
 cd ..
 node scripts/verify-logic.cjs        # 纯逻辑自检（签名/解析/定价页抽取），期望 7/7 通过
+# 改账户同步或凭据关联，另跑 release examples：account_sync_checks、account_connection_checks、account_sync_migration_checks（内存凭据库）
 ```
 
-打包（NSIS 工具链首次需代理下载，之后已缓存）：
+打包（也可双击根目录 build-installer.cmd；自动配置 GNU、同步依赖并执行检查）：
 
-```bash
-export PATH="$HOME/.rustup/toolchains/stable-x86_64-pc-windows-gnu/lib/rustlib/x86_64-pc-windows-gnu/bin:$HOME/.cargo/bin:$PATH"
-HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 npm run tauri build
+```powershell
+npm run package:windows
 ```
 
 打包前先退出正在运行的 quota.exe。产物：`src-tauri/target/release/quota.exe`（便携版）与 `src-tauri/target/release/bundle/nsis/*-setup.exe`（安装包）。
@@ -173,10 +173,14 @@ node scripts/preview-server.cjs 4174
 | 2026-10-07 小时趋势入口与天梯布局迭代（Windows 本地构建） | `1.0.1300` | `1.0.1300` |
 | 2026-10-07 天梯坐标区间自适应修复（Windows 本地构建） | `1.0.1301` | `1.0.1301` |
 | 2026-10-08 天梯时间筛选、推理档选择与紧凑缓存概览（Windows 本地安装包交付） | `1.0.1400` | `1.0.1400` |
+| 2026-10-09 账户共享同步重复项与删除回流修复（Windows 本地安装包交付） | `1.0.1401` | `1.0.1401` |
+| 2026-10-09 关联凭据自动恢复与同步交互修复（Windows 本地安装包交付） | `1.0.1402` | `1.0.1402` |
 | 2026-10-09 Trae 用量记录与一次性采集提醒（Windows 本地安装包交付） | `1.0.1500` | `1.0.1500` |
 | 2026-10-09 修复 Token 活动 Trae 模型通道鉴别（Trae 提供 / API 接入分开，Windows 本地构建） | `1.0.1501` | `1.0.1501` |
 | 2026-10-09 安装包完整性标签修复 NSIS 临时文件错误（Windows 本地安装包交付） | `1.0.1502` | `1.0.1502` |
 | 2026-10-09 厂商分类排除 Trae 通道模型（Windows 本地安装包交付） | `1.0.1503` | `1.0.1503` |
+| 2026-10-10 账户同步旧台账兼容与关联修复（Windows 修复构建） | `1.0.1504` | `1.0.1504` |
+| 2026-10-11 多设备账户关联与小米会话恢复（Windows 本地功能构建） | `1.0.1600` | `1.0.1600` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 

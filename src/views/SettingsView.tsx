@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Notice, Seg, Switch } from "../components/ui";
+import { AccountSyncPanel } from "../components/AccountSyncPanel";
 import { DataImportPanel } from "../components/DataImportPanel";
-import { api, copyText, errText } from "../lib/api";
+import { api, copyText, errText, events } from "../lib/api";
 import { toast } from "../lib/store";
 import type { ActivityOptions, AppInfo, Settings } from "../lib/types";
 
@@ -46,7 +47,15 @@ export function SettingsView({
   const [activityError, setActivityError] = useState("");
   const [cloudStatus, setCloudStatus] = useState<{lastSynced:string|null;error:string|null}|null>(null);
   const [cloudBusy, setCloudBusy] = useState(false);
-  useEffect(() => {void api.getAccountSyncStatus().then(setCloudStatus).catch(()=>undefined);}, []);
+  useEffect(() => {
+    let active = true;
+    const reload = () => api.getAccountSyncStatus().then(status => {
+      if (active) setCloudStatus(status);
+    }).catch(() => undefined);
+    void reload();
+    const unlisten = events.onAccountsUpdated(() => void reload());
+    return () => { active = false; void unlisten.then(off => off()).catch(() => undefined); };
+  }, []);
   useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
   const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
     if (!activity || activityBusy) return false;
@@ -142,6 +151,7 @@ export function SettingsView({
 
   return (
     <div className="content-inner" style={{ maxWidth: 760 }}>
+      <AccountSyncPanel />
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
         <p>从本地日志增量采集用量，采集完成后自动更新图表。</p>

@@ -16,6 +16,7 @@ import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
+import { LaunchAnimation } from './components/LaunchAnimation';
 import appIcon from "../src-tauri/icons/128x128.png";
 
 type View = "accounts" | "models" | "ladder" | "activity" | "costs" | "settings";
@@ -85,6 +86,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <LaunchAnimation/>
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>
       <aside className="sidebar">

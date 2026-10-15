@@ -6,6 +6,8 @@
   const callbacks = {};
   const eventHandlers = {};
   let windowMaximized = false;
+  let widgetOptions = {enabled:true,side:'right',heightPercent:50};
+  function widgetState(expanded){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side}});}
   const activityCase = new URLSearchParams(location.search).get("activityCase");
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
@@ -701,6 +703,15 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case 'get_widget_options': return {...widgetOptions};
+        case 'save_widget_options': widgetOptions={...args.options};return {...widgetOptions};
+        case 'get_widget_usage': {
+          const test=new URLSearchParams(location.search).get('widgetCase');
+          if(test==='error')throw Error('演示：统计暂不可读');
+          return {today:test==='empty'?0:1234567,total:test==='empty'?0:98765432,date:'2026-10-16',updatedAt:test==='empty'?null:Date.now(),partial:test==='partial'};
+        }
+        case 'widget_ready': widgetState(false);return null;
+        case 'set_widget_expanded': widgetState(args.expanded);return null;
         case "plugin:window|is_maximized": return windowMaximized;
         case "plugin:window|toggle_maximize": {
           windowMaximized=!windowMaximized;

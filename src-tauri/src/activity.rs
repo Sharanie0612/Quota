@@ -327,6 +327,21 @@ fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
 pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub sessions:u64 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
+pub struct UsageSummary { pub today:u64, pub total:u64, pub date:String, pub updated_at:Option<i64>, pub partial:bool }
+/// Read existing deduplicated metrics without building the full chart/report payload.
+pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
+    let today=chrono::Local::now().date_naive();let db=database(dir)?;
+    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae'").map_err(|_|"读取用量失败")?;
+    let rows=stmt.query_map([],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?))).map_err(|_|"读取用量失败")?;
+    let mut result=UsageSummary{today:0,total:0,date:today.to_string(),updated_at:None,partial:false};
+    for row in rows {let(timestamp,total)=row.map_err(|_|"用量记录损坏")?;let total=u64::try_from(total).map_err(|_|"用量记录损坏")?;if let Some(t)=chrono::DateTime::from_timestamp_millis(timestamp){let date=t.with_timezone(&chrono::Local).date_naive();if date<=today {result.total=result.total.saturating_add(total);if date==today{result.today=result.today.saturating_add(total);}}}}
+    let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+    result.updated_at=status.get("at").and_then(Value::as_i64);
+    result.partial=status.get("errors").and_then(Value::as_array).is_some_and(|e|!e.is_empty())||status.get("syncErrors").and_then(Value::as_array).is_some_and(|e|!e.is_empty());
+    Ok(result)
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
 pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String>,pub sync_errors:Vec<String> }
 fn aggregate(events:&[Metric],key:impl Fn(&Metric)->String)->Vec<Group>{
     let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();

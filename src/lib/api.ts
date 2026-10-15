@@ -19,6 +19,12 @@ import type {
 } from "./types";
 
 export const api = {
+  getWidgetOptions: () => invoke<{enabled:boolean;side:'left'|'right';heightPercent:number}>('get_widget_options'),
+  saveWidgetOptions: (options:{enabled:boolean;side:'left'|'right';heightPercent:number}) => invoke<typeof options>('save_widget_options',{options}),
+  getWidgetUsage: () => invoke<{today:number;total:number;date:string;updatedAt:number|null;partial:boolean}>('get_widget_usage'),
+  widgetReady: () => invoke<void>('widget_ready'),
+  setWidgetExpanded: (expanded:boolean) => invoke<void>('set_widget_expanded',{expanded}),
+  openMain: () => invoke<void>('show_main_window'),
   getVendorCosts: (from: string, to: string) => invoke<VendorCostReport>("get_vendor_costs", {from,to}),
   getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months}),
   saveMonthlyUsageFx: (month: string, rate: number | null) => invoke<void>("save_monthly_usage_fx",{month,rate}),

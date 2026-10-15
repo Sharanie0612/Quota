@@ -2,7 +2,8 @@ param(
   [Parameter(Mandatory=$true)][string]$Installer,
   [Parameter(Mandatory=$true)][string]$ExePath,
   [Parameter(Mandatory=$true)][string]$ExpectedExe,
-  [Parameter(Mandatory=$true)][string]$TestRoot
+  [Parameter(Mandatory=$true)][string]$TestRoot,
+  [switch]$CheckWidget
 )
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -49,6 +50,7 @@ try {
   if ((Get-FileHash -LiteralPath (Join-Path $installPath 'WebView2Loader.dll')).Hash -ne (Get-FileHash -LiteralPath (Join-Path $workspace 'src-tauri\WebView2Loader.dll')).Hash) { throw 'Installed loader hash mismatch' }
   foreach ($file in $personalHashes.Keys) { if ((Get-FileHash -LiteralPath $file).Hash -ne $personalHashes[$file]) { throw 'Installer changed personal application data' } }
   & (Join-Path $PSScriptRoot 'check-install.ps1') -ExePath $exe -DataDir $data
+  if ($CheckWidget) { & (Join-Path $PSScriptRoot 'check-widget.ps1') -ExePath $exe -DataDir $data }
   $evidence = @{previousVersion=$previousVersion;version=$version;kind='existing-install-overwrite';actualUpgradeVerified=$true;personalFilesUnchanged=$personalHashes.Count;startupSeconds=8;installerSha256=(Get-FileHash -LiteralPath $Installer).Hash.ToLowerInvariant()}
   [IO.File]::WriteAllText((Join-Path $testPath 'evidence.json'),($evidence | ConvertTo-Json),$utf8)
   Write-Output "PASS installed overwrite $previousVersion -> $version; build and loader hashes match; personal data retained"

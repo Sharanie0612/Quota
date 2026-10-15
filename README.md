@@ -72,6 +72,8 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 
 同一待发布版本另补充[一体化窗口与小米会话续接](docs/window-session-1.0.1900.md)：取消顶部横条、保留现有风格；通过官网 SSO 恢复过期的短期登录，并保留轮换 Cookie，减少重复扫码。
 
+最新[产品界面优化](docs/product-polish-1.0.1900.md)进一步统一圆角、留白和浅深色层次，精简重复说明，并修复筛选恢复、更新失败及误操作问题。
+
 安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
 
 ## 界面预览

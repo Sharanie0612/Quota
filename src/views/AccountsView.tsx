@@ -144,7 +144,6 @@ export function AccountsView({
       <LowBalanceBanner accounts={accounts} trends={trends} />
       {[{title:"余额账户",items:accounts.filter(a => !isSubscriptionAccount(a))},{title:"订阅账户",items:accounts.filter(isSubscriptionAccount)}].filter(group => group.items.length).map(group => <section className="account-group" key={group.title}>
       <h3 className="account-group-title">{group.title}<span>{group.items.length} 个</span></h3>
-      {group.title === "余额账户" ? <p className="account-group-hint">“—”表示未取得该项数据；充值余额与累计充值分别展示，不作推算。</p> : null}
       <div className="accounts-grid">
         {group.items.map((a) => (
           <AccountCard

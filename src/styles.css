@@ -11,7 +11,7 @@
   width: var(--highlight-width, 0px); height: var(--highlight-height, 0px);
   transform: translate(var(--highlight-x, 0px), var(--highlight-y, 0px)); border-radius: var(--radius);
   transition: transform 360ms var(--motion-spring), width 300ms var(--motion-ease), height 300ms var(--motion-ease); }
-.sidebar-nav .motion-highlight { background: var(--blue); }
+.sidebar-nav .motion-highlight { background: var(--surface); box-shadow: var(--shadow-card); }
 .sidebar-nav .nav-item.active, .sidebar-nav .nav-item.active:hover { background: transparent; }
 .nav-subitem { padding-left: 24px; font-size: 12.5px; }
 .motion-seg .motion-highlight { border-radius: 999px; background: var(--seg-thumb); box-shadow: var(--shadow-card); }
@@ -120,10 +120,10 @@
   --amber-soft: rgba(255, 159, 10, 0.14);
   --red: #d70015;
   --red-soft: rgba(215, 0, 21, 0.1);
-  --radius-xl: 28px;
-  --radius-lg: 20px;
-  --radius: 16px;
-  --radius-sm: 12px;
+  --radius-xl: 30px;
+  --radius-lg: 24px;
+  --radius: 18px;
+  --radius-sm: 14px;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 28px rgba(0, 0, 0, 0.05);
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.22);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -229,32 +229,32 @@ textarea {
   display: flex;
   height: 100vh;
   overflow: hidden;
+  padding: 12px;
+  gap: 12px;
+  background: var(--bg);
 }
 
 .sidebar {
-  width: 218px;
-  flex: 0 0 218px;
+  width: 204px;
+  flex: 0 0 204px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 32px 12px 12px;
-  background: var(--bg-sidebar);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-right: 1px solid var(--border);
+  padding: 28px 6px 10px;
+  overflow-y: auto;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 8px 16px;
+  padding: 6px 12px 28px;
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   object-fit: contain;
 }
 
@@ -265,7 +265,7 @@ textarea {
 }
 
 .brand-title {
-  font-size: 13.5px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -277,8 +277,8 @@ textarea {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 8px 10px;
+  gap: 12px;
+  padding: 12px 14px;
   border-radius: var(--radius);
   border: none;
   background: transparent;
@@ -290,25 +290,25 @@ textarea {
 }
 
 .nav-item:hover {
-  background: rgba(0, 0, 0, 0.045);
+  background: var(--fill);
   color: var(--text);
 }
 
 .nav-item.active {
-  background: var(--blue);
-  color: #fff;
-  font-weight: 500;
+  background: var(--surface);
+  color: var(--blue);
+  font-weight: 600;
 }
 
 .nav-item.active:hover {
-  background: var(--blue-hover);
-  color: #fff;
+  background: var(--surface);
+  color: var(--blue);
 }
 
 .nav-item.active .count {
   margin-left: auto;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--blue);
   font-variant-numeric: tabular-nums;
 }
 
@@ -332,6 +332,12 @@ textarea {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  margin-top: 30px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
 }
 
 .window-drag-region {
@@ -374,11 +380,11 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  padding: 0 0 22px;
+  padding: 0 0 26px;
 }
 .page-heading-text { flex: 1; min-width: 220px; }
 .page-heading h1 {
-  font-size: 23px;
+  font-size: 25px;
   font-weight: 600;
   margin: 0;
   letter-spacing: -0.02em;
@@ -397,7 +403,8 @@ textarea {
 .content {
   flex: 1;
   overflow-y: auto;
-  padding: 48px 28px 40px;
+  padding: 28px 28px 40px;
+  scrollbar-gutter: stable;
 }
 
 .content-inner {
@@ -412,8 +419,8 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 13px;
+  height: 36px;
+  padding: 0 16px;
   border-radius: 999px;
   border: none;
   background: var(--fill);
@@ -476,8 +483,8 @@ textarea {
 }
 
 .btn-sm {
-  height: 26px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 12px;
   font-size: 12.5px;
 }
 
@@ -502,7 +509,7 @@ button:focus-visible {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
+  box-shadow: none;
 }
 
 .grid {
@@ -813,11 +820,11 @@ button:focus-visible {
 .select,
 textarea.input {
   width: 100%;
-  height: 32px;
-  padding: 0 11px;
+  height: 38px;
+  padding: 0 13px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   outline: none;
   transition: border-color 0.16s ease, box-shadow 0.16s ease;
   user-select: text;
@@ -885,7 +892,7 @@ textarea.input:focus {
   display: inline-flex;
   background: var(--seg-track);
   border-radius: 999px;
-  padding: 2px;
+  padding: 4px;
   gap: 2px;
 }
 
@@ -893,7 +900,7 @@ textarea.input:focus {
   border: none;
   background: transparent;
   border-radius: 999px;
-  height: 26px;
+  height: 28px;
   padding: 0 12px;
   cursor: pointer;
   color: var(--text-2);
@@ -929,7 +936,7 @@ textarea.input:focus {
 .search .input {
   padding-left: 31px;
   border-radius: 999px;
-  height: 30px;
+  height: 36px;
 }
 
 /* ---------------------------------------------------------------- 弹层 */
@@ -938,7 +945,7 @@ textarea.input:focus {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(8px);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -975,7 +982,7 @@ textarea.input:focus {
   position: sticky;
   top: 0;
   background: var(--surface);
-  padding: 18px 20px 12px;
+  padding: 22px 24px 16px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -985,20 +992,20 @@ textarea.input:focus {
 
 .modal-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .modal-body {
-  padding: 18px 20px 4px;
+  padding: 20px 24px 8px;
 }
 
 .modal-foot {
   position: sticky;
   bottom: 0;
   background: var(--surface);
-  padding: 12px 20px 18px;
+  padding: 16px 24px 20px;
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -1078,13 +1085,13 @@ textarea.input:focus {
 }
 
 .section {
-  padding: 18px 20px;
-  margin-bottom: 16px;
+  padding: 24px;
+  margin-bottom: 18px;
 }
 
 .section h2 {
   margin: 0 0 6px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -1415,11 +1422,11 @@ textarea.input:focus {
 .usage-label { display: flex; justify-content: space-between; gap: 12px; }
 .usage-window progress, .rank-score progress { width: 100%; height: 6px; border: 0; border-radius: 6px; accent-color: var(--blue); }
 .usage-window progress.is-low { accent-color: var(--red); }
-.ladder-hero { padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.ladder-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .ladder-hero h2 { font-size: 23px; margin: 6px 0; letter-spacing: -0.04em; }
 .ladder-hero p { margin: 0; color: var(--text-2); }
 .eyebrow { font-size: 11px; color: var(--blue); font-weight: 600; letter-spacing: 0.08em; }
-.ladder-sync { display: grid; justify-items: end; gap: 12px; }
+.ladder-sync { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ladder-toolbar, .ladder-filters { display: flex; gap: 12px; align-items: center; margin: 20px 0; flex-wrap: wrap; }
 .ladder-search { margin-left: auto; max-width: 220px; }
 .ladder-filters .select { width: auto; max-width: 220px; }
@@ -1498,11 +1505,10 @@ dialog.overlay::backdrop { background: transparent; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px 18px;
+  padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
   min-width: 0;
 }
 
@@ -1609,7 +1615,6 @@ dialog.overlay::backdrop { background: transparent; }
 .usage-window progress.is-low::-webkit-progress-value { background: var(--red); }
 .usage-window progress::-moz-progress-bar { background: var(--blue); border-radius: 8px; }
 .usage-window progress.is-low::-moz-progress-bar { background: var(--red); }
-.ladder-hero { background: linear-gradient(120deg, var(--surface), var(--blue-soft)); border-color: var(--border); }
 .ladder-layout { display: block; }
 .ladder-compare { margin-top: 18px; }
 .ladder-compare[hidden] { display: none; }
@@ -1742,3 +1747,35 @@ dialog.overlay::backdrop { background: transparent; }
 .sync-devices > div { display: flex; justify-content: space-between; padding: 12px 0; gap: 16px; }
 .sync-folder { overflow-wrap: anywhere; }
 .cross-device-sync .badge { white-space: nowrap; }
+
+/* Inset workspace and quiet grouped surfaces, shared by every page. */
+.settings-page, .content:has(.settings-page) .page-heading { max-width: 760px; }
+.settings-page .section h2 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.setting-row { flex-wrap: wrap; }
+.setting-row .txt { min-width: 180px; }
+.setting-row .seg { flex-wrap: wrap; }
+.sync-heading p { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+.sync-start { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 20px 0 16px; }
+.product-details { border-radius: var(--radius); background: var(--fill); padding: 12px 16px; font-size: 12px; color: var(--text-2); }
+.product-details > summary { cursor: pointer; }
+.product-details > summary > span { float: right; font-size: 11px; }
+.product-details p { margin: 10px 0 0; line-height: 1.7; }
+.my-usage-fx > summary { font-size: 12px; font-weight: 500; }
+.my-usage-range, .usage-subscriptions-entry, .my-usage-summary section { padding: 24px; }
+.my-usage-range-head h3 { font-size: 23px; }
+.usage-costs-intro { margin-top: -8px; }
+.my-usage-vendors h3, .activity-detail-heading h3 { font-size: 15px; }
+.account-group-title { margin: 26px 4px 14px; font-weight: 600; }
+.account-summary .stat-value { font-size: 22px; font-weight: 600; }
+.account-summary .stat-label { color: var(--text-2); }
+.window-controls { top: 7px; right: 14px; }
+.window-drag-region { height: 32px; }
+.modal-head, .modal-foot { background: var(--surface); }
+@media (max-width: 1100px) {
+  .sidebar { width: 184px; flex-basis: 184px; }
+  .content { padding: 24px 20px 32px; }
+  .accounts-grid .account-card { padding: 18px; }
+  .vendor-cost-head { grid-template-columns: minmax(135px,1fr) minmax(90px,.8fr) minmax(85px,.7fr); gap: 16px; }
+  .vendor-cost-head > div:nth-child(4) { grid-column: 1 / 3; }
+  .vendor-cost-head > .btn { justify-self: end; }
+}

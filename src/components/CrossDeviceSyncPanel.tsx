@@ -26,7 +26,7 @@ export function CrossDeviceSyncPanel(){
       const results=await Promise.allSettled([api.refreshActivity(),o.syncAccounts?api.syncAccounts():Promise.resolve()]);
       const next=await reload();
       const errors=results.flatMap(r=>r.status==='rejected'?[errText(r.reason)]:[]).concat(next.r.syncErrors??[],next.o.syncAccounts&&next.a.error?[next.a.error]:[]);
-      if(errors.length)setError([...new Set(errors)].join('；'));else setMessage('已完成本机同步。云盘传输完成后，另一台设备会自动更新。');
+      if(errors.length)setError([...new Set(errors)].join('；'));else setMessage('已同步，等待云盘传输到其他设备。');
     }catch(e){setError(errText(e));}finally{setBusy(false);}
   };
   const update=async(patch:Partial<ActivityOptions>)=>{
@@ -43,12 +43,12 @@ export function CrossDeviceSyncPanel(){
   const old=readers.filter(r=>r.compressed!==true).length;
   const last=report?.updatedAt?new Date(report.updatedAt).toLocaleString('zh-CN'):null;
   return <section className="card section cross-device-sync">
-    <div className="sync-heading"><div><h2>跨设备同步</h2><p>在其他电脑继续查看同一份账户、用量与订阅账期。密钥和登录信息留在本机。</p></div><span className={`badge ${failed?'bad':enabled?'good':''}`}>{!options?'正在检查':failed?'需要重试':enabled?'已开启':'未开启'}</span></div>
-    {!enabled?<><ol className="sync-steps"><li><b>选一个云盘文件夹</b><span>例如 iCloud Drive、OneDrive 或 NAS 中的 QuotaSync。</span></li><li><b>其他电脑选同一个文件夹</b><span>在另一台 Quota 的设置中完成同样的选择。</span></li><li><b>保持 Quota 与云盘运行</b><span>账户、Token 用量、订阅账期、支出和月度参考汇率会自动更新。</span></li></ol><Button variant="primary" disabled={busy||!options} onClick={()=>void choose()}>开启跨设备同步</Button></>:<>
+    <div className="sync-heading"><div><h2>跨设备同步</h2><p>账户、用量与账期随你同步。密钥和登录信息留在本机。</p></div><span className={`badge ${failed?'badge-amber':enabled?'badge-green':''}`}>{!options?'正在检查':failed?'需要重试':enabled?'已开启':'未开启'}</span></div>
+    {!enabled?<><div className="sync-start"><span className="hint">每台设备选择同一个云盘文件夹</span><Button variant="primary" disabled={busy||!options} onClick={()=>void choose()}>开启同步</Button></div><details className="product-details"><summary>如何设置</summary><ol className="sync-steps"><li><b>选择云盘文件夹</b><span>支持 iCloud Drive、OneDrive 或 NAS。</span></li><li><b>其他设备选择同一文件夹</b><span>在 Quota 设置中开启同步。</span></li><li><b>保持 Quota 与云盘运行</b><span>账户、用量、账期和支出会自动更新。</span></li></ol></details></>:<>
       <div className="sync-overview"><div><small>同步文件夹</small><b>{options?.syncDir.split(/[\\/]/).filter(Boolean).pop()}</b></div><div><small>其他设备</small><b>{other.length?`${other.length} 台已发现`:'等待另一台电脑连接'}</b></div></div>
-      <p className="hint">每台电脑只需设置一次。运行时通常每 5 分钟交换数据，关闭自动采集后仍会同步。我的使用复用 Token 活动记录，登录信息仍需在各设备单独连接。</p>
+      <p className="hint">约每 5 分钟自动同步 · 各设备需单独连接登录</p>
       <div className="tag-row"><Button variant="primary" disabled={busy} onClick={()=>void sync()}>{busy?'同步中…':'立即同步'}</Button><span className="hint">{last?`本机上次检查 ${last}`:'尚未同步'}</span></div>
-      {old>0&&<p className="hint">还有 {old} 台设备未确认更新，本机会自动兼容。全部设备更新后可在高级选项中节省空间。</p>}
+      {old>0&&<p className="hint">{old} 台设备待更新 · 兼容模式已开启</p>}
       {other.length>0&&<details className="sync-devices"><summary>查看已发现的设备</summary>{other.map(d=><div key={d.id}><b>{d.name||'其他电脑'}</b><span className="hint">{readers.find(r=>r.device===d.id)?.version??'版本待确认'}</span></div>)}</details>}
     </>}
     {message&&<Notice>{message}</Notice>}

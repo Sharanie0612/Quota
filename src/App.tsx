@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccountSheet } from "./components/AccountSheet";
-import { IconGear, IconLayers, IconPlus, IconRefresh, IconWallet } from "./components/icons";
+import { IconChart, IconClock, IconGear, IconLayers, IconPlus, IconRefresh, IconSpark, IconWallet } from "./components/icons";
 import { Button, EmptyState, Notice } from "./components/ui";
 import { api, events } from "./lib/api";
 import { money } from "./lib/format";
@@ -25,7 +25,7 @@ export default function App() {
   const { settings, update } = useSettings();
 
   const [view, setView] = useState<View>("accounts");
-  const nav = useSlidingHighlight<HTMLDivElement>(view);
+  const nav = useSlidingHighlight<HTMLElement>(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
   const [providers, setProviders] = useState<ProviderView[]>([]);
@@ -80,8 +80,8 @@ export default function App() {
         ? "还没有添加账户"
         : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个额度不足` : ""}${failedCount > 0 ? ` · ${failedCount} 个同步异常` : ""}${pendingCount > 0 ? ` · ${pendingCount} 个待查询` : ""}${!lowCount && !failedCount && !pendingCount ? " · 状态正常" : ""}`
       : view === "models"
-        ? `${modelCount} 个可用模型 · 价格以官网为准`
-        : view === "ladder" ? "十家厂商的能力排名与官方价格" : view === "activity" ? "历史用量与跨设备同步" : view === "costs" ? "实际支出与厂商用量" : "同步与提醒";
+        ? `${modelCount} 个可用模型`
+        : view === "ladder" ? "能力与价格，一起比较" : view === "activity" ? "每一次使用，都有记录" : view === "costs" ? "用量、支出与订阅" : "让 Quota 按你的习惯工作";
 
   return (
     <div className="app">
@@ -92,11 +92,11 @@ export default function App() {
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
             <span className="brand-title">Quota</span>
-            <span className="brand-sub">余额与额度看板</span>
+            <span className="brand-sub">你的 AI 用量空间</span>
           </div>
         </div>
 
-        <div className="sidebar-nav" ref={nav}>
+        <nav className="sidebar-nav" ref={nav} aria-label="主导航">
         <span className="motion-highlight" aria-hidden="true"/>
         <button data-motion-active={view === "accounts"}
           className={`nav-item${view === "accounts" ? " active" : ""}`}
@@ -106,7 +106,7 @@ export default function App() {
           账户总览
           <span className="count">{accounts.length || ""}</span>
         </button>
-        <button data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconWallet size={16}/>我的使用</button>
+        <button data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconChart size={17}/>我的使用</button>
         <button data-motion-active={view === "models"}
           className={`nav-item${view === "models" ? " active" : ""}`}
           onClick={() => setView("models")}
@@ -116,9 +116,9 @@ export default function App() {
           <span className="count">{modelCount || ""}</span>
         </button>
         <button data-motion-active={view === "ladder"} className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
-          <IconLayers size={16} />AI 模型天梯
+          <IconSpark size={17} />AI 模型天梯
         </button>
-        <button data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconLayers size={16}/>Token 活动</button>
+        <button data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/>Token 活动</button>
         <button data-motion-active={view === "settings"}
           className={`nav-item${view === "settings" ? " active" : ""}`}
           onClick={() => setView("settings")}
@@ -126,7 +126,7 @@ export default function App() {
           <IconGear size={16} />
           设置
         </button>
-        </div>
+        </nav>
 
         <div className="sidebar-foot">
           {lowCount > 0 ? (

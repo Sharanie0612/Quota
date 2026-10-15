@@ -221,8 +221,6 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     {options && <section className="card activity-settings">
       <h3>本机采集设置</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
-      <p className="hint">采集频率和账户跨设备同步在「设置」调整。</p>
-      <p className="hint">跨设备同步统一在「设置」中管理。</p>
       {(data?.errors.length || syncError) ? <details className="activity-error-details"><summary>最近采集详情</summary><ul>{[...new Set([...(data?.errors ?? []), ...(syncError ? [syncError] : [])])].map(message => <li key={message}>{message}</li>)}</ul></details> : null}
       <Field label="Trae 本机用量" hint="首次连接需打开 Trae 或 Trae SOLO，之后可离线读取历史。只保存用量指标。">
         <Button disabled={!!busy || connectingTrae} onClick={() => void connectTrae()}>{options.traeEnabled ? "断开 Trae" : "连接本机 Trae"}</Button>

@@ -84,6 +84,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   useEffect(() => { setSelection(null); }, [query]);
   const [options, setOptions] = useState<ActivityOptions | null>(null);
   const [detail, setDetail] = useState("models");
+  useEffect(()=>{setDetail(model==="vendor:trae"||model.startsWith("channel:")||source==="trae"?"channels":"models");},[model,source]);
   const [connectingTrae, setConnectingTrae] = useState(false);
   const [busy, setBusy] = useState<"collect" | "save" | null>(null);
   const [loading, setLoading] = useState(true);
@@ -200,7 +201,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const channelRows = (detailData?.channels ?? []).map(row => ({ ...row, key: activityChannelName(row.key) || "未鉴别" }));
   const detailOptions = [{ value: "models", label: "模型" }, { value: "tools", label: "工具" }, { value: "agents", label: "Agent" }, { value: "devices", label: "设备" },
     ...(channelRows.length ? [{ value: "channels", label: "Trae 通道" }] : [])];
-  const rows = detail === "models" ? detailData?.models ?? [] : detail === "tools" ? detailData?.tools ?? []
+  const rows = detail === "models" ? (detailData?.models ?? []).filter(row=>!activityModelChannel(row.key)) : detail === "tools" ? detailData?.tools ?? []
     : detail === "agents" ? detailData?.agents ?? [] : detail === "channels" ? channelRows
     : (detailData?.byDevice ?? []).map(row => ({ ...row, key: data?.devices.find(d => d.id === row.key)?.name ?? row.key }));
   const status = !data ? loading ? "正在读取统计…" : readError ? "统计读取失败" : "暂无统计"

@@ -2,7 +2,7 @@ import type { ActivityGroup } from "./types";
 
 /** Model rows carry the usage channel after a unit separator that model names cannot contain. */
 const separator = "\u001f";
-const channelNames: Record<string, string> = { trae: "Trae 提供", api: "API 接入", unknown: "未鉴别" };
+const channelNames: Record<string, string> = { trae: "Trae 提供", api: "API 接入 Trae", unknown: "未鉴别" };
 
 /** Display name of a model row, without its channel suffix. */
 export function activityModelName(key: string) { return key.split(separator)[0]; }
@@ -38,14 +38,14 @@ export function activityModelChoices(rows: ActivityGroup[], search: string) {
 /** Channels present in the given rows, in a stable order. */
 export function activityChannels(rows: ActivityGroup[]) {
   const present = new Set(rows.map(row => activityModelChannel(row.key)).filter(Boolean));
-  return (["trae", "api"] as const).filter(channel => present.has(channel));
+  return (["trae", "api", "unknown"] as const).filter(channel => present.has(channel));
 }
 
 /** Readable label for the current model/channel/vendor filter value. */
 export function activityFilterLabel(value: string) {
   if (!value) return "";
   if (value.startsWith("channel:")) return activityChannelName(value.slice(8)) || "Trae 用量通道";
-  if (value.startsWith("vendor:")) return "供应商汇总";
+  if (value.startsWith("vendor:")) return value === "vendor:trae" ? "Trae" : "供应商汇总";
   const channel = activityChannelName(activityModelChannel(value));
   return channel ? `${activityModelName(value)} · ${channel}` : activityModelName(value);
 }

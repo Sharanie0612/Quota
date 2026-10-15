@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ActivityGroup } from "../lib/types";
 import { metricValue, periodLabel, emptyTokens, smoothUsagePath, bucketUsage, heatLevel, parseDay, usageCalendar, periodRange, type ActivityMetric, type ActivityRange, type TimeScale } from "../lib/activityCharts";
 import "./activity-charts.css";
+import { activityFilterLabel } from "../lib/activityModels";
 
 const number = (n: number) => new Intl.NumberFormat("zh-CN").format(n);
 const compact = (n: number) => new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -35,7 +36,7 @@ export function ActivityCharts({ rows, hourly, format, days, model, metric, setM
   const offset = calendar.length ? (parseDay(calendar[0].key)!.getDay() + 6) % 7 : 0;
   const activeDays = calendar.filter(day => day.tokens.total > 0).length;
   const vendorNames:Record<string,string>={custom:"OpenAI",deepseek:"DeepSeek",zhipu:"智谱 GLM",moonshot:"Kimi",mimo:"小米 MiMo",anthropic:"Anthropic",google:"Google",alibaba:"Alibaba",unknown:"其他"};
-  const label = model.startsWith("vendor:") ? `${vendorNames[model.slice(7)] ?? "供应商"} · 全部模型` : model || "全部模型";
+  const label = model==="vendor:trae" ? "Trae · 全部用量" : model.startsWith("channel:") ? activityFilterLabel(model) : model.startsWith("vendor:") ? `${vendorNames[model.slice(7)] ?? "供应商"} · 全部模型` : model || "全部模型";
   return <>
     <section className="card usage-trend">
       <div className="usage-heading"><div><h3>{label} · {metricLabel}趋势</h3><p className="hint">{isHourly ? "每小时用量" : scale === "overview" || scale === "day" ? "每日用量" : scale === "week" ? "每周用量" : "每月用量"} · Token</p></div><div className="ladder-filters"><select className="select" aria-label="趋势指标" value={metric} onChange={e=>setMetric(e.target.value as typeof metric)}><option value="total">总 Token</option><option value="input">输入 Token</option><option value="output">输出 Token</option><option value="cached">缓存命中</option><option value="uncached">未命中输入</option></select><select className="select" aria-label="趋势量程" value={scale} onChange={e=>{const next=e.target.value as TimeScale|"overview";setScale(next);setPeriod("");setHover("");const day=last(hourDates.filter(d=>d.recorded))??last(hourDates);onRange(next==="day"&&day?{from:day.key,to:day.key}:null);}}><option value="overview">总览</option><option value="day">按日</option><option value="week">按周</option><option value="month">按月</option></select></div></div>

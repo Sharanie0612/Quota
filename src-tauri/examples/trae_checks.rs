@@ -124,7 +124,7 @@ fn fixture() {
     // undetermined instead of being claimed as either side.
     assert!(has(&report(), "glm-5.3", "trae"));
     assert!(has(&report(), "deepseek-v4-pro", "api"));
-    assert!(has(&report(), "GLM-5.3-Flash", ""));
+    assert!(has(&report(), "GLM-5.3-Flash", "unknown"));
     let channels = report().channels;
     assert_eq!(channels.len(), 3);
     let total = |channels: &[activity::Group], key: &str| channels.iter().find(|row| row.key == key).map_or(0, |row| row.tokens.total);

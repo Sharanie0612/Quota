@@ -781,7 +781,7 @@
           const row=(key,f=1)=>({key,tokens:Object.fromEntries(Object.entries(tokens).map(([k,v])=>[k,Math.round(v*f*factor)])),calls:Math.round(326*f*factor),sessions:Math.round(38*f*factor)});
           const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source && args.source!=="without-trae" ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("kimi-k2.6",.1)];
           const vendorOf={"gpt-6.1-sol":"vendor:custom","GLM-5.3":"vendor:zhipu","deepseek-flash":"vendor:deepseek","kimi-k2.6":"vendor:moonshot"};
-          const models = args.model ? availableModels.filter(model => model.key === args.model || vendorOf[model.key] === args.model || (args.model === "channel:api" && model.key.endsWith("\u001fapi")) || (args.model === "channel:trae" && model.key.endsWith("\u001ftrae"))) : availableModels;
+          const models = args.model ? availableModels.filter(model => (args.model === "vendor:trae" && model.key.includes("\u001f")) || model.key === args.model || vendorOf[model.key] === args.model || (args.model === "channel:api" && model.key.endsWith("\u001fapi")) || (args.model === "channel:trae" && model.key.endsWith("\u001ftrae"))) : availableModels;
           const selectedFactor = !args.model ? 1 : models.length ? (args.source && args.source!=="without-trae" ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.5,"GLM-5.3":.25,"deepseek-flash":.15,"kimi-k2.6":.1})[row.key],0)) : 0;
           const selectedRow=(key,f=1)=>row(key,f*selectedFactor);
           let totals=selectedRow("全部");

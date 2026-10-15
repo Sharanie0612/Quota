@@ -4,7 +4,7 @@ html:has(.usage-widget),body:has(.usage-widget),body:has(.usage-widget) #root { 
 .widget-handle { width:22px; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:9px; border:1px solid var(--border); border-right:0; border-radius:16px 0 0 16px; background:var(--surface); color:var(--text-2); font-size:10px; padding:0; cursor:pointer; }
 .side-left .widget-handle { border-radius:0 16px 16px 0; border-left:0; border-right:1px solid var(--border); }
 .widget-handle-dot { width:5px; height:5px; border-radius:50%; background:var(--blue); box-shadow:0 0 0 3px var(--blue-soft); }
-.widget-panel { width:calc(100% - 12px); height:calc(100% - 16px); margin:8px 0 8px 12px; border:1px solid var(--border); border-radius:26px 0 0 26px; background:var(--surface); padding:17px 20px; box-shadow:var(--shadow-card); animation:widget-reveal 260ms var(--motion-ease) both; }
+.widget-panel { width:calc(100% - 12px); height:calc(100% - 16px); margin:8px 0 8px 12px; border:1px solid var(--border); border-radius:26px 0 0 26px; background:var(--surface); padding:17px 20px; box-shadow:var(--shadow-card); }
 .side-left .widget-panel { margin:8px 12px 8px 0; border-radius:0 26px 26px 0; }
 .widget-heading { display:flex; gap:9px; align-items:center; font-size:12px; font-weight:600; }
 .widget-orbit { display:grid; place-items:center; position:relative; width:30px; height:30px; border-radius:11px; background:var(--blue-soft); color:var(--blue); font-size:20px; line-height:1; }
@@ -17,7 +17,17 @@ html:has(.usage-widget),body:has(.usage-widget),body:has(.usage-widget) #root { 
 .widget-value strong { display:block; font-size:34px; font-weight:600; letter-spacing:-.045em; line-height:1.25; font-variant-numeric:tabular-nums; color:var(--text); animation:view-arrive 220ms var(--motion-ease) both; }
 .widget-status { margin-top:4px; color:var(--text-3); font-size:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .widget-status.has-error { color:var(--amber); }
-@keyframes widget-reveal { from { opacity:0; transform:translateX(14px) scale(.98); } }
-.side-left .widget-panel { animation-name:widget-reveal-left; }
-@keyframes widget-reveal-left { from { opacity:0; transform:translateX(-14px) scale(.98); } }
 @keyframes widget-breathe { 50% { opacity:.45; transform:scale(.8); } }
+
+/* Animate out before shrinking the native hit area. */
+.usage-widget { position:relative; }
+.widget-handle { position:absolute; right:0; top:50%; height:100px; transform:translateY(-50%); transition:opacity 180ms ease,transform 260ms var(--motion-ease); }
+.side-left .widget-handle { right:auto; left:0; }
+.is-expanded .widget-handle { opacity:0; pointer-events:none; transform:translateY(-50%) scale(.9); }
+.widget-panel { position:absolute; right:0; top:50%; width:280px; height:170px; margin:0; opacity:0; transform:translate(24px,-50%) scale(.96); transform-origin:right center; pointer-events:none; animation:none; transition:opacity 180ms ease,transform 260ms var(--motion-ease); }
+.side-left .widget-panel { left:0; right:auto; margin:0; animation:none; transform:translate(-24px,-50%) scale(.96); transform-origin:left center; }
+.is-expanded .widget-panel { opacity:1; transform:translate(0,-50%) scale(1); pointer-events:auto; }
+.widget-value strong { letter-spacing:-.035em; }
+@media (prefers-reduced-motion:reduce) { .widget-panel,.widget-handle { transition:none; } }
+
+.widget-number-unit { margin-left:3px; font-size:21px; letter-spacing:0; font-weight:500; }

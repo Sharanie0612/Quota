@@ -74,6 +74,8 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 
 最新[产品界面优化](docs/product-polish-1.0.1900.md)进一步统一圆角、留白和浅深色层次，精简重复说明，并修复筛选恢复、更新失败及误操作问题。
 
+新增[贴边用量悬浮窗与启动动效](docs/usage-widget-1.0.1900.md)：鼠标移入查看今日 Token，点击切换累计用量；设置可调整左右侧和位置。
+
 安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
 
 ## 界面预览

@@ -26,6 +26,8 @@ export const IconPlus = (p: P) => (
     <path d="M12 5v14M5 12h14" />
   </Base>
 );
+export const IconGrid = (p:P) => <Base {...p}><rect x="4" y="4" width="6" height="6" rx="1.8"/><rect x="14" y="4" width="6" height="6" rx="1.8"/><rect x="4" y="14" width="6" height="6" rx="1.8"/><rect x="14" y="14" width="6" height="6" rx="1.8"/></Base>;
+export const IconArrowUpRight = (p:P) => <Base {...p}><path d="M6 18 18 6M7 6h11v11"/></Base>;
 
 export const IconRefresh = (p: P) => (
   <Base {...p}>

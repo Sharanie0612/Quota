@@ -3,6 +3,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Modal, Notice, Seg, Switch } from "../components/ui";
 import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
+import { UsageWidgetSettings } from '../components/UsageWidgetSettings';
 
 import { DataImportPanel } from "../components/DataImportPanel";
 import { api, copyText, errText } from "../lib/api";
@@ -132,6 +133,7 @@ export function SettingsView({
   return (
     <div className="content-inner settings-page">
       <CrossDeviceSyncPanel />
+      <UsageWidgetSettings />
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
         <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>

@@ -10,8 +10,8 @@ import type { AccountTrend, AccountView, HistoryPoint } from "../lib/types";
 import { ProviderLogo } from "./logos";
 import {
   IconAlert,
-  IconExternal,
-  IconLayers,
+  IconArrowUpRight,
+  IconGrid,
   IconPencil,
   IconPlus,
   IconRefresh,
@@ -254,10 +254,10 @@ export function AccountCard({
       <div className="card-foot">
         <span className="meta">更新于 {timeAgo(account.status.lastChecked)}{balance?.source === "manual" ? isPlan ? " · 手动额度" : " · 手动余额" : ""}</span>
         <div className="account-actions">
-          {!isPlan && account.provider !== "mimo" && <Button size="sm" onClick={onShowModels}><IconLayers size={13}/>模型</Button>}
-          <Button size="sm" disabled={busy} onClick={onRefresh}><IconRefresh size={13} className={busy ? "spin" : ""}/>{busy ? "刷新中" : "刷新"}</Button>
-          <Button size="sm" onClick={onEdit}><IconPencil size={13}/>编辑</Button>
-          <Button size="sm" variant="primary" disabled={!account.effectiveRechargeUrl} onClick={() => void openUrl(account.effectiveRechargeUrl,isPlan ? "订阅" : "充值")}><IconExternal size={13}/>{isPlan ? "管理订阅" : "充值"}</Button>
+          {!isPlan && account.provider !== "mimo" && <Button size="sm" onClick={onShowModels}><IconGrid size={16}/>模型</Button>}
+          <Button size="sm" disabled={busy} onClick={onRefresh}><IconRefresh size={16} className={busy ? "spin" : ""}/>{busy ? "刷新中" : "刷新"}</Button>
+          <Button size="sm" onClick={onEdit}><IconPencil size={16}/>编辑</Button>
+          <Button size="sm" variant="primary" disabled={!account.effectiveRechargeUrl} onClick={() => void openUrl(account.effectiveRechargeUrl,isPlan ? "订阅" : "充值")}><IconArrowUpRight size={16}/>{isPlan ? "管理订阅" : "充值"}</Button>
         </div>
       </div>
     </div>

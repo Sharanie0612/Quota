@@ -29,6 +29,7 @@ mod refresh;
 mod secrets;
 mod storage;
 mod tray;
+pub mod widget;
 
 // 暴露给 examples/：本机跑不了 cargo test，用 example 真正执行解析与网络查询
 pub use catalog::{cards_for_account, comparison_entries, embedded_file, hidden_keys, is_hidden, merge_cards, normalize};
@@ -70,10 +71,12 @@ pub fn run() {
             connections::set_app_handle(app.handle().clone());
             app.manage(state);
             tray::setup(app.handle())?;
+            widget::setup(app.handle())?;
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
             activity::spawn(app.handle().clone());
             account_sync::spawn(app.handle().clone());
+            widget::smoke_if_requested(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -89,13 +92,23 @@ pub fn run() {
                         if close_to_tray {
                             api.prevent_close();
                             let _ = window.hide();
+                        } else {
+                            window.app_handle().exit(0);
                         }
+                    } else if window.label() == widget::LABEL {
+                        api.prevent_close();
+                        let _ = window.hide();
                     }
                 }
                 _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
+            widget::get_widget_options,
+            widget::save_widget_options,
+            widget::get_widget_usage,
+            widget::widget_ready,
+            widget::set_widget_expanded,
             exchange::get_exchange_rate,
             usage_fx::get_monthly_usage_fx,
             usage_fx::save_monthly_usage_fx,

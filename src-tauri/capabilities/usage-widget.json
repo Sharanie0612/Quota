@@ -1,0 +1,6 @@
+{
+  "identifier": "usage-widget",
+  "description": "本机用量悬浮窗，仅需默认事件能力，无凭据或第三方网页权限",
+  "windows": ["usage-widget"],
+  "permissions": ["core:event:default"]
+}

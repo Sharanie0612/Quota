@@ -13,6 +13,16 @@ fn put(id:&str, value:serde_json::Value) { keyring::Entry::new("Quota",id).unwra
 fn main() {
     let memory=memory_keyring::MemoryKeyring::default();keyring::set_default_credential_builder(Box::new(memory.clone()));
     let root=std::env::temp_dir().join(format!("quota-connection-check-{}",uuid::Uuid::new_v4()));
+    let expired=account();let peer=account();let unrelated=account();
+    let session=uuid::Uuid::new_v4().to_string();
+    put(&expired.id,json!({"mimoSession":session}));put(&peer.id,json!({"mimoSession":session}));
+    put(&unrelated.id,json!({"consoleCookie":"UNRELATED","mimoSession":uuid::Uuid::new_v4().to_string()}));
+    let same_session=state(&root.join("expired-peers"),vec![expired.clone(),peer.clone(),unrelated.clone()]);
+    quota_lib::update_mimo_cookie(&same_session,&expired.id,"RENEWED").unwrap();
+    assert_eq!(get_secrets(&peer.id).unwrap().console_cookie.as_deref(),Some("RENEWED"));
+    assert_eq!(get_secrets(&unrelated.id).unwrap().console_cookie.as_deref(),Some("UNRELATED"));
+    assert_eq!(get_secrets(&peer.id).unwrap().mimo_session.as_deref(),Some(session.as_str()));
+    println!("PASS same saved SSO session renews both expired cards even without old flat cookies; unrelated logins remain unchanged");
     let a=account();let mut b=account();b.base_url=None;b.balance_mode=Some("auto".into());
     let blob=json!({"apiKey":"SYNTHETIC-KEY","adminKey":"SYNTHETIC-ADMIN","accessKeyId":"SYNTHETIC-ID","accessKeySecret":"SYNTHETIC-SECRET","consoleCookie":"SYNTHETIC-COOKIE","subscriptionAccount":"SYNTHETIC-ACCOUNT"});
     put(&a.id,blob.clone());let st=state(&root.join("inherit"),vec![a.clone(),b.clone()]);

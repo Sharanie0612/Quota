@@ -1,5 +1,11 @@
 //! Navigation policy shared by the Xiaomi login view and its popup requests.
 
+/// Same first-party SSO entry used by the console's login button. Loading the
+/// homepage alone uses skipAuthRedirect and cannot renew expired API cookies.
+pub fn entry_url() -> &'static str {
+    "https://platform.xiaomimimo.com/api/v1/genLoginUrl?currentPath=%2F"
+}
+
 pub fn allows_navigation(url: &tauri::Url) -> bool {
     url.scheme() == "https"
         && url.port_or_known_default() == Some(443)

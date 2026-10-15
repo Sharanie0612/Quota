@@ -2,6 +2,13 @@
 mod mimo_login;
 
 fn main() {
+    let entry:tauri::Url=mimo_login::entry_url().parse().unwrap();
+    assert!(mimo_login::allows_navigation(&entry));
+    assert_eq!(entry.host_str(),Some("platform.xiaomimimo.com"));
+    assert_eq!(entry.path(),"/api/v1/genLoginUrl");
+    assert_eq!(entry.query_pairs().collect::<Vec<_>>(),vec![("currentPath".into(),"/".into())]);
+    assert!(quota_lib::parse_balance("{\"code\":\"401\"}").unwrap_err().contains("小米登录已过期"));
+    assert!(quota_lib::parse_token_plan_usage("{\"code\":401}").unwrap_err().contains("小米登录已过期"));
     for url in [
         "https://platform.xiaomimimo.com/",
         "https://account.xiaomi.com/pass/serviceLogin?sid=api-platform",

@@ -15,6 +15,7 @@ import { LadderView } from "./views/LadderView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
+import { WindowControls } from "./components/WindowControls";
 import appIcon from "../src-tauri/icons/128x128.png";
 
 type View = "accounts" | "models" | "ladder" | "activity" | "costs" | "settings";
@@ -84,8 +85,10 @@ export default function App() {
 
   return (
     <div className="app">
+      <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
+      <WindowControls/>
       <aside className="sidebar">
-        <div className="brand">
+        <div className="brand" data-tauri-drag-region>
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
             <span className="brand-title">Quota</span>
@@ -136,10 +139,11 @@ export default function App() {
       </aside>
 
       <main className="main">
-        <div className="topbar">
-          <h1>{title}</h1>
-          <span className="sub">{sub}</span>
-          <div className="spacer" />
+        <div className="content" ref={contentRef}>
+          <div className="view-transition" key={view}>
+        <header className="page-heading content-inner">
+          <div className="page-heading-text"><h1>{title}</h1><p>{sub}</p></div>
+          <div className="page-actions">
           {view === "accounts" || view === "models" ? (
             <Button
               size="sm"
@@ -154,10 +158,8 @@ export default function App() {
             <IconPlus size={13} />
             添加账户
           </Button> : null}
-        </div>
-
-        <div className="content" ref={contentRef}>
-          <div className="view-transition" key={view}>
+          </div>
+        </header>
           {info?.storageIssues?.length ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
               <Notice tone="error" actions={<Button size="sm" onClick={() => setView("settings")}>查看配置目录</Button>}>

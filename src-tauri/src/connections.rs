@@ -102,13 +102,16 @@ pub fn update_mimo_connection(
         .accounts
         .clone();
     let old_cookie = crate::secrets::get_console_cookie(account_id);
+    let old_session = crate::secrets::get_secrets(account_id)?.mimo_session;
     let mut ids = vec![account_id.to_string()];
-    if let Some(old) = old_cookie.filter(|value| !value.is_empty()) {
+    if old_cookie.is_some() || old_session.is_some() {
         for account in accounts
             .iter()
             .filter(|a| a.id != account_id && matches!(a.provider.as_str(), "mimo" | "mimo-plan"))
         {
-            if crate::secrets::get_console_cookie(&account.id).as_deref() == Some(old.as_str()) {
+            let peer = crate::secrets::get_secrets(&account.id)?;
+            if old_cookie.as_ref().is_some_and(|old| !old.is_empty() && peer.console_cookie.as_ref() == Some(old))
+                || old_session.as_ref().is_some_and(|reference| peer.mimo_session.as_ref() == Some(reference)) {
                 ids.push(account.id.clone());
             }
         }
@@ -203,7 +206,7 @@ async fn open_login_window(
             }
             if window
                 .navigate(
-                    "https://platform.xiaomimimo.com/"
+                    mimo_login::entry_url()
                         .parse()
                         .map_err(|_| "无法打开登录页")?,
                 )
@@ -402,20 +405,22 @@ pub async fn query_mimo(
             .map_err(|_| "小米连接状态不可用")?;
         if attempts
             .get(id)
-            .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(1800))
+            .is_some_and(|at| at.elapsed() < std::time::Duration::from_secs(60))
         {
-            return result;
+            return Err("小米会话正在等待自动续接，请一分钟后重试；已保存的登录信息仍保留".into());
         }
         attempts.insert(id.into(), std::time::Instant::now());
     }
     let label = format!("mimo-recover-{}", uuid::Uuid::new_v4());
     let window = open_login_window(app, &label, false, Some(payload)).await?;
-    let recovered = tokio::time::timeout(std::time::Duration::from_secs(20), async {
-        for attempt in 0..12 {
+    let recovered = tokio::time::timeout(std::time::Duration::from_secs(45), async {
+        let mut last_error = None;
+        for attempt in 0..24 {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             if attempt % 3 != 2 {
                 continue;
             }
+            if window.url().map_err(|_| "无法读取小米会话状态")?.host_str() != Some("platform.xiaomimimo.com") { continue; }
             let cookies = window
                 .cookies_for_url(
                     "https://platform.xiaomimimo.com/api/v1/balance"
@@ -432,23 +437,26 @@ pub async fn query_mimo(
                 .collect::<Vec<_>>()
                 .join("; ");
             let mut updates = vec![];
-            if let Ok(balance) =
-                crate::mimo::fetch_console_tracked(&state.http, &mut cookie, &mut updates, provider)
-                    .await
-            {
+            let authenticated = crate::mimo::validate_login_tracked(&state.http, &mut cookie, &mut updates).await;
+            if matches!(authenticated, Ok(true)) {
                 let payload =
                     crate::mimo_session::encode(window.cookies().map_err(|_| "无法读取小米会话")?)?;
                 let payload = crate::mimo_session::update(Some(&payload), &updates)?;
                 crate::secrets::save_mimo_session(id, &payload)?;
                 let session = crate::secrets::get_secrets(id)?.mimo_session;
                 update_mimo_connection(state, id, &cookie, session.as_deref())?;
-                return Ok(balance);
+                return Ok(());
             }
+            if let Err(error) = authenticated { last_error = Some(error); }
         }
-        Err("小米登录已过期，自动恢复未成功；请编辑账户并重新登录".into())
+        Err(last_error.unwrap_or_else(|| "小米官方会话需要重新验证，请编辑账户并连接官网；已保存的会话仍保留".into()))
     })
     .await
-    .unwrap_or_else(|_| Err("小米登录已过期，自动恢复超时；请编辑账户并重新登录".into()));
+    .unwrap_or_else(|_| Err("小米会话自动续接超时，已保存的登录信息仍保留，请稍后重试".into()));
     let _ = window.close();
-    recovered
+    recovered?;
+    state.mimo_recovery_attempts.lock().map_err(|_| "小米连接状态不可用")?.remove(id);
+    // Authentication has already been durably saved. A plan outage or absent
+    // subscription must not discard a successfully renewed SSO session.
+    query_and_save(state, id, provider).await
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
-import { Button, Notice, Seg, Switch } from "../components/ui";
+import { Button, Modal, Notice, Seg, Switch } from "../components/ui";
 import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
 
 import { DataImportPanel } from "../components/DataImportPanel";
@@ -46,6 +46,8 @@ export function SettingsView({
   const [activity, setActivity] = useState<ActivityOptions | null>(null);
   const [activityBusy, setActivityBusy] = useState(false);
   const [activityError, setActivityError] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
   useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
   const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
     if (!activity || activityBusy) return false;
@@ -128,24 +130,22 @@ export function SettingsView({
     && Number(intervalValue) >= 1 && Number(intervalValue) <= 1440;
 
   return (
-    <div className="content-inner" style={{ maxWidth: 760 }}>
+    <div className="content-inner settings-page">
       <CrossDeviceSyncPanel />
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
-        <p>从本地日志增量采集用量，采集完成后自动更新图表。</p>
-        <div className="setting-row"><div className="txt"><b>自动采集</b><span>仅在 Quota 运行时执行；关闭后可在 Token 活动页手动采集</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
-        <div className="setting-row"><div className="txt"><b>采集频率</b><span>默认 30 秒；Token 共享交换最低间隔 5 分钟</span></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
+        <div className="setting-row"><div className="txt"><b>采集频率</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
         {activityError && <Notice tone="warn">{activityError}</Notice>}
       </div>
       <div className="card section">
         <h2>
           <IconClock size={14} /> 余额刷新
         </h2>
-        <p>自动同步余额与额度。</p>
         <div className="setting-row">
           <div className="txt">
             <b>自动刷新</b>
-            <span>启动时更新一次；关闭后续定时刷新后，可手动刷新</span>
+            <span>启动时始终刷新一次</span>
           </div>
           <Switch
             checked={settings.autoRefresh}
@@ -156,7 +156,6 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>刷新间隔</b>
-            <span>余额变动不频繁的话，30 分钟到 1 小时足够</span>
           </div>
           <Seg
             value={isPreset ? String(settings.refreshIntervalMinutes) : "custom"}
@@ -175,7 +174,7 @@ export function SettingsView({
           <div className="setting-row">
             <div className="txt">
               <b>自定义间隔（分钟）</b>
-              <span>{validInterval ? "范围 1–1440，整数；有效值自动保存" : "请输入 1–1440 的整数，当前输入未保存"}</span>
+              <span>{validInterval ? "1–1440 分钟" : "请输入 1–1440 的整数"}</span>
             </div>
             <input
               className="input"
@@ -200,7 +199,6 @@ export function SettingsView({
         <h2>
           <IconSpark size={14} /> 余额与额度提醒
         </h2>
-        <p>选择需要的提醒。</p>
         <div className="setting-row">
           <div className="txt">
             <b>发送系统通知</b>
@@ -257,7 +255,6 @@ export function SettingsView({
         <h2>
           <IconSpark size={14} /> 模型资料库
         </h2>
-        <p>查看官方价格，核对后保存到本机。</p>
         <div className="setting-row">
           <div className="txt">
             <b>恢复内置资料</b>
@@ -265,14 +262,7 @@ export function SettingsView({
           </div>
           <Button
             size="sm"
-            onClick={async () => {
-              try {
-                await api.resetCatalog();
-                toast("已恢复内置模型资料");
-              } catch {
-                toast("恢复失败", "error");
-              }
-            }}
+            onClick={() => setConfirmReset(true)}
           >
             恢复
           </Button>
@@ -283,12 +273,11 @@ export function SettingsView({
         <h2>
           <IconGear size={14} /> 备份与迁移
         </h2>
-        <p>统一导出与导入账户、余额历史、设置、模型资料及 Token 活动。</p>
         {dataExport && <Notice><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
         <div className="setting-row">
           <div className="txt">
             <b>导出备份</b>
-            <span>默认不含登录信息；可选择加密保存密钥与小米连接</span>
+            <span>默认不含登录信息</span>
           </div>
           <Button
             size="sm"
@@ -303,7 +292,7 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>导入数据 / 迁移账户</b>
-            <span>先读取普通 JSON 或加密备份，再勾选账户、登录信息及其他内容；未选内容保留</span>
+            <span>选择需要恢复的内容，未选内容保留</span>
           </div>
           <Button
             size="sm"
@@ -368,7 +357,6 @@ export function SettingsView({
         <div className="setting-row">
           <div className="txt">
             <b>配置文件目录</b>
-            <span>账户信息与设置保存在这里，可直接备份</span>
             <div className="mono" style={{ marginTop: 6 }}>
               {info?.configDir ?? "读取中…"}
             </div>
@@ -394,6 +382,10 @@ export function SettingsView({
         </div>
       </div>
 
+      {confirmReset && <Modal title="恢复内置模型资料？" onClose={() => { if (!resetting) setConfirmReset(false); }} footer={<><Button disabled={resetting} onClick={() => setConfirmReset(false)}>取消</Button><Button variant="danger" disabled={resetting} onClick={() => {
+        setResetting(true);
+        void api.resetCatalog().then(() => {setConfirmReset(false);toast('已恢复内置模型资料');}).catch(e => toast(errText(e), 'error')).finally(() => setResetting(false));
+      }}>{resetting ? '恢复中…' : '恢复内置资料'}</Button></>}><p>你对模型资料的本地修改将被清除。</p></Modal>}
     </div>
   );
 }

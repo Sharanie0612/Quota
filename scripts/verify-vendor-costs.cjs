@@ -2,7 +2,7 @@ const fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),a
 const modules=new Map();
 function load(file){if(modules.has(file))return modules.get(file);const output={};modules.set(file,output);const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;new Function('exports','require',js)(output,name=>load(path.resolve(path.dirname(file),name+'.ts')));return output;}
 const {vendorRows,endOfSubscription,effectiveVendorPrice,modelFamilies,expensePortions}=load(path.resolve('src/lib/vendorCosts.ts'));
-const {monthRange,shiftMonth}=load(path.resolve('src/lib/usageMonths.ts'));
+const {monthRange,shiftMonth,restoreUsageRange}=load(path.resolve('src/lib/usageMonths.ts'));
 assert.deepEqual(monthRange('2024-02'),{from:'2024-02-01',to:'2024-02-29'});
 assert.deepEqual(monthRange('2026-02'),{from:'2026-02-01',to:'2026-02-28'});
 assert.equal(shiftMonth('2026-01',-1),'2025-12');
@@ -12,6 +12,15 @@ assert.equal(shiftMonth('9999-12',1),null);
 assert.equal(monthRange('2026-13'),null);
 assert.equal(monthRange(''),null);
 console.log('PASS monthly filtering: calendar/leap-year boundaries, year navigation, invalid and bounded months');
+const now=new Date(2026,9,15);
+const restored=value=>restoreUsageRange(JSON.stringify(value),now);
+assert.deepEqual(restored({mode:'all'}),{from:'1900-01-01',to:'9999-12-31',mode:'all'});
+assert.deepEqual(restored({mode:'custom',from:'2024-02-29',to:'2024-03-02'}),{from:'2024-02-29',to:'2024-03-02',mode:'custom'});
+assert.deepEqual(restored({mode:'month',from:'2026-09-15'}),{from:'2026-09-01',to:'2026-09-30',mode:'month'});
+for(const value of [{mode:'custom',from:'2026-02-29',to:'2026-03-01'},{mode:'custom',from:'2026-10-20',to:'2026-10-10'},{mode:'custom',from:12,to:null},{mode:'invalid'},null])
+  assert.deepEqual(restored(value),{from:'2026-10-01',to:'2026-10-31',mode:'month'});
+assert.equal(restoreUsageRange('malformed',now).mode,'month');
+console.log('PASS applied month/all/custom usage filters survive re-entry; corrupt preferences and impossible dates recover safely');
 const row=(key,total)=>({key,tokens:{input:total*.8,output:total*.2,total,cached:total*.4,reasoning:total*.1,cacheWrite:0},calls:0,sessions:1});
 const models=[row('gpt-6.1-sol-high',700000),row('gpt-6.1-sol-low',300000),row('gpt-6-sol',1000000),row('glm-5.3',1000000)];
 const report={accounts:[],plans:[],expenses:[{vendor:'custom',from:'2026-10-01',to:'2026-10-31',currency:'USD',subscription:20,usage:5,planId:null}],coveredModels:{custom:models.slice(0,2),'custom:USD':models.slice(0,2),'custom:CNY':[row('gpt-6.1-sol',500000)]}};

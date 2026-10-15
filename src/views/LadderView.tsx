@@ -67,7 +67,7 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   const refresh = useCallback(async (force: boolean) => {
     setBusy(true);
     try { setData(await api.refreshLadder(force)); setError(null); }
-    catch { setError("更新失败，继续显示已有数据"); }
+    catch { setError("更新失败，请稍后重试"); }
     finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -99,7 +99,7 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   useEffect(() => { setSelected(current => current.map(id => entries.some(e => e.id === id) ? id : "")); }, [entries]);
   const compare = selected.map(id=>entries.find(e=>e.id===id)).filter((entry):entry is LadderEntry=>!!entry);
   return <div className="content-inner ladder-page">
-    <div className="ladder-hero card"><div><span className="eyebrow">AI 模型天梯</span><h2>找到适合你的模型</h2><p>十家厂商 · 能力排名 · 官方价格</p></div>
+    <div className="ladder-hero"><span className="hint">十家厂商 · 官方标准价格</span>
       <div className="ladder-sync"><span className="hint">更新于 {timeAgo(data?.updatedAt)}{autoUpdate ? " · 每日检查" : " · 手动更新"}</span><Button disabled={busy} onClick={() => void refresh(true)}><IconRefresh size={14} className={busy ? "spin" : ""} />{busy ? "更新中…" : "更新排名与价格"}</Button></div></div>
     {error || data?.error ? <Notice tone="warn" actions={<Button size="sm" onClick={() => void refresh(true)} disabled={busy}>重试</Button>}>{error ?? data?.error}</Notice> : null}
 
@@ -112,10 +112,10 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
       <select className="select" aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value)}><option value="rank">能力排名</option><option value="price">按币种 · 价格从低到高</option></select>
       <span className="hint">原厂标准价格 · 缓存价格独立</span>
     </div></details>
-    {mode === "chart" && !data && <div className="card section">读取中…</div>}
+    {mode === "chart" && !data && <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div>}
     {mode==="chart" && data && (entries.length ? <LadderChart entries={entries} domain={domain} focused={focused} onFocus={setFocused} exchange={exchange} /> : <div className="card"><EmptyState icon={<IconLayers size={24}/>} title="没有匹配的模型" desc="试试更长的推出时间范围或其他筛选条件"/></div>)}
     <div className={`ladder-layout${mode==="chart"?" chart-layout":""}`}><div className="ladder-tables" hidden={mode!=="table"}>
-      {!data ? <div className="card section">读取中…</div> : !entries.length ? <div className="card"><EmptyState icon={<IconLayers size={24} />} title="没有匹配的模型" desc="试试其他筛选条件" /></div> : tableGroups.map(group => <section className="card ladder-table-wrap" key={group.key}>
+      {!data ? <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div> : !entries.length ? <div className="card"><EmptyState icon={<IconLayers size={24} />} title="没有匹配的模型" desc="试试其他筛选条件" /></div> : tableGroups.map(group => <section className="card ladder-table-wrap" key={group.key}>
         <div className="ladder-table-heading"><h3>{group.title}</h3><span>{group.entries.length} 个模型 · 每百万 Token</span></div>
         <LadderTable entries={group.entries} domain={domain} onReview={setFocused} label={`${group.title}模型天梯`} />
       </section>)}

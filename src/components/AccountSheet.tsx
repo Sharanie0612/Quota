@@ -292,7 +292,7 @@ export function AccountSheet({
 
   return (
     <Modal
-      title={initial ? `编辑账户 · ${initial.label}` : "添加模型账户"}
+      title={initial ? `编辑账户 · ${initial.label}` : "添加账户"}
       onClose={onClose}
       wide
       footer={

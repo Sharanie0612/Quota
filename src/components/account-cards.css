@@ -4,8 +4,8 @@
 .account-group-hint { color: var(--text-2); font-size: 11px; line-height: 1.5; margin: -5px 0 12px; }
 .account-summary .stat-value { display: flex; flex-direction: column; gap: 2px; white-space: normal; overflow-wrap: anywhere; font-size: 18px; }
 .account-summary .hint { color: var(--text-2); font-size: 11px; }
-.accounts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
-.accounts-grid .account-card { padding: 16px; gap: 12px; min-width: 0; }
+.accounts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.accounts-grid .account-card { padding: 22px; gap: 18px; min-width: 0; }
 .accounts-grid .account-subscription { min-height: 310px; }
 .accounts-grid .acct-head { gap: 9px; align-items: center; }
 .accounts-grid .acct-provider { font-size: 11px; }
@@ -41,7 +41,7 @@
 .accounts-grid .card-foot { display: block; margin-top: auto; padding-top: 9px; }
 .accounts-grid .card-foot .meta { display: block; font-size: 10px; margin-bottom: 8px; }
 .account-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.account-actions .btn { min-height: 28px; padding: 4px 8px; border-radius: 8px; font-size: 11px; gap: 4px; }
+.account-actions .btn { min-height: 30px; padding: 4px 10px; border-radius: 999px; font-size: 11px; gap: 4px; }
 .account-actions .btn-primary { margin-left: auto; }
 .subscription-empty { min-height: 144px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 9px; font-size: 12px; }
 .subscription-empty span { color: var(--text-2); }

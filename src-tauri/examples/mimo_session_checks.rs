@@ -47,6 +47,26 @@ fn main() {
     let cleared = mimo_session::update(Some(&saved), &[removed]).unwrap();
     assert!(!cleared.contains("api=NEW"));
     println!("PASS rotated Set-Cookie updates query and saved session, logout removes cookie, foreign domains ignored");
+    let now = 1791000000;
+    let expiring = mimo_session::encode_at(vec![cookie("api=SHORT; Domain=platform.xiaomimimo.com; Path=/; Max-Age=60; Secure; HttpOnly")],now).unwrap();
+    assert!(!expiring.contains("Max-Age"));
+    assert_eq!(mimo_session::decode_at(&expiring,now+59).unwrap().len(),1);
+    assert!(mimo_session::decode_at(&expiring,now+60).unwrap().is_empty());
+    let restarted = mimo_session::encode_at(mimo_session::decode_at(&expiring,now+30).unwrap(),now+30).unwrap();
+    assert!(mimo_session::decode_at(&restarted,now+61).unwrap().is_empty());
+    let normalized=mimo_session::encode_at(vec![
+        cookie("sid=OLD; Domain=ACCOUNT.XIAOMI.COM; Secure; HttpOnly"),
+        cookie("sid=NEW; Domain=account.xiaomi.com; Path=/; Secure; HttpOnly"),
+    ],now).unwrap();
+    let normalized=mimo_session::decode_at(&normalized,now).unwrap();
+    assert_eq!(normalized.len(),1);assert_eq!(normalized[0].value(),"NEW");assert_eq!(normalized[0].path(),Some("/"));
+    let mut header="api=UNCHANGED".to_string();
+    let scoped=mimo_session::merge_header(&mut header,"plan=ROTATED; Path=/api/v1/tokenPlan; Secure").unwrap();
+    assert_eq!(header,"api=UNCHANGED");
+    let kept=mimo_session::update(Some(&payload),&[scoped]).unwrap();assert!(kept.contains("plan=ROTATED"));
+    let deleted=mimo_session::update(Some(&kept),&["plan=; Domain=PLATFORM.XIAOMIMIMO.COM; Path=/api/v1/tokenPlan; Expires=Thu, 01 Jan 1970 00:00:00 GMT".into()]).unwrap();
+    assert!(!deleted.contains("plan=ROTATED"));assert!(deleted.contains("sid=SYNTHETIC"));
+    println!("PASS absolute Max-Age receipt time survives restarts without extending TTL, normalized cookie identity, scoped rotation retention and expired-cookie removal without losing SSO");
     let id = uuid::Uuid::new_v4().to_string();
     let large = payload.repeat(100);
     save_mimo_session(&id, &large).unwrap();

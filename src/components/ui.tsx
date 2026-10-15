@@ -3,6 +3,7 @@ import { Children, cloneElement, isValidElement, useEffect, useId, useRef, type 
 import { IconAlert, IconInfo, IconRefresh, IconX } from "./icons";
 import { ToastStack } from "./ToastStack";
 import { useSlidingHighlight } from "../lib/useSlidingHighlight";
+import { WindowControls } from "./WindowControls";
 
 export function Button({
   children,
@@ -206,6 +207,8 @@ export function Modal({
         {footer ? <div className="modal-foot">{footer}</div> : null}
       </div>
       <ToastStack />
+      <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
+      <WindowControls/>
     </dialog>
   );
 }

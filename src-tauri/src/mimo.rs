@@ -203,6 +203,7 @@ pub fn parse_plan_detail(text: &str) -> Result<Option<PlanInfo>, String> {
 fn check_envelope(v: &Value, what: &str) -> Result<(), String> {
     let code = match v.get("code") {
         Some(Value::Number(n)) => n.as_i64().unwrap_or(-1),
+        Some(Value::String(n)) => n.parse::<i64>().unwrap_or(-1),
         _ => 0,
     };
     if code == 0 {
@@ -269,7 +270,7 @@ pub async fn validate_login_tracked(client:&reqwest::Client,cookie:&mut String,u
     let response=get_json(client,&format!("{CONSOLE_BASE}/balance"),cookie)
         .timeout(std::time::Duration::from_secs(10)).send().await
         .map_err(|e| if e.is_timeout(){"小米登录验证超时，请检查网络后重试"}else{"无法连接小米官网，请检查网络或系统代理"})?;
-    if matches!(response.status().as_u16(),401|403){return Ok(false)}
+    if matches!(response.status().as_u16(),401|302)||response.url().host_str()!=Some("platform.xiaomimimo.com"){return Ok(false)}
     if !response.status().is_success(){return Err("小米官网暂时无法验证登录，请稍后重试".into())}
     if response.url().scheme()=="https"&&response.url().host_str()==Some("platform.xiaomimimo.com") {
         for header in response.headers().get_all(reqwest::header::SET_COOKIE) {
@@ -277,11 +278,11 @@ pub async fn validate_login_tracked(client:&reqwest::Client,cookie:&mut String,u
         }
     }
     let body:Value=response.json().await.map_err(|_|"小米登录验证返回格式异常，请稍后重试")?;
-    match body.get("code").and_then(Value::as_i64){Some(0)=>Ok(true),Some(401)=>Ok(false),_=>Err("小米官网暂时无法验证登录，请稍后重试".into())}
+    match body.get("code").and_then(|v|v.as_i64().or_else(||v.as_str()?.parse().ok())){Some(0)=>Ok(true),Some(401)=>Ok(false),_=>Err("小米官网暂时无法验证登录，请稍后重试".into())}
 }
 
 async fn console_text(response:reqwest::Response)->String {
-    if response.status().as_u16()==401 {return "{\"code\":401}".into()}
+    if matches!(response.status().as_u16(),401|302) || response.url().host_str()!=Some("platform.xiaomimimo.com") {return "{\"code\":401}".into()}
     response.text().await.unwrap_or_default()
 }
 
@@ -313,6 +314,7 @@ pub async fn fetch_console_tracked(client:&reqwest::Client,cookie:&mut String,up
         Err(e) => money_err = Some(format!("请求 MiMo 余额接口失败：{e}")),
     }
 
+    if let Some(error) = money_err.as_ref().filter(|e| e.contains("小米登录已过期")) { return Err(error.clone()); }
     // 2) 套餐额度 + 本月用量
     let usage_url = format!("{CONSOLE_BASE}/tokenPlan/usage");
     let usage_text = match console_response(client, &usage_url, cookie, updates).await {

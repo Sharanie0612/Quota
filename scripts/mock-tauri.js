@@ -5,6 +5,7 @@
   let seq = 1;
   const callbacks = {};
   const eventHandlers = {};
+  let windowMaximized = false;
   const activityCase = new URLSearchParams(location.search).get("activityCase");
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
@@ -700,6 +701,15 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case "plugin:window|is_maximized": return windowMaximized;
+        case "plugin:window|toggle_maximize": {
+          windowMaximized=!windowMaximized;
+          for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='tauri://resize')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{width:1280,height:800}});
+          return null;
+        }
+        case "plugin:window|minimize":
+        case "plugin:window|close":
+        case "plugin:window|start_dragging": return null;
         case "get_vendor_costs": {
           const activity=await window.__TAURI_INTERNALS__.invoke("get_activity",{device:"",source:"without-trae",days:0,model:"",from:args.from,to:args.to});
           const expenses=window.demoVendorExpenses || [];

@@ -9,7 +9,7 @@ export const currencyTitle = (currency: string) => currency === "CNY" ? "人民�
 import { reasoningLabel } from "../lib/ladderModels";
 export { reasoningLabel } from "../lib/ladderModels";
 
-type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null };
+type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null; onShowList?:()=>void };
 function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency, highlightBrand }: Props & { metric: LadderMetric; currency: string; highlightBrand: string }) {
   const [hover, setHover] = useState<LadderEntry | null>(null);
   const points = entries.map(entry => ({ entry, cost: plotPrice(entry, metric, currency, exchange)!, score: entry.rankings[domain].score }));
@@ -34,7 +34,7 @@ function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency,
       <line x1={scale.x(value)} x2={scale.x(value)} y1={plotBounds.top} y2={plotBounds.bottom} className="scatter-grid" />
       <text x={scale.x(value)} y={plotBounds.bottom+30} textAnchor="middle" className="scatter-tick">{Number(value.toPrecision(3))}</text>
     </g>)}
-    <text x="452" y={plotBounds.bottom+65} textAnchor="middle" className="scatter-axis-title">标准未命中成本（{currency} / {metric === "total" ? "百万输入 + 百万输出 Token" : "百万 Token"}）→</text>
+    <text x="452" y={plotBounds.bottom+65} textAnchor="middle" className="scatter-axis-title">未命中成本（{currency} / {metric === "total" ? "百万输入 + 百万输出 Token" : "百万 Token"}）→</text>
     {clusters.map(group => {
       const chosen = group.find(point => point.entry.id === active?.id) ?? group.find(point => modelBrand(point.entry.name) === highlightBrand) ?? group[0];
       const { entry, cost, score } = chosen;
@@ -55,7 +55,7 @@ function Canvas({ entries, domain, focused, onFocus, exchange, metric, currency,
   </svg>
     <div className="scatter-inspector" aria-live="polite">{active ? <>
       <div className="scatter-detail"><ModelLogo name={active.name} size={22} /><b>{active.name}</b><span>{active.vendor} · {reasoningLabel(active)} · 能力 {active.rankings[domain].score.toFixed(1)} 分</span></div>
-      <div className="scatter-prices"><span>标准成本 {priceText(comparisonPrice(active, metric), active.price.currency)}</span><span>图中 {priceText(plotPrice(active, metric, currency, exchange), currency)}</span><span>{metric === "total" ? "每百万输入 + 百万输出 Token" : "每百万 Token"}</span></div>
+      <div className="scatter-prices"><span>所选价格 {priceText(comparisonPrice(active, metric), active.price.currency)}</span><span>图中 {priceText(plotPrice(active, metric, currency, exchange), currency)}</span><span>{metric === "total" ? "每百万输入 + 百万输出 Token" : "每百万 Token"}</span></div>
     </> : <span className="hint">点击模型查看详情</span>}</div>
     {active && neighbours.length > 1 && <div className="scatter-neighbours"><span className="hint">此位置附近 {neighbours.length} 个型号</span><div>{neighbours.map(({ entry, cost }) => <button key={entry.id} type="button" aria-pressed={focused?.id === entry.id} onClick={() => onFocus(entry)}><ModelLogo name={entry.name} size={18} /><span>{entry.name}</span><b>{priceText(cost, currency)}</b></button>)}</div></div>}
   </div>;
@@ -67,17 +67,18 @@ export function LadderChart(props: Props) {
   const priced = ranked.filter(entry => comparisonPrice(entry, metric) != null && entry.verifiedAt && entry.price.currency.trim());
   const effectiveEffort = ranked.some(entry => reasoningLabel(entry) === effort) ? effort : "all";
   const selected = priced.filter(entry => effectiveEffort === "all" || reasoningLabel(entry) === effectiveEffort);
-  const groups = [{ currency: chartCurrency, entries: selected.filter(entry => plotPrice(entry, metric, chartCurrency, props.exchange) != null) }];
+  const effectiveCurrency=selected.some(e=>plotPrice(e,metric,chartCurrency,props.exchange)!=null)?chartCurrency:selected.find(e=>["CNY","USD"].includes(e.price.currency))?.price.currency??chartCurrency;
+  const groups = [{ currency: effectiveCurrency, entries: selected.filter(entry => plotPrice(entry, metric, effectiveCurrency, props.exchange) != null) }];
   const omitted = props.entries.filter(entry => !groups.some(group => group.entries.some(value => value.id === entry.id)));
-  return <section className="ladder-chart-block"><div className="chart-heading"><div><h3>价格 × 性能</h3></div><div className="ladder-filters">
+  return <section className="ladder-chart-block"><div className="chart-heading"><div><h3>价格 × 性能</h3></div><details><summary>比较选项</summary><div className="ladder-filters">
     {<select className="select" aria-label="比较价格类型" value={metric} onChange={event => setMetric(event.target.value as LadderMetric)}><option value="total">输入 + 输出成本</option><option value="input">输入价格</option><option value="output">输出价格</option></select>}
     <select className="select" aria-label="推理强度" value={effectiveEffort} onChange={event => setEffort(event.target.value)}><option value="all">全部推理强度</option>{[...new Set(ranked.map(reasoningLabel))].sort().map(value => <option key={value}>{value}</option>)}</select>
-    <select className="select" aria-label="图表币种" value={chartCurrency} onChange={event=>setChartCurrency(event.target.value)}><option value="CNY">人民币</option><option value="USD">美元</option></select>
+    <select className="select" aria-label="图表币种" value={effectiveCurrency} onChange={event=>setChartCurrency(event.target.value)}><option value="CNY">人民币</option><option value="USD">美元</option></select>
 
-  </div></div>
+  </div></details></div>
     {<>
       <p className="hint" role="status">{validExchange(props.exchange) ? `1 USD = ${props.exchange.cnyPerUsd.toFixed(4)} CNY · ECB ${props.exchange.date}${props.exchange.error ? ` · ${props.exchange.error}` : ""}` : "汇率暂不可用，仅显示所选原币种；可切换人民币或美元。"}</p>
-      <div>{groups.map(group => <div className="card scatter-chart" key={group.currency}>{group.entries.length ? <Canvas {...props} entries={group.entries} currency={group.currency} metric={metric} highlightBrand={highlightBrand} /> : <p className="hint">暂无同时具备评测分与已核实价格的型号。</p>}</div>)}</div>
+      <div>{groups.map(group => <div className="card scatter-chart" key={group.currency}>{group.entries.length ? <Canvas {...props} entries={group.entries} currency={group.currency} metric={metric} highlightBrand={highlightBrand} /> : <div className="section"><h3>{ranked.length?"这个分类暂不支持价格对比":"这个分类暂无已收录评测"}</h3><p className="hint">图表需要同一计费单位、已核实价格与评测分。仍可在列表查看现有模型与来源。</p>{props.onShowList&&<button className="btn" onClick={props.onShowList}>查看模型列表</button>}</div>}</div>)}</div>
       <div className="scatter-footer"><p className="hint">区间自动适配当前模型 · 价格轴使用对数刻度 · 汇率仅供比较</p><div className="scatter-legend">{[...new Set(groups.flatMap(group => group.entries.map(entry => modelBrand(entry.name))))].sort().map(brand => <button type="button" key={brand} aria-pressed={highlightBrand === brand} onClick={() => setHighlightBrand(current => current === brand ? "" : brand)}><ModelLogo name={brand} size={20} />{brand}</button>)}</div></div>
       <details className="card scatter-chart"><summary>未进入价格图的型号（{omitted.length}）</summary><div className="scatter-models">{omitted.map(entry => <button key={entry.id} onClick={() => props.onFocus(entry)}>{entry.name} · {reasoningLabel(entry)} · {!entry.rankings[props.domain] ? "当前分类暂无评测" : !entry.verifiedAt || comparisonPrice(entry, metric) == null ? "暂无可比较的标准 Token 价格" : effectiveEffort !== "all" && reasoningLabel(entry) !== effectiveEffort ? "推理强度筛选已排除" : "等待可用汇率"}</button>)}</div></details>
     </>}

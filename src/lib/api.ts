@@ -19,6 +19,10 @@ import type {
 } from "./types";
 
 export const api = {
+  moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),
+  syncUsageNow: () => invoke<void>('sync_usage_now'),
+  syncActivityNow: () => invoke<void>('sync_activity_now'),
+  getSyncOverview: () => invoke<{devices:{id:string;name:string}[];updatedAt:number|null;syncErrors:string[]}>('get_sync_overview'),
   getWidgetOptions: () => invoke<{enabled:boolean;side:'left'|'right';heightPercent:number}>('get_widget_options'),
   saveWidgetOptions: (options:{enabled:boolean;side:'left'|'right';heightPercent:number}) => invoke<typeof options>('save_widget_options',{options}),
   getWidgetUsage: () => invoke<{today:number;total:number;date:string;updatedAt:number|null;partial:boolean}>('get_widget_usage'),

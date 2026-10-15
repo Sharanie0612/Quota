@@ -98,13 +98,14 @@ pub fn exchange(dir: &Path) -> Result<(),String> {
     for file in files {
         let path = file.path();
         if path.extension().is_none_or(|e|e != "json") { continue; }
-        let Some(device) = path.file_stem().and_then(|s|s.to_str()) else { continue; };
         count += 1;
         if count > 100 { errors.push("费用同步设备文件超过 100 个上限".into()); break; }
         let result = (|| -> Result<(),String> {
             if !file.file_type().is_ok_and(|t|t.is_file() && !t.is_symlink()) { return Err("不读取符号链接的费用同步文件".into()); }
             let packet: Packet = read(&path)?;
-            if packet.schema != 1 || packet.device != device || uuid::Uuid::parse_str(device).is_err()
+            // Cloud drives rename conflict copies. The signed-in local folder is
+            // not an identity authority: validate the embedded UUID and records.
+            if packet.schema != 1 || uuid::Uuid::parse_str(&packet.device).is_err()
                 || !valid_records(&packet.records) || !vendor_costs::valid_samples(&packet.samples) { return Err("费用同步数据无效，原记录已保留".into()); }
             let mut candidate = local.clone();
             merge(&mut candidate.expenses,&packet.records.expenses)?;
@@ -134,6 +135,18 @@ pub fn sync(state: &AppState) -> Result<(),String> {
     let result = exchange(state.store.dir());
     write(&state.store.dir().join("usage-sync-status.json"),&result.as_ref().err())?;
     result
+}
+#[tauri::command]
+pub async fn sync_usage_now(app: tauri::AppHandle) -> Result<(),String> {
+    use tauri::{Manager, Emitter};
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = sync(&app.state::<AppState>());
+        let _ = app.emit("activity-updated", ());
+        result
+    }).await.map_err(|_| "费用同步暂不可用")?
+}
+pub fn queue(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move { let _ = sync_usage_now(app).await; });
 }
 pub(crate) fn errors(dir: &Path) -> Vec<String> {
     if activity::options(dir).sync_dir.is_empty() { return Vec::new(); }

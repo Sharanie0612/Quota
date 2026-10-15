@@ -39,6 +39,8 @@ pub struct Entry {
     pub provider: String,
     pub rankings: HashMap<String, Ranking>,
     pub price: ModelPrice,
+    #[serde(default)]
+    pub off_peak: Option<ModelPrice>,
     pub price_source: String,
     pub verified_at: Option<String>,
     pub candidate: Option<Candidate>,
@@ -88,7 +90,7 @@ pub fn with_overrides(mut snapshot: Snapshot, overrides: &[crate::model::Catalog
         }
         if let Some(base) = embedded.entries.iter().find(|b| b.id == e.id).filter(|b|e.verified_at.as_deref().unwrap_or("")<=b.verified_at.as_deref().unwrap_or("")) {
             e.price = base.price.clone(); e.verified_at = base.verified_at.clone();
-            e.price_source = base.price_source.clone();
+            e.price_source = base.price_source.clone();e.off_peak=base.off_peak.clone();
         }
         let api_id = api_model_id(&e.id);
         if let Some(local) = overrides.iter().rev().find(|o| o.r#match.contains(&api_id) && o.verified && o.source.as_deref() == Some(e.price_source.as_str())) {
@@ -174,7 +176,7 @@ pub fn parse_models(html: &str) -> Result<Vec<Entry>, String> {
             .filter(|s|chrono::NaiveDate::parse_from_str(s,"%Y-%m-%d").is_ok()).map(str::to_string);
         if let Some(e)=base.entries.iter().find(|e|e.id==id) {let mut e=e.clone();if released_at.is_some(){e.released_at=released_at;}entries.insert(id.to_string(),e);continue}
         let template=base.entries.iter().find(|e|e.vendor==vendor&&!e.price_source.is_empty());
-        entries.insert(id.to_string(), Entry{id:id.into(),name:name.into(),vendor:vendor.into(),provider:template.map(|e|e.provider.clone()).unwrap_or_else(||vendor.to_lowercase()),rankings:HashMap::new(),price:ModelPrice::default(),price_source:template.map(|e|e.price_source.clone()).unwrap_or_default(),verified_at:None,candidate:None,released_at});
+        entries.insert(id.to_string(), Entry{id:id.into(),name:name.into(),vendor:vendor.into(),provider:template.map(|e|e.provider.clone()).unwrap_or_else(||vendor.to_lowercase()),rankings:HashMap::new(),price:ModelPrice::default(),off_peak:None,price_source:template.map(|e|e.price_source.clone()).unwrap_or_default(),verified_at:None,candidate:None,released_at});
     }
     Ok(entries.into_values().collect())
 }
@@ -219,14 +221,13 @@ pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
     for old in &previous.entries {if !entries.iter().any(|entry|entry.id==old.id){entries.push(old.clone());}}
     for entry in &mut entries {
         if let Some(old)=previous.entries.iter().find(|e|e.id==entry.id&&e.verified_at.as_deref().unwrap_or("")>entry.verified_at.as_deref().unwrap_or("")){
-            entry.price=old.price.clone();entry.price_source=old.price_source.clone();entry.verified_at=old.verified_at.clone();
+            entry.price=old.price.clone();entry.off_peak=old.off_peak.clone();entry.price_source=old.price_source.clone();entry.verified_at=old.verified_at.clone();
         }
         if let Some(check)=official.get(&entry.vendor){
-            entry.price_source=check.source.clone();
             let name=entry.name.split(" (").next().unwrap_or(&entry.name);
             let model=api_model_id(&entry.id);
             let found=check.prices.get(&crate::official_prices::key(&model)).or_else(||check.prices.get(&crate::official_prices::key(name)));
-            let issue=if let Some(price)=found {entry.price=price.clone();entry.verified_at=Some(now.to_rfc3339());None}
+            let issue=if let Some(price)=found {entry.price=price.clone();entry.price_source=check.source.clone();entry.off_peak=check.off_peak.get(&crate::official_prices::key(&model)).or_else(||check.off_peak.get(&crate::official_prices::key(name))).cloned();entry.verified_at=Some(now.to_rfc3339());None}
                 else{Some(check.error.clone().unwrap_or_else(||"官网未找到该精确型号可确认的标准 Token 价格；保留上次核实记录，自动重试".into()))};
             entry.candidate=Some(Candidate{prices:Vec::new(),excerpts:Vec::new(),checked_at:now.to_rfc3339(),error:issue});
         }

@@ -48,7 +48,7 @@ pub const SOURCES: &[(&str,&str)] = &[
  ("OpenAI","https://developers.openai.com/api/docs/pricing.md"),
  ("Kimi","https://platform.kimi.com/docs/pricing/chat.md"),
  ("Anthropic","https://platform.claude.com/docs/en/about-claude/pricing.md"),
- ("DeepSeek","https://api-docs.deepseek.com/zh-cn/quick_start/pricing"),
+ ("DeepSeek","https://api-docs.deepseek.com/quick_start/pricing/"),
  ("Z AI","https://docs.bigmodel.cn/cn/guide/start/pricing.md"),
  ("Google","https://ai.google.dev/gemini-api/docs/pricing"),
  ("Xiaomi","https://mimo.mi.com/docs/price/pay-as-you-go"),
@@ -60,7 +60,7 @@ pub fn parse(vendor:&str,body:&str)->HashMap<String,ModelPrice>{
  use crate::official_tables::*;
  match vendor {"OpenAI"=>openai(body),"Kimi"=>kimi(body),"Anthropic"=>anthropic(body),"DeepSeek"=>deepseek(body),"Z AI"=>zhipu(body),"Google"=>google(body),"Xiaomi"=>xiaomi(body),"Alibaba"=>alibaba(body),"SpaceXAI"=>xai(body),"Meta"=>meta(body),_=>HashMap::new()}
 }
-pub struct Check {pub prices:HashMap<String,ModelPrice>,pub source:String,pub error:Option<String>}
+pub struct Check {pub prices:HashMap<String,ModelPrice>,pub off_peak:HashMap<String,ModelPrice>,pub source:String,pub error:Option<String>}
 async fn download_http(client:&reqwest::Client,url:&str)->Result<String,String>{
  let mut response=client.get(url).header(reqwest::header::USER_AGENT,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36").timeout(std::time::Duration::from_secs(25)).send().await.map_err(|e|if e.is_timeout(){"官网连接超时"}else{"官网连接失败"})?;
  if !response.status().is_success(){return Err(format!("官网返回 HTTP {}",response.status().as_u16()))}
@@ -118,10 +118,11 @@ pub async fn fetch(client:&reqwest::Client)->HashMap<String,Check>{
  let limiter=std::sync::Arc::new(tokio::sync::Semaphore::new(4));
  let tasks:Vec<_>=SOURCES.iter().map(|&(vendor,url)|{let client=client.clone();let limiter=limiter.clone();tauri::async_runtime::spawn(async move{
   let _permit=limiter.acquire_owned().await.ok();
-  let result=async{let body=download(&client,url).await?;let body=if vendor=="Xiaomi"{xiaomi_document(&client,&body).await?}else{body};let parsed=parse(vendor,&body);if parsed.is_empty(){return Err("官网定价表结构变化或暂无可自动确认的标准 Token 价格".into())}Ok(parsed)}.await;
-  let (prices,error)=match result{Ok(prices)=>(prices,None),Err(e)=>(HashMap::new(),Some(e))};
+  let result=async{let body=download(&client,url).await?;let body=if vendor=="Xiaomi"{xiaomi_document(&client,&body).await?}else{body};let parsed=parse(vendor,&body);if parsed.is_empty(){return Err("官网定价表结构变化或暂无可自动确认的标准 Token 价格".into())}let offers=if vendor=="DeepSeek"{crate::official_tables::deepseek_band(&body,true)}else{HashMap::new()};Ok((parsed,offers))}.await;
+  let (prices,offers,error)=match result{Ok((prices,offers))=>(prices,offers,None),Err(e)=>(HashMap::new(),HashMap::new(),Some(e))};
   let mut normalized=HashMap::new();for(id,p)in prices{let k=key(&id);if normalized.insert(k,p).is_some(){normalized.clear();break}}
-  (vendor.into(),Check{prices:normalized,source:url.trim_end_matches(".md").into(),error})
+  let mut off_peak=HashMap::new();for(id,p)in offers{let k=key(&id);if off_peak.insert(k,p).is_some(){off_peak.clear();break}}
+  (vendor.into(),Check{prices:normalized,off_peak,source:url.trim_end_matches(".md").into(),error})
  })}).collect();
  let mut results=HashMap::new();for task in tasks{if let Ok((vendor,check))=task.await{results.insert(vendor,check);}}results
 }

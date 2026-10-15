@@ -31,3 +31,6 @@ html:has(.usage-widget),body:has(.usage-widget),body:has(.usage-widget) #root { 
 @media (prefers-reduced-motion:reduce) { .widget-panel,.widget-handle { transition:none; } }
 
 .widget-number-unit { margin-left:3px; font-size:21px; letter-spacing:0; font-weight:500; }
+.widget-heading { cursor:grab; touch-action:none; user-select:none; }
+.widget-heading:active { cursor:grabbing; }
+.widget-panel,.widget-handle { will-change:transform,opacity; backface-visibility:hidden; }

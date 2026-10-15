@@ -275,6 +275,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
           <div id="activity-details" className="activity-detail-heading"><h3>{range ? range.from === range.to ? range.from : range.from + " — " + range.to : "当前范围"} · 活动明细</h3><Seg value={detail} onChange={setDetail} options={detailOptions} /></div>
           {range && <div className="usage-selected" role="status"><span>{rangeError || (!detailData ? "读取所选周期…" : `${number(detailData.totals.tokens.total)} Token · ${number(detailData.totals.sessions)} 个会话`)}</span><Button size="sm" onClick={()=>setSelection(null)}>清除日期选择</Button>{rangeError && <Button size="sm" onClick={()=>setReloadKey(k=>k+1)}>重试</Button>}</div>}
           <Breakdown format={format} title={detail === "models" ? "模型使用" : detail === "tools" ? "工具调用" : detail === "agents" ? "Agent 使用" : detail === "channels" ? "Trae 用量通道 · Trae 提供与 API 接入分列" : "设备用量"} calls={detail === "tools"} rows={rows} onModel={detail === "models" ? key => { setModel(key); modelPicker.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } : undefined} />
+          {detail==="channels"&&detailData?.channels.some(row=>row.key==="unknown"&&row.tokens.total>0)&&<Notice>部分旧记录未包含通道信息。请在记录所属电脑连接本机 Trae 并重新采集，再同步到其他设备；用量总数不变。</Notice>}
         </>}
     <details className="activity-method"><summary>统计口径与隐私</summary><p className="hint">输入包含缓存命中与缓存写入，推理包含在输出中，不重复相加。历史范围以本地保留记录为准；仅保存用量指标。</p></details>
   </div>;

@@ -33,6 +33,13 @@ fn main() {
     let text=fs::read_to_string(&packet).unwrap();
     assert!(!text.contains("tokens")&&!text.contains("events")&&!text.contains("codexHome")&&!text.contains("label"));
     assert!(!a.join("activity.sqlite").exists());
+    // OneDrive/iCloud conflict copies keep their embedded device identity.
+    let duplicate=shared.join(format!("quota-usage-v1/{A} 2.json"));
+    fs::copy(&packet,&duplicate).unwrap();
+    sync(&a,&b);
+    assert_eq!(data(&a,"vendor-costs.json"),data(&b,"vendor-costs.json"));
+    assert_eq!(data(&b,"vendor-costs.json")["expenses"].as_object().unwrap().len(),1);
+    fs::remove_file(&duplicate).unwrap();
     // Associated accounts can use the same immutable observations despite
     // retaining different local display IDs on the two computers.
     let local_id="00000000-0000-4000-8000-000000000012";

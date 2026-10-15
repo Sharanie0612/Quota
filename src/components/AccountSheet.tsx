@@ -67,9 +67,12 @@ export function AccountSheet({
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [loginOpened, setLoginOpened] = useState(false);
+  const [loginStatus, setLoginStatus] = useState("");
+  const [loginError, setLoginError] = useState(false);
   const [mimoConnections, setMimoConnections] = useState<{id: string; label: string}[]>([]);
   const [mimoSource, setMimoSource] = useState("");
   const staged = useRef<string | null>(null);
+  const connectionAttempt = useRef(0);
   const isMimo = providerId === "mimo" || providerId === "mimo-plan";
   const isChatgpt = providerId === "custom";
   const isSubscription = isChatgpt || providerId === "mimo-plan";
@@ -90,28 +93,60 @@ export function AccountSheet({
     if (mode === "manual" && manual.trim() === "") setManualCurrency(isSubscription ? "%" : "CNY");
   };
   useEffect(() => () => {
+    ++connectionAttempt.current;
     if (staged.current) void api.discardConnection(staged.current).catch(() => undefined);
     void api.cancelMimoLogin().catch(() => undefined);
   }, []);
+  useEffect(() => {
+    if (!loginOpened || !isMimo) return;
+    let live = true;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const status = await api.pollMimoLogin(providerId);
+        if (!live) { if (status.connectionId) void api.discardConnection(status.connectionId).catch(() => undefined); return; }
+        setLoginStatus(status.message); setLoginError(false);
+        if (status.connectionId) {
+          if (staged.current) await api.discardConnection(staged.current);
+          if (!live) { void api.discardConnection(status.connectionId).catch(() => undefined); return; }
+          staged.current = status.connectionId; setConnectionId(status.connectionId); setLoginOpened(false);
+          toast("小米已自动连接，保存账户后开始同步"); return;
+        }
+        if (status.state === "closed") { setLoginOpened(false); return; }
+      } catch (e) {
+        if (!live) return;
+        setLoginStatus(errText(e)); setLoginError(true);
+      }
+      if (live) timer = window.setTimeout(() => void poll(), 3000);
+    };
+    setLoginStatus("正在等待官方窗口登录，完成后将自动连接…");
+    setLoginError(false);
+    void poll();
+    return () => { live = false; clearTimeout(timer); };
+  }, [loginOpened, isMimo, providerId]);
   const connect = async (finish = false) => {
+    const attempt = ++connectionAttempt.current;
     setConnecting(true);
     try {
       if (isMimo && !finish) { await api.startMimoLogin(initial?.id); setLoginOpened(true); return; }
       const id = isMimo ? await api.finishMimoLogin(providerId) : await api.connectChatgpt();
+      if (attempt !== connectionAttempt.current) { await api.discardConnection(id); return; }
       if (staged.current) await api.discardConnection(staged.current);
       staged.current = id;
       setConnectionId(id);
       setLoginOpened(false);
       toast("连接成功");
-    } catch (e) { toast(errText(e), "error"); }
-    finally { setConnecting(false); }
+    } catch (e) { if (attempt === connectionAttempt.current) toast(errText(e), "error"); }
+    finally { if (attempt === connectionAttempt.current) setConnecting(false); }
   };
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const reuseMimo = async () => {
     if (!mimoSource) return;
+    const attempt = ++connectionAttempt.current;
     setConnecting(true);
     try {
       const id = await api.reuseMimoConnection(mimoSource, providerId);
+      if (attempt !== connectionAttempt.current) { await api.discardConnection(id); return; }
       if (staged.current) await api.discardConnection(staged.current);
       staged.current = id; setConnectionId(id); setLoginOpened(false);
       await api.cancelMimoLogin();
@@ -121,6 +156,7 @@ export function AccountSheet({
   };
 
   const onProviderChange = (id: string) => {
+    ++connectionAttempt.current; setConnecting(false); setLoginStatus("");
     if (staged.current) void api.discardConnection(staged.current).catch(() => undefined);
     staged.current = null; setConnectionId(null); setConsoleCookie(""); setLoginOpened(false);
     void api.cancelMimoLogin().catch(() => undefined);
@@ -412,9 +448,10 @@ export function AccountSheet({
             <Button variant="primary" onClick={() => void connect()} disabled={connecting}>
               {connecting ? "连接中…" : isMimo ? mimoConnections.length ? "登录另一个小米账户" : "登录小米" : "连接本机登录"}
             </Button>
-            {isMimo && loginOpened ? <Button onClick={() => void connect(true)} disabled={connecting}>完成连接</Button> : null}
+            {isMimo && loginOpened ? <Button onClick={() => { setLoginOpened(false); setLoginStatus("已取消登录"); void api.cancelMimoLogin().catch(() => undefined); }} disabled={connecting}>取消登录</Button> : null}
             {isChatgpt ? <Button onClick={() => void openLink("https://chatgpt.com/codex")}>打开 Codex</Button> : null}
           </div>
+          {isMimo && loginStatus && <div className={`mimo-login-status${loginError ? " error" : ""}`} role="status">{loginStatus}</div>}
           {isMimo ? <details className="advanced"><summary>其他连接方式</summary>
             <Field label="登录 Cookie" hint="保存在系统凭据管理器">
               <textarea className="input" rows={2} value={consoleCookie} onChange={(e) => setConsoleCookie(e.target.value)} autoComplete="off" spellCheck={false} />
@@ -453,7 +490,7 @@ export function AccountSheet({
           <span className="advanced-title">高级设置</span>
           <span className="advanced-hint">可选</span>
         </summary>
-        {isMimo ? <Field label="API Key" hint="可选，用于同步模型列表"><input className="input" type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off" /></Field> : null}
+        {isMimo ? <Field label={initial?.hasKey ? "API Key（已保存，留空不修改）" : "API Key"} hint="可选，用于同步模型列表"><input className="input" type="password" placeholder={initial?.hasKey ? "••••••••（留空保持不变）" : "粘贴 API Key"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="off" /></Field> : null}
         {provider?.balanceModes.some((m) => m.value === "custom") ? <Field label="自定义同步"><select className="select" value={balanceMode === "custom" ? "custom" : "default"} onChange={(e) => setBalanceMode(e.target.value === "custom" ? "custom" : provider.balanceModes[0]?.value ?? "auto")}><option value="default">使用平台同步方式</option><option value="custom">自定义接口</option></select></Field> : null}
       {balanceMode === "custom" ? (
         <>

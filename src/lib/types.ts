@@ -351,6 +351,17 @@ export type RechargeEvent = {
 export interface ActivityTokens { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; total: number }
 export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
 export interface ActivityOptions { deviceId: string; deviceName: string; autoCollect: boolean; collectIntervalSeconds: number; syncAccounts: boolean; codexHome: string; zcodeHome: string; harnessHome: string; traeHome: string; traeEnabled: boolean; syncDir: string }
-export interface ActivityReport { options: ActivityOptions; devices: {id: string; name: string}[]; totals: ActivityGroup; models: ActivityGroup[]; availableModels: ActivityGroup[]; tools: ActivityGroup[]; agents: ActivityGroup[]; daily: ActivityGroup[]; hourly: ActivityGroup[]; sources: ActivityGroup[]; channels: ActivityGroup[]; byDevice: ActivityGroup[]; updatedAt: number | null; errors: string[] }
+export interface ActivityReport { options: ActivityOptions; devices: {id: string; name: string}[]; totals: ActivityGroup; models: ActivityGroup[]; availableModels: ActivityGroup[]; tools: ActivityGroup[]; agents: ActivityGroup[]; daily: ActivityGroup[]; hourly: ActivityGroup[]; sources: ActivityGroup[]; channels: ActivityGroup[]; byDevice: ActivityGroup[]; updatedAt: number | null; errors: string[]; syncErrors: string[] }
 
 export interface AccountSyncCandidate { id: string; provider: string; label: string; createdAt: string; pending: boolean }
+export interface ActivityStorage { bytes: number; files: number; legacyFiles: number; ownLegacyFiles: number; legacyCompatibility: boolean }
+export interface UsageRate { currency: string; input: number | null; cachedInput: number | null; cacheWrite: number | null; output: number | null }
+export interface UsagePriceReference { aliases: string[]; price: ModelPrice; source: string; verifiedAt: string }
+export interface UsageScope { device: string; source: string; from: string; to: string }
+export interface UsageBill { amount: number; currency: string }
+export interface VendorExpense { vendor: string; from: string; to: string; currency: string; subscription: number | null; usage: number | null; planId: string | null }
+export interface SubscriptionPrice { id: string; vendor: string; name: string; currency: string; amount: number; months: number; source: string; verifiedAt: string; condition: string }
+export interface FinanceAccount { id: string; vendor: string; label: string; currency: string; cumulativeRecharge: number | null; cumulativeSpend: number | null; observedRecharge: number | null; observedSpend: number | null; observedFrom: number | null; observedTo: number | null; balanceRises: number; balanceDrops: number; historyFrom: number | null; historyTo: number | null; plan: string | null; issues: string[] }
+export interface VendorCostReport { accounts: FinanceAccount[]; expenses: VendorExpense[]; plans: SubscriptionPrice[]; coveredModels: Record<string, ActivityGroup[]>; lifetimeTokens: ActivityTokens; lifetimeSessions: number; firstDate: string | null; lastDate: string | null }
+export interface MonthlyUsageRate { month: string; cnyPerUsd: number; date: string; source: string }
+export interface MimoLoginStatus { state: "waiting" | "closed" | "connected"; message: string; connectionId: string | null }

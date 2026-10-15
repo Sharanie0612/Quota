@@ -700,6 +700,52 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case "get_vendor_costs": {
+          const activity=await window.__TAURI_INTERNALS__.invoke("get_activity",{device:"",source:"without-trae",days:0,model:"",from:args.from,to:args.to});
+          const expenses=window.demoVendorExpenses || [];
+          const modelVendor=key=>key.startsWith("gpt")?"custom":key.toLowerCase().startsWith("glm")?"zhipu":"deepseek";
+          const coveredModels={};
+          for(const e of expenses.filter(e=>e.from<=args.to&&e.to>=args.from)){const models=activity.models.filter(m=>modelVendor(m.key)===e.vendor);coveredModels[e.vendor]=models;coveredModels[`${e.vendor}:${e.currency}`]=models;}
+          return {expenses,coveredModels,lifetimeTokens:{input:2400000,output:320000,total:2720000,cached:1700000,cacheWrite:50000,reasoning:90000},lifetimeSessions:38,firstDate:new Date(Date.now()-29*86400000).toLocaleDateString('sv-SE'),lastDate:new Date().toLocaleDateString('sv-SE'),accounts:ACCOUNTS.map(a=>({id:a.id,vendor:a.provider==="mimo-plan"?"mimo":a.provider,label:a.label,currency:a.provider==="custom"?"USD":"CNY",cumulativeRecharge:a.provider==="zhipu"?40:null,cumulativeSpend:a.provider==="zhipu"?28.4:null,observedRecharge:null,observedSpend:null,observedFrom:null,observedTo:null,balanceRises:a.provider==="zhipu"?10:0,balanceDrops:a.provider==="zhipu"?2:0,historyFrom:1791072000,historyTo:1791849600,plan:a.provider==="custom"?"plus":null,issues:[]})),plans:[
+            {id:"plus",vendor:"custom",name:"ChatGPT Plus",currency:"USD",amount:20,months:1,source:"https://learn.chatgpt.com/docs/pricing",verifiedAt:"2026-10-14",condition:"公开月费；不含税费或额外额度购买"},
+            {id:"mimo-lite-cn",vendor:"mimo",name:"MiMo Lite 月付",currency:"CNY",amount:39,months:1,source:"https://mimo.mi.com/docs/zh-CN/tokenplan",verifiedAt:"2026-10-14",condition:"中国区公开月费；优惠请按实付填写"},
+            {id:"glm-lite",vendor:"zhipu",name:"GLM Coding Lite",currency:"CNY",amount:118,months:1,source:"https://zcode.z.ai/cn",verifiedAt:"2026-10-14",condition:"官网月付标价；优惠请按实付填写"}
+          ]};
+        }
+        case "save_vendor_expense": {
+          const input=args.input;window.demoVendorExpenses ||= [];
+          const same=(a,b)=>a.vendor===b.vendor&&a.from===b.from&&a.to===b.to&&a.currency===b.currency;
+          const previous=args.previous;
+          if(previous&&!window.demoVendorExpenses.some(e=>same(e,previous)&&e.subscription===previous.subscription&&e.usage===previous.usage&&e.planId===previous.planId))throw new Error('此账期已更新或删除，请重新读取');
+          if(previous&&!same(previous,input)&&window.demoVendorExpenses.some(e=>same(e,input)))throw new Error('目标账期已有支出记录');
+          const next=window.demoVendorExpenses.filter(e=>!same(e,previous||input));
+          if(input.subscription!=null||input.usage!=null){
+            if(next.some(e=>e.vendor===input.vendor&&e.currency===input.currency&&e.from<=input.to&&e.to>=input.from))throw new Error('该厂商已有重叠支出周期');
+            next.push(input);
+          }
+          window.demoVendorExpenses=next;return null;
+        }
+        case "get_monthly_usage_fx": return {rates:args.months.map(month=>window.demoMonthlyRates?.[month]||{month,cnyPerUsd:7,date:'2026-09-30',source:'manual'}),error:null};
+        case "save_monthly_usage_fx": window.demoMonthlyRates ||= {}; if(args.rate==null)delete window.demoMonthlyRates[args.month];else window.demoMonthlyRates[args.month]={month:args.month,cnyPerUsd:args.rate,date:new Date().toLocaleDateString('sv-SE'),source:'manual'};return null;
+        case "get_activity_storage": return {bytes:51692437, files:430, legacyFiles:430, ownLegacyFiles:218,legacyCompatibility:new URLSearchParams(location.search).get("storageCase")==="legacy"};
+        case "get_activity_readers": return new URLSearchParams(location.search).get("storageCase")==="legacy"?[{device:"demo-b",version:null,compressed:null}]:[{device:"demo-b",version:"1.0.1700",compressed:true}];
+        case "rebuild_activity_sync": return 0;
+        case "optimize_activity_storage": return {before:{bytes:51692437,files:430,legacyFiles:430,ownLegacyFiles:218},after:{bytes:28124820,files:430,legacyFiles:212,ownLegacyFiles:0},converted:218};
+        case "get_usage_prices": return [[
+          {aliases:["gpt-6.1-sol"],price:{currency:"USD",unit:"每百万 tokens",input:2,output:10,cachedInput:.1,cacheWrite:2.5},source:"https://openai.com/api/pricing/",verifiedAt:"2026-10-05T00:00:00Z"},
+          {aliases:["glm-5.3"],price:{currency:"CNY",unit:"每百万 tokens",input:2,output:8,cachedInput:.4,cacheWrite:0},source:"https://open.bigmodel.cn/",verifiedAt:"2026-10-05T00:00:00Z"},
+        ], window.demoUsageRates || {}];
+        case "save_usage_calculation": {
+          window.demoUsageRates ||= {}; if(args.rate)window.demoUsageRates[args.model]=args.rate;else delete window.demoUsageRates[args.model];
+          window.demoUsageBills ||= {}; const scope=JSON.stringify(args.scope); window.demoUsageBills[scope] ||= {};
+          if(args.bill)window.demoUsageBills[scope][args.model]=args.bill;else delete window.demoUsageBills[scope][args.model];return null;
+        }
+        case "get_usage_bills": return window.demoUsageBills?.[JSON.stringify(args.scope)] || {};
+        case "poll_mimo_login": {
+          if(accountCase === "mimo-network")throw new Error("小米登录验证超时，请检查网络后重试");
+          if(accountCase === "mimo-waiting")return {state:"waiting",message:"正在等待小米登录完成…",connectionId:null};
+          return {state:"connected",message:"已自动连接，保存后开始同步",connectionId:"demo-connection"};
+        }
         case "get_activity": {
           const read = ++activityReads;
           if (activityCase === "loading" || (activityCase === "race" && args.source === "codex")) {
@@ -712,10 +758,10 @@
           const deviceFactor = args.device === "demo-a" ? .6 : args.device === "demo-b" ? .4 : 1;
           const factor = sourceFactor * deviceFactor * (activityCase === "empty" ? 0 : 1);
           const row=(key,f=1)=>({key,tokens:Object.fromEntries(Object.entries(tokens).map(([k,v])=>[k,Math.round(v*f*factor)])),calls:Math.round(326*f*factor),sessions:Math.round(38*f*factor)});
-          const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("kimi-k2.6",.1)];
+          const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source && args.source!=="without-trae" ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("kimi-k2.6",.1)];
           const vendorOf={"gpt-6.1-sol":"vendor:custom","GLM-5.3":"vendor:zhipu","deepseek-flash":"vendor:deepseek","kimi-k2.6":"vendor:moonshot"};
           const models = args.model ? availableModels.filter(model => model.key === args.model || vendorOf[model.key] === args.model || (args.model === "channel:api" && model.key.endsWith("\u001fapi")) || (args.model === "channel:trae" && model.key.endsWith("\u001ftrae"))) : availableModels;
-          const selectedFactor = !args.model ? 1 : models.length ? (args.source ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.5,"GLM-5.3":.25,"deepseek-flash":.15,"kimi-k2.6":.1})[row.key],0)) : 0;
+          const selectedFactor = !args.model ? 1 : models.length ? (args.source && args.source!=="without-trae" ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.5,"GLM-5.3":.25,"deepseek-flash":.15,"kimi-k2.6":.1})[row.key],0)) : 0;
           const selectedRow=(key,f=1)=>row(key,f*selectedFactor);
           let totals=selectedRow("全部");
           const count=args.days===7?7:30;
@@ -736,7 +782,7 @@
         case "refresh_activity":
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
           return 0;
-        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:""};
+        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""};
         case "get_account_sync_candidates": return structuredClone(syncCandidates);
         case "resolve_account_sync": {
           const source = syncCandidates.find(row => row.id === args.sourceId);
@@ -865,7 +911,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1600",
+            version: "1.0.1800",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

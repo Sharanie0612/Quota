@@ -264,6 +264,22 @@ async fn console_response(client:&reqwest::Client,url:&str,cookie:&mut String,up
     Ok(response)
 }
 
+/// Verify authentication without requiring an active Token Plan, retaining rotated cookies.
+pub async fn validate_login_tracked(client:&reqwest::Client,cookie:&mut String,updates:&mut Vec<String>)->Result<bool,String> {
+    let response=get_json(client,&format!("{CONSOLE_BASE}/balance"),cookie)
+        .timeout(std::time::Duration::from_secs(10)).send().await
+        .map_err(|e| if e.is_timeout(){"小米登录验证超时，请检查网络后重试"}else{"无法连接小米官网，请检查网络或系统代理"})?;
+    if matches!(response.status().as_u16(),401|403){return Ok(false)}
+    if !response.status().is_success(){return Err("小米官网暂时无法验证登录，请稍后重试".into())}
+    if response.url().scheme()=="https"&&response.url().host_str()==Some("platform.xiaomimimo.com") {
+        for header in response.headers().get_all(reqwest::header::SET_COOKIE) {
+            if let Ok(raw)=header.to_str(){if let Some(saved)=crate::mimo_session::merge_header(cookie,raw){updates.push(saved);}}
+        }
+    }
+    let body:Value=response.json().await.map_err(|_|"小米登录验证返回格式异常，请稍后重试")?;
+    match body.get("code").and_then(Value::as_i64){Some(0)=>Ok(true),Some(401)=>Ok(false),_=>Err("小米官网暂时无法验证登录，请稍后重试".into())}
+}
+
 async fn console_text(response:reqwest::Response)->String {
     if response.status().as_u16()==401 {return "{\"code\":401}".into()}
     response.text().await.unwrap_or_default()

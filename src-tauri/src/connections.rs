@@ -166,7 +166,7 @@ async fn open_login_window(
                 &label,
                 WebviewUrl::External("about:blank".parse().map_err(|_| "无法打开登录页")?),
             )
-            .title("登录小米 · 登录后返回 Quota 点击完成连接")
+            .title("登录小米 · 完成登录后自动连接 Quota")
             .inner_size(1000.0, 760.0)
             .visible(visible)
             .incognito(true)
@@ -244,11 +244,13 @@ pub async fn start_mimo_login(app: AppHandle, account_id: Option<String>) -> Res
             None
         }
     };
+    state.mimo_login_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     open_login_window(&app, "mimo-login", true, payload).await?;
     Ok(())
 }
 #[tauri::command]
 pub async fn cancel_mimo_login(app: AppHandle) {
+    app.state::<AppState>().mimo_login_generation.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     if let Some(w) = app.get_webview_window("mimo-login") {
         let _ = w.close();
     }
@@ -257,29 +259,54 @@ pub async fn cancel_mimo_login(app: AppHandle) {
 // Stage the cookie in the OS credential manager. The renderer only receives an opaque UUID.
 #[tauri::command]
 pub async fn finish_mimo_login(app: AppHandle, provider: String) -> Result<String, String> {
+    let status = poll_mimo_login(app, provider).await?;
+    status.connection_id.ok_or(status.message)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginStatus {
+    pub state: &'static str,
+    pub message: String,
+    pub connection_id: Option<String>,
+}
+
+#[tauri::command]
+pub async fn poll_mimo_login(app: AppHandle, provider: String) -> Result<LoginStatus, String> {
     if !matches!(provider.as_str(), "mimo" | "mimo-plan") {
         return Err("请选择小米账户".into());
     }
-    let w = app
-        .get_webview_window("mimo-login")
-        .ok_or("请先打开小米登录")?;
+    let state = app.state::<AppState>();
+    let _guard = state.mimo_login_lock.lock().await;
+    let generation = state.mimo_login_generation.load(std::sync::atomic::Ordering::SeqCst);
+    let waiting = |message: &str| LoginStatus { state: "waiting", message: message.into(), connection_id: None };
+    let Some(w) = app.get_webview_window("mimo-login") else {
+        return Ok(LoginStatus { state: "closed", message: "登录窗口已关闭，可重新打开".into(), connection_id: None });
+    };
+    let current = w.url().map_err(|_| "无法读取登录窗口状态")?;
+    if current.host_str() != Some("platform.xiaomimimo.com") {
+        return Ok(waiting("请在官方窗口完成登录，返回后会自动连接"));
+    }
     let url = "https://platform.xiaomimimo.com/api/v1/balance"
         .parse()
         .map_err(|_| "无法读取登录")?;
     let cookies = w.cookies_for_url(url).map_err(|_| "无法读取登录，请重试")?;
     if cookies.is_empty() {
-        return Err("请先在登录窗口完成登录".into());
+        return Ok(waiting("正在等待小米登录完成…"));
     }
     let mut cookie = cookies
         .iter()
         .map(|c| format!("{}={}", c.name(), c.value()))
         .collect::<Vec<_>>()
         .join("; ");
-    let state = app.state::<AppState>();
     let mut updates = vec![];
-    crate::mimo::fetch_console_tracked(&state.http, &mut cookie, &mut updates, &provider)
-        .await
-        .map_err(|_| "尚未连接，请完成小米登录后重试")?;
+    if !crate::mimo::validate_login_tracked(&state.http, &mut cookie, &mut updates).await? {
+        return Ok(waiting("登录尚未完成，请等待官网返回控制台后自动连接"));
+    }
+    if app.get_webview_window("mimo-login").is_none()
+        || generation != state.mimo_login_generation.load(std::sync::atomic::Ordering::SeqCst) {
+        return Ok(waiting("登录已取消，可重新打开窗口"));
+    }
     let payload = crate::mimo_session::encode(w.cookies().map_err(|_| "无法读取小米会话")?)?;
     let payload = crate::mimo_session::update(Some(&payload), &updates)?;
     let id = stage_mimo_connection(&state, &cookie, provider)?;
@@ -293,7 +320,7 @@ pub async fn finish_mimo_login(app: AppHandle, provider: String) -> Result<Strin
         return Err(error);
     }
     let _ = w.close();
-    Ok(id)
+    Ok(LoginStatus { state: "connected", message: "已连接，保存账户后开始同步".into(), connection_id: Some(id) })
 }
 
 #[tauri::command]

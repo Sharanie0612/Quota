@@ -53,3 +53,7 @@ Windows 构建目录可能继承 Low Mandatory Level。EXE 继承此标签后启
 此步骤不修改工作区或安装目录 ACL、系统 TEMP、SmartScreen/Defender 或安装包内容，沿用原 NSIS 升级与卸载逻辑。安装器验收应直接启动最终 EXE，使用原系统 TEMP，核对真实安装文件、实际版本、DLL 和隔离启动；不能只根据安装器退出码判定成功。
 
 原理参见 [微软 Mandatory Integrity Control](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control)。
+
+## 已有安装的覆盖更新验证
+
+已有正式安装需要验证覆盖更新时，可使用 `scripts/check-installed-upgrade.ps1`，显式传入 `-Installer`、现有 `-ExePath`、从同一安装包提取的 `-ExpectedExe` 和工作区内全新的 `-TestRoot`。脚本核对卸载登记与目标目录一致，备份程序文件，以 `/UPDATE /NS` 更新原目录；校验安装器没有改动个人配置/费用文件，再以隔离配置验证启动，并恢复原应用运行。安装版必须与包内提取的 exe 比较，便携版可能使用不同的打包类型标记。此检查会实际更新指定安装，不能用于只读检查；记录中应区分同版本覆盖更新与跨版本升级。

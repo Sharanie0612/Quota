@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Notice, Seg, Switch } from "../components/ui";
-import { AccountSyncPanel } from "../components/AccountSyncPanel";
+import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
+
 import { DataImportPanel } from "../components/DataImportPanel";
-import { api, copyText, errText, events } from "../lib/api";
+import { api, copyText, errText } from "../lib/api";
 import { toast } from "../lib/store";
 import type { ActivityOptions, AppInfo, Settings } from "../lib/types";
 
@@ -45,17 +46,6 @@ export function SettingsView({
   const [activity, setActivity] = useState<ActivityOptions | null>(null);
   const [activityBusy, setActivityBusy] = useState(false);
   const [activityError, setActivityError] = useState("");
-  const [cloudStatus, setCloudStatus] = useState<{lastSynced:string|null;error:string|null}|null>(null);
-  const [cloudBusy, setCloudBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    const reload = () => api.getAccountSyncStatus().then(status => {
-      if (active) setCloudStatus(status);
-    }).catch(() => undefined);
-    void reload();
-    const unlisten = events.onAccountsUpdated(() => void reload());
-    return () => { active = false; void unlisten.then(off => off()).catch(() => undefined); };
-  }, []);
   useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
   const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
     if (!activity || activityBusy) return false;
@@ -67,18 +57,6 @@ export function SettingsView({
     } catch(e) {setActivityError(errText(e));return false;}
     finally {setActivityBusy(false);}
   };
-  const syncCloud = async () => {
-    setCloudBusy(true);
-    try {await api.syncAccounts();toast("账户展示资料已与共享目录合并；云盘传输由对应客户端完成");}
-    catch(e){toast(errText(e),"error");}
-    finally {await api.getAccountSyncStatus().then(setCloudStatus).catch(()=>undefined);setCloudBusy(false);}
-  };
-  const chooseCloud = async () => {
-    try {const path=await open({directory:true,multiple:false,title:"选择 iCloud Drive、OneDrive 或 NAS 中各设备共用的目录"});
-      if(typeof path==="string" && await updateActivity({syncDir:path}))await syncCloud();
-    }catch(e){toast(errText(e),"error");}
-  };
-
   if (!settings) {
     return (
       <div className="content-inner">
@@ -151,22 +129,13 @@ export function SettingsView({
 
   return (
     <div className="content-inner" style={{ maxWidth: 760 }}>
-      <AccountSyncPanel />
+      <CrossDeviceSyncPanel />
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
         <p>从本地日志增量采集用量，采集完成后自动更新图表。</p>
         <div className="setting-row"><div className="txt"><b>自动采集</b><span>仅在 Quota 运行时执行；关闭后可在 Token 活动页手动采集</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
         <div className="setting-row"><div className="txt"><b>采集频率</b><span>默认 30 秒；Token 共享交换最低间隔 5 分钟</span></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
         {activityError && <Notice tone="warn">{activityError}</Notice>}
-      </div>
-      <div className="card section">
-        <h2><IconGear size={14} /> 跨设备同步</h2>
-        <p>选择各设备共用的 iCloud Drive、OneDrive 或 NAS 文件夹；由对应云盘客户端传输，Quota 不创建云账户。</p>
-        <div className="setting-row"><div className="txt"><b>共享目录</b><span style={{overflowWrap:"anywhere"}}>{activity?.syncDir || "未开启；请在每台设备选择同一个目录"}</span></div><Button size="sm" disabled={!activity || activityBusy || cloudBusy} onClick={()=>void chooseCloud()}>选择目录</Button></div>
-        <div className="setting-row"><div className="txt"><b>同步账户展示资料</b><span>账户名称、金额、提醒阈值与余额/订阅快照；每 5 分钟合并，不含任何登录凭据或自定义连接配置</span></div><Switch checked={activity?.syncAccounts ?? true} disabled={!activity || activityBusy || cloudBusy} label="同步账户展示资料" onChange={value=>void updateActivity({syncAccounts:value})}/></div>
-        <p className="hint">Token 活动使用同一目录。删除账户仅影响本机；同账户资料冲突取最新编辑，余额快照取最新查询时间，不累加。新设备查询需单独连接账户。请勿在账户名称或设备名称中填写秘密。</p>
-        {activity?.syncDir && <div className="tag-row"><Button size="sm" disabled={cloudBusy || activityBusy || !activity.syncAccounts} onClick={()=>void syncCloud()}>{cloudBusy?"同步中…":"立即同步账户"}</Button><Button size="sm" disabled={cloudBusy || activityBusy} onClick={()=>void updateActivity({syncDir:""})}>关闭目录同步</Button><span className="hint">{cloudStatus?.lastSynced?`本机上次合并：${new Date(cloudStatus.lastSynced).toLocaleString()}`:"尚未合并"}</span></div>}
-        {cloudStatus?.error && <Notice tone="warn">{cloudStatus.error}</Notice>}
       </div>
       <div className="card section">
         <h2>

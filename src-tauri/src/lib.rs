@@ -1,5 +1,8 @@
 mod aliyun;
 pub mod activity;
+pub mod usage_costs;
+pub mod vendor_costs;
+pub mod usage_fx;
 pub mod account_sync;
 pub mod data_export;
 pub mod official_prices;
@@ -93,10 +96,21 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             exchange::get_exchange_rate,
+            usage_fx::get_monthly_usage_fx,
+            usage_fx::save_monthly_usage_fx,
             activity::get_activity,
             activity::get_activity_options,
             activity::refresh_activity,
             activity::save_activity_options,
+            activity::sync_storage::get_activity_storage,
+            activity::sync_storage::optimize_activity_storage,
+            activity::sync_storage::get_activity_readers,
+            activity::sync_storage::rebuild_activity_sync,
+            usage_costs::get_usage_prices,
+            usage_costs::save_usage_calculation,
+            usage_costs::get_usage_bills,
+            vendor_costs::get_vendor_costs,
+            vendor_costs::save_vendor_expense,
             ladder::get_ladder,
             ladder::refresh_ladder,
             ladder::check_ladder_price,
@@ -105,6 +119,7 @@ pub fn run() {
             connections::list_mimo_connections,
             connections::reuse_mimo_connection,
             connections::finish_mimo_login,
+            connections::poll_mimo_login,
             connections::cancel_mimo_login,
             connections::connect_chatgpt,
             connections::discard_connection,

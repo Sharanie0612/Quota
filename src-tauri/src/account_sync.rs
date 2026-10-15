@@ -303,6 +303,17 @@ struct Local {
     #[serde(default)]
     associations: Vec<Association>,
 }
+/// Cost history reads only validated display snapshots, with no keyring access.
+/// Read the snapshot subtree so newer peers' unrelated top-level fields do not
+/// prevent restoring a last-known financial display after a restart.
+pub(crate) fn saved_finance_status(dir:&Path,account:&Account)->Option<AccountStatus>{
+    let value:serde_json::Value=read(&dir.join("account-sync-state.json")).ok()?;
+    let record=value.get("records")?.get(&account.id)?;
+    if record.get("profile")?.get("id")?.as_str()!=Some(&account.id)||record.get("profile")?.get("provider")?.as_str()!=Some(&account.provider){return None}
+    let snapshot:Snapshot=serde_json::from_value(record.get("snapshot")?.clone()).ok()?;
+    if !snapshot.valid(){return None}
+    let mut status=AccountStatus::default();snapshot.apply(&mut status);Some(status)
+}
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Packet {

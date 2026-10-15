@@ -8,6 +8,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::commands::AppState;
 #[path = "activity_harness.rs"]
 mod harness;
+#[path = "activity_sync.rs"]
+pub mod sync_storage;
 #[path = "activity_trae.rs"]
 pub mod trae;
 
@@ -124,6 +126,14 @@ fn database(dir:&Path) -> Result<Connection,String> {
         CREATE TABLE IF NOT EXISTS outbox(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS receipts(path TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL);").map_err(|_| "初始化统计资料库失败")?;
+    // A settlement may be revised many times before the next directory exchange.
+    // Keep one pending event, not one copy for every revision.
+    let indexed: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='outbox_event')", [], |r| r.get(0)).map_err(|_| "读取同步队列失败")?;
+    if !indexed {
+        db.execute_batch("BEGIN IMMEDIATE; DELETE FROM outbox WHERE seq NOT IN (SELECT MAX(seq) FROM outbox GROUP BY event_id); CREATE UNIQUE INDEX IF NOT EXISTS outbox_event ON outbox(event_id); COMMIT;").map_err(|_| "优化同步队列失败")?;
+    }
+    let has_fingerprint:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM pragma_table_info('receipts') WHERE name='fingerprint')",[],|r|r.get(0)).map_err(|_|"读取同步索引失败")?;
+    if !has_fingerprint {db.execute_batch("ALTER TABLE receipts ADD COLUMN fingerprint TEXT;").map_err(|_|"升级同步索引失败")?;}
     Ok(db)
 }
 pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,String> {
@@ -147,7 +157,7 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
     let body=serde_json::to_string(&next).map_err(|_| "保存统计失败")?;
     if old.as_deref()==Some(&body) { return Ok(false); }
     db.execute("INSERT INTO metrics(id,body,local) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET body=excluded.body,local=MAX(metrics.local,excluded.local)",params![next.id,body,local as i32]).map_err(|_| "保存统计失败")?;
-    if local { db.execute("INSERT INTO outbox(event_id) VALUES(?1)",[&next.id]).map_err(|_| "保存同步队列失败")?; }
+    if local { db.execute("INSERT OR IGNORE INTO outbox(event_id) VALUES(?1)",[&next.id]).map_err(|_| "保存同步队列失败")?; }
     Ok(true)
 }
 fn cursor(db:&Connection,key:&str) -> Result<Cursor,String> {
@@ -257,31 +267,38 @@ pub fn import_activity_data(dir:&Path,data:&Value)->Result<usize,String>{
 pub struct OptionsDevice { pub id:String, pub name:String }
 fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
     if o.sync_dir.is_empty(){return Ok(())}
+    if uuid::Uuid::parse_str(&o.device_id).is_err(){return Err("本机设备标识无效".into())}
     let root=PathBuf::from(&o.sync_dir).join("quota-activity-v1");let own=root.join(&o.device_id);
     fs::create_dir_all(&own).map_err(|_| "同步目录不可用，统计已保留在本机")?;
+    sync_storage::announce(&own,&o.device_id)?;
+    let legacy=sync_storage::readers_for(o)?.iter().any(|r|r.compressed!=Some(true));
     loop {
         let pending:Vec<(i64,String)>=db.prepare("SELECT seq,event_id FROM outbox ORDER BY seq LIMIT 1000").map_err(|_| "读取同步队列失败")?.query_map([],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|_| "读取同步队列失败")?.collect::<Result<_,_>>().map_err(|_| "读取同步队列失败")?;
         if pending.is_empty(){break}let mut events=Vec::new();
         for (_,id) in &pending {let text:String=db.query_row("SELECT body FROM metrics WHERE id=?1",[id],|r|r.get(0)).map_err(|_| "读取同步统计失败")?;events.push(serde_json::from_str(&text).map_err(|_| "同步统计格式无效")?);}
         let max=pending.last().expect("nonempty").0;
         let packet=Packet {schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},events};
-        crate::storage::write_atomic(&own.join(format!("{max:020}.json")),&serde_json::to_string(&packet).map_err(|_| "写入同步统计失败")?)?;
+        let fingerprint=hash(&serde_json::to_string(&packet).map_err(|_| "编码同步统计失败")?);
+        sync_storage::write_packet(&own.join(format!("{max:020}-{fingerprint}.json.zst")), &packet)?;
         db.execute("DELETE FROM outbox WHERE seq<=?1",[max]).map_err(|_| "保存同步进度失败")?;
     }
     let dirs=fs::read_dir(&root).map_err(|_| "同步目录暂时无法读取")?;
-    for device in dirs.flatten(){if !device.file_type().is_ok_and(|t|t.is_dir()&&!t.is_symlink()){continue}if let Ok(items)=fs::read_dir(device.path()){for file in items.flatten(){
-        if !file.file_type().is_ok_and(|t|t.is_file()&&!t.is_symlink())||file.path().extension().is_none_or(|e|e!="json"){continue}
-        let receipt=file.path().to_string_lossy().into_owned();let seen:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM receipts WHERE path=?1)",[&receipt],|r|r.get(0)).map_err(|_| "读取同步进度失败")?;if seen{continue}
-        if file.metadata().map_err(|_| "同步文件暂不可用")?.len()>4*1024*1024{return Err("同步文件过大".into())}
-        let data=fs::read(file.path()).map_err(|_| "同步文件暂不可用")?;
-        let p:Packet=serde_json::from_slice(&data).map_err(|_| "同步文件尚未下载完成或格式无效")?;
-        if p.schema!=1||p.events.len()>1000||uuid::Uuid::parse_str(&p.device.id).is_err()||p.device.name.len()>640{return Err("同步文件格式无效".into())}
+    let mut errors=if legacy{sync_storage::restore_legacy(&own,&o.device_id)}else{Vec::new()};
+    for device in dirs {let device=match device{Ok(d)=>d,Err(_)=>{errors.push("部分同步设备目录暂不可用".to_string());continue}};
+    if !device.file_type().is_ok_and(|t|t.is_dir()&&!t.is_symlink()){continue}
+    let items=match fs::read_dir(device.path()){Ok(items)=>items,Err(_)=>{errors.push("部分设备同步目录暂不可用".to_string());continue}};
+    for file in items {let file=match file{Ok(f)=>f,Err(_)=>{errors.push("部分同步文件暂不可用".to_string());continue}};
+        if !file.file_type().is_ok_and(|t|t.is_file()&&!t.is_symlink()) || !sync_storage::is_packet(&file.path()) {continue}
+        let receipt=file.path().to_string_lossy().into_owned();
+        let (p,fingerprint)=match sync_storage::read_packet_with_hash(&file.path()){Ok(p)=>p,Err(e)=>{errors.push(e);continue}};
+        let previous:Option<String>=db.query_row("SELECT fingerprint FROM receipts WHERE path=?1",[&receipt],|r|r.get(0)).optional().map_err(|_|"读取同步索引失败")?.flatten();
+        if previous.as_deref()==Some(fingerprint.as_str()){continue}
         let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;
         tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![p.device.id,label(&p.device.name)]).map_err(|_| "保存设备信息失败")?;
         for e in p.events {merge_metric(&tx,&e,false)?;}
-        tx.execute("INSERT INTO receipts(path) VALUES(?1)",[receipt]).map_err(|_| "保存同步进度失败")?;tx.commit().map_err(|_| "保存同步统计失败")?;
-    }}}
-    Ok(())
+        tx.execute("INSERT INTO receipts(path,fingerprint) VALUES(?1,?2) ON CONFLICT(path) DO UPDATE SET fingerprint=excluded.fingerprint",params![receipt,fingerprint]).map_err(|_| "保存同步进度失败")?;tx.commit().map_err(|_| "保存同步统计失败")?;
+    }}
+    if errors.is_empty(){Ok(())}else{errors.sort();errors.dedup();Err(format!("其他有效文件已合并，异常包保留并将在下次重试：{}",errors.into_iter().take(4).collect::<Vec<_>>().join("；")))}
 }
 
 #[derive(Default,Serialize)]
@@ -289,7 +306,7 @@ fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
 pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub sessions:u64 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String> }
+pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String>,pub sync_errors:Vec<String> }
 fn aggregate(events:&[Metric],key:impl Fn(&Metric)->String)->Vec<Group>{
     let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
     for e in events{let k=key(e);let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
@@ -338,7 +355,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source){events.push(e)}}
+        if in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
     let devices=db.prepare("SELECT id,name FROM devices ORDER BY name").map_err(|_| "读取设备失败")?.query_map([],|r|Ok(OptionsDevice{id:r.get(0)?,name:r.get(1)?})).map_err(|_| "读取设备失败")?.collect::<Result<_,_>>().map_err(|_| "读取设备失败")?;
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     // Keep model choices scoped to device/source/dates while viewing one model.
@@ -346,7 +363,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     events.retain(|e|model.as_deref().is_none_or(|m|model_matches(m,e)));
     let token_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tokens").cloned().collect();let tool_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tool").cloned().collect();
     let trae_events:Vec<Metric>=events.iter().filter(|e|e.source=="trae").cloned().collect();
-    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default() })
+    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors:status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default() })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)
@@ -384,7 +401,7 @@ pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),S
     input.device_id=previous.device_id;input.device_name=label(&input.device_name);
     if !(5..=3600).contains(&input.collect_interval_seconds) { return Err("采集间隔应为 5–3600 秒".into()); }
     for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.trae_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
-    if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}
+    if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT OR IGNORE INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}
     save_options(state.store.dir(),&input)
     }).await.map_err(|_|"保存统计设置失败")?
 }

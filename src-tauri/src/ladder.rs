@@ -66,7 +66,7 @@ pub fn load(dir: &std::path::Path) -> Snapshot {
     snapshot
 }
 
-fn api_model_id(id: &str) -> String {
+pub(crate) fn api_model_id(id: &str) -> String {
     let id = ["-non-reasoning","-xhigh","-high","-medium","-low","-max"].iter().find_map(|suffix|id.strip_suffix(suffix)).unwrap_or(id);
     match id {
         "deepseek-v4-1-flash" => "deepseek-flash".into(),

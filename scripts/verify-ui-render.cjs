@@ -154,7 +154,7 @@ const {SettingsView}=load(path.resolve(__dirname,'../src/views/SettingsView.tsx'
 const settingsHtml=render(SettingsView,{settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},info:null});
 assert.match(settingsHtml,/>导出<\/button>/);assert.match(settingsHtml,/Token 采集频率/);assert.match(settingsHtml,/导出备份/);assert.ok(!settingsHtml.includes('飞书'));assert.ok(!settingsHtml.includes('导出数据</button>'));
 assert.match(settingsHtml,/导入数据 \/ 迁移账户/);assert.match(settingsHtml,/未选内容保留/);assert.match(settingsHtml,/macOS/);
-assert.match(settingsHtml,/跨设备同步/);assert.match(settingsHtml,/iCloud Drive/);assert.match(settingsHtml,/不含任何登录凭据/);
+assert.match(settingsHtml,/跨设备同步/);assert.match(settingsHtml,/iCloud Drive/);assert.match(settingsHtml,/密钥和登录信息留在本机/);
 console.log('PASS unified backup export/import, configurable collection frequency, shared account privacy boundary and no Feishu sync entry');
 
 const {priceText}=load(path.resolve(__dirname,'../src/lib/format.ts'));

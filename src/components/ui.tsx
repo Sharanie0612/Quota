@@ -2,6 +2,7 @@
 import { Children, cloneElement, isValidElement, useEffect, useId, useRef, type ReactNode } from "react";
 import { IconAlert, IconInfo, IconRefresh, IconX } from "./icons";
 import { ToastStack } from "./ToastStack";
+import { useSlidingHighlight } from "../lib/useSlidingHighlight";
 
 export function Button({
   children,
@@ -97,13 +98,16 @@ export function Seg<T extends string>({
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
 }) {
+  const track = useSlidingHighlight<HTMLDivElement>(value);
   return (
-    <div className="seg" role="tablist">
+    <div className="seg motion-seg" role="tablist" ref={track}>
+      <span className="motion-highlight" aria-hidden="true" />
       {options.map((o) => (
         <button
           key={o.value}
           role="tab"
           aria-selected={o.value === value}
+          data-motion-active={o.value === value}
           tabIndex={o.value === value ? 0 : -1}
           className={o.value === value ? "active" : ""}
           onClick={() => onChange(o.value)}

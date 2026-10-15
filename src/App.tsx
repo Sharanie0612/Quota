@@ -13,15 +13,18 @@ import { ModelsView } from "./views/ModelsView";
 import { SettingsView } from "./views/SettingsView";
 import { LadderView } from "./views/LadderView";
 import { ActivityView } from "./views/ActivityView";
+import { UsageCostsView } from "./views/UsageCostsView";
+import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import appIcon from "../src-tauri/icons/128x128.png";
 
-type View = "accounts" | "models" | "ladder" | "activity" | "settings";
+type View = "accounts" | "models" | "ladder" | "activity" | "costs" | "settings";
 
 export default function App() {
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
 
   const [view, setView] = useState<View>("accounts");
+  const nav = useSlidingHighlight<HTMLDivElement>(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
   const [providers, setProviders] = useState<ProviderView[]>([]);
@@ -69,7 +72,7 @@ export default function App() {
   };
 
   const title =
-    view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "ladder" ? "AI 模型天梯" : view === "activity" ? "Token 活动" : "设置";
+    view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "ladder" ? "AI 模型天梯" : view === "activity" ? "Token 活动" : view === "costs" ? "我的使用" : "设置";
   const sub =
     view === "accounts"
       ? accounts.length === 0
@@ -77,7 +80,7 @@ export default function App() {
         : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个额度不足` : ""}${failedCount > 0 ? ` · ${failedCount} 个同步异常` : ""}${pendingCount > 0 ? ` · ${pendingCount} 个待查询` : ""}${!lowCount && !failedCount && !pendingCount ? " · 状态正常" : ""}`
       : view === "models"
         ? `${modelCount} 个可用模型 · 价格以官网为准`
-        : view === "ladder" ? "十家厂商的能力排名与官方价格" : view === "activity" ? "历史用量与跨设备同步" : "同步与提醒";
+        : view === "ladder" ? "十家厂商的能力排名与官方价格" : view === "activity" ? "历史用量与跨设备同步" : view === "costs" ? "实际支出与厂商用量" : "同步与提醒";
 
   return (
     <div className="app">
@@ -90,7 +93,9 @@ export default function App() {
           </div>
         </div>
 
-        <button
+        <div className="sidebar-nav" ref={nav}>
+        <span className="motion-highlight" aria-hidden="true"/>
+        <button data-motion-active={view === "accounts"}
           className={`nav-item${view === "accounts" ? " active" : ""}`}
           onClick={() => setView("accounts")}
         >
@@ -98,7 +103,8 @@ export default function App() {
           账户总览
           <span className="count">{accounts.length || ""}</span>
         </button>
-        <button
+        <button data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconWallet size={16}/>我的使用</button>
+        <button data-motion-active={view === "models"}
           className={`nav-item${view === "models" ? " active" : ""}`}
           onClick={() => setView("models")}
         >
@@ -106,17 +112,18 @@ export default function App() {
           模型库
           <span className="count">{modelCount || ""}</span>
         </button>
-        <button className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
+        <button data-motion-active={view === "ladder"} className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
           <IconLayers size={16} />AI 模型天梯
         </button>
-        <button className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconLayers size={16}/>Token 活动</button>
-        <button
+        <button data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconLayers size={16}/>Token 活动</button>
+        <button data-motion-active={view === "settings"}
           className={`nav-item${view === "settings" ? " active" : ""}`}
           onClick={() => setView("settings")}
         >
           <IconGear size={16} />
           设置
         </button>
+        </div>
 
         <div className="sidebar-foot">
           {lowCount > 0 ? (
@@ -150,6 +157,7 @@ export default function App() {
         </div>
 
         <div className="content" ref={contentRef}>
+          <div className="view-transition" key={view}>
           {info?.storageIssues?.length ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
               <Notice tone="error" actions={<Button size="sm" onClick={() => setView("settings")}>查看配置目录</Button>}>
@@ -198,10 +206,12 @@ export default function App() {
           ) : null}
 
           {view === "ladder" ? <LadderView autoUpdate={settings?.ladderAutoUpdate ?? false} /> : null}
-          {view === "activity" ? <ActivityView /> : null}
+          {view === "activity" ? <ActivityView onOpenSyncSettings={()=>setView('settings')} /> : null}
+          {view === "costs" ? <UsageCostsView /> : null}
           {view === "settings" ? (
             <SettingsView settings={settings} onUpdate={(s) => void update(s)} info={info} />
           ) : null}
+          </div>
         </div>
       </main>
 

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  ActivityReport, ActivityOptions,
+  ActivityReport, ActivityOptions, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
   AccountInput,
   AccountTrend,
   AccountView,
@@ -19,8 +19,22 @@ import type {
 } from "./types";
 
 export const api = {
+  getVendorCosts: (from: string, to: string) => invoke<VendorCostReport>("get_vendor_costs", {from,to}),
+  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months}),
+  saveMonthlyUsageFx: (month: string, rate: number | null) => invoke<void>("save_monthly_usage_fx",{month,rate}),
+  saveVendorExpense: (input: VendorExpense, previous: VendorExpense | null = null) => invoke<void>("save_vendor_expense", {input,previous}),
+  getActivityStorage: () => invoke<ActivityStorage>("get_activity_storage"),
+  getActivityReaders: () => invoke<{device:string;version:string|null;compressed:boolean|null}[]>("get_activity_readers"),
+  rebuildActivitySync: () => invoke<number>("rebuild_activity_sync"),
+  optimizeActivityStorage: () => invoke<{before: ActivityStorage; after: ActivityStorage; converted: number}>("optimize_activity_storage"),
+  getUsagePrices: () => invoke<[UsagePriceReference[], Record<string, UsageRate>]>("get_usage_prices"),
+  saveUsageCalculation: (model: string, rate: UsageRate | null, scope: UsageScope, bill: UsageBill | null) => invoke<void>("save_usage_calculation", { model, rate, scope, bill }),
+  getUsageBills: (scope: UsageScope) => invoke<Record<string, UsageBill>>("get_usage_bills", { scope }),
+  pollMimoLogin: (provider: string) => invoke<MimoLoginStatus>("poll_mimo_login", { provider }),
   getAccountSyncStatus: () => invoke<{lastSynced:string|null;error:string|null}>("get_account_sync_status"),
   syncAccounts: () => invoke<void>("sync_accounts"),
+  getAccountSyncCandidates: () => invoke<AccountSyncCandidate[]>("get_account_sync_candidates"),
+  resolveAccountSync: (sourceId: string, targetId: string | null) => invoke<void>("resolve_account_sync", { sourceId, targetId }),
   exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
   importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
   getActivityOptions: () => invoke<ActivityOptions>("get_activity_options"),

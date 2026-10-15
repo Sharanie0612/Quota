@@ -20,6 +20,9 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 pub struct AppState {
+    pub billing_lock: Mutex<()>,
+    pub mimo_login_lock: tokio::sync::Mutex<()>,
+    pub mimo_login_generation: std::sync::atomic::AtomicU64,
     pub account_sync_lock: Mutex<()>,
     pub activity_lock: Mutex<()>,
     pub ladder: Mutex<crate::ladder::Snapshot>,
@@ -70,6 +73,9 @@ impl AppState {
             builder.build().unwrap_or_default()
         };
         Self {
+            billing_lock: Mutex::new(()),
+            mimo_login_lock: tokio::sync::Mutex::new(()),
+            mimo_login_generation: std::sync::atomic::AtomicU64::new(0),
             account_sync_lock: Mutex::new(()),
             activity_lock: Mutex::new(()),
             ladder: Mutex::new(crate::ladder::load(store.dir())),
@@ -420,6 +426,10 @@ pub fn apply_manual_balance(account: &Account, status: &mut AccountStatus) {
 
 /// 刷新拿到余额后追加一条历史记录；余额明显上涨时向前端广播疑似充值事件
 fn record_history(state: &AppState, account: &Account, app: &AppHandle) {
+    if crate::vendor_costs::capture(state, account).is_err() {
+        // No provider response, credentials or account content enters this log.
+        eprintln!("[Quota] 本次账面消费记录未能保存");
+    }
     let Some(balance) = state
         .statuses
         .lock()
@@ -740,10 +750,7 @@ pub async fn delete_account(
     app: AppHandle,
     id: String,
 ) -> Result<(), String> {
-    {
-        let mut cfg = state.config.lock().map_err(|_| "配置锁定失败".to_string())?;
-        state.store.update_config(&mut cfg, |next| next.accounts.retain(|a| a.id != id))?;
-    }
+    crate::account_sync::remove_account(&state, &id)?;
     let _ = secrets::delete(&id);
     if let Ok(mut map) = state.statuses.lock() {
         map.remove(&id);

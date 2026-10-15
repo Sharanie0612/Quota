@@ -1,7 +1,7 @@
 {
   "name": "quota",
   "private": true,
-  "version": "1.0.1400",
+  "version": "1.0.1800",
   "type": "module",
   "description": "A lightweight local-first dashboard for AI provider balances and quotas.",
   "scripts": {
@@ -9,7 +9,8 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "tauri": "node scripts/tauri.cjs"
+    "tauri": "node scripts/tauri.cjs",
+    "package:windows": "node scripts/package-windows.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.11",

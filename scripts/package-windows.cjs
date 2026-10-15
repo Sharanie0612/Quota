@@ -1,0 +1,67 @@
+// Reuse release artifacts and run independent checks concurrently; never clean target.
+const fs = require('node:fs');
+const path = require('node:path');
+const { spawn, execFileSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..');
+const started = Date.now();
+const npmCli = process.env.npm_execpath;
+const env = { ...process.env, RUSTUP_TOOLCHAIN: 'stable-x86_64-pc-windows-gnu' };
+function run(label, command, args, cwd = root) {
+  const start = Date.now();
+  console.log(`[开始] ${label}`);
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, env, stdio: 'inherit', windowsHide: true });
+    child.on('error', reject);
+    child.on('exit', code => {
+      console.log(`[${code === 0 ? '通过' : '失败'}] ${label} (${((Date.now() - start) / 1000).toFixed(1)}s)`);
+      code === 0 ? resolve() : reject(Error(`${label} 退出码 ${code}`));
+    });
+  });
+}
+function dependenciesMatch() {
+  try {
+    const expected = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'))).packages;
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json')));
+    for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+      const declared = manifest[group] || {};
+      const locked = expected[''][group] || {};
+      if (Object.keys(declared).length !== Object.keys(locked).length ||
+          Object.keys(declared).some(name => declared[name] !== locked[name])) return false;
+    }
+    const installed = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/.package-lock.json'))).packages;
+    for (const [name, pkg] of Object.entries(expected)) {
+      if (!name) continue;
+      const actual = installed[name];
+      if (!actual && pkg.optional) continue;
+      if (!actual || actual.version !== pkg.version || actual.integrity !== pkg.integrity ||
+          !fs.existsSync(path.join(root, name, 'package.json'))) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+async function main() {
+  if (process.platform !== 'win32') throw Error('此入口仅用于 Windows GNU + NSIS 打包');
+  if (!npmCli) throw Error('请使用 npm run package:windows');
+  const rustc = execFileSync('rustup', ['which', '--toolchain', env.RUSTUP_TOOLCHAIN, 'rustc'], { encoding: 'utf8', windowsHide: true }).trim();
+  const toolchain = path.dirname(path.dirname(rustc));
+  const gnuBin = path.join(toolchain, 'lib/rustlib/x86_64-pc-windows-gnu/bin');
+  env.PATH = [path.join(toolchain, 'bin'), path.join(gnuBin, 'self-contained'), gnuBin, process.env.PATH].join(path.delimiter);
+  const running = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-Command', 'ConvertTo-Json -InputObject @((Get-Process quota -ErrorAction SilentlyContinue).Path) -Compress'], { encoding: 'utf8', windowsHide: true }).trim());
+  const releaseExe = path.join(root, 'src-tauri/target/release/quota.exe').toLowerCase();
+  if (running.some(file => file && path.resolve(file).toLowerCase() === releaseExe)) throw Error('请先退出构建产物位置正在运行的 Quota，再打包');
+  if (!fs.existsSync(path.join(root, 'src-tauri/WebView2Loader.dll'))) throw Error('缺少 WebView2Loader.dll');
+  if (!dependenciesMatch()) await run('同步前端锁定依赖', process.execPath, [npmCli, 'ci', '--no-audit', '--no-fund']);
+  else console.log('[复用] 前端依赖与 lockfile 一致');
+  const checks = await Promise.allSettled([
+    run('TypeScript', process.execPath, [npmCli, 'run', 'typecheck']),
+    run('Rust 类型检查', 'cargo', ['check', '--locked'], path.join(root, 'src-tauri')),
+    run('纯逻辑', process.execPath, ['scripts/verify-logic.cjs']),
+    run('组件渲染', process.execPath, ['scripts/verify-ui-render.cjs']),
+  ]);
+  const failures = checks.filter(check => check.status === 'rejected');
+  if (failures.length) throw Error(failures.map(check => check.reason.message).join('\n'));
+  // Tauri's beforeBuildCommand builds the frontend exactly once.
+  await run('Release 编译与 NSIS 打包', process.execPath, [npmCli, 'run', 'tauri', '--', 'build']);
+  console.log(`[完成] 总耗时 ${((Date.now() - started) / 1000).toFixed(1)}s；安装包位于 src-tauri/target/release/bundle/nsis`);
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; });

@@ -254,6 +254,20 @@ fn get_json(client: &reqwest::Client, url: &str, cookie: &str) -> reqwest::Reque
         .header("x-timezone", "Asia/Shanghai")
 }
 
+/// Authentication is independent of whether this account owns a Token Plan.
+/// Use one bounded request; never return URLs/headers containing login secrets.
+pub async fn validate_login(client: &reqwest::Client, cookie: &str) -> Result<bool, String> {
+    let response = get_json(client, &format!("{CONSOLE_BASE}/balance"), cookie)
+        .timeout(std::time::Duration::from_secs(10)).send().await
+        .map_err(|e| if e.is_timeout() { "小米登录验证超时，请检查网络后重试" } else { "无法连接小米官网，请检查网络或系统代理" })?;
+    if matches!(response.status().as_u16(), 401 | 403) { return Ok(false); }
+    if !response.status().is_success() { return Err("小米官网暂时无法验证登录，请稍后重试".into()); }
+    let body: Value = response.json().await.map_err(|_| "小米登录验证返回格式异常，请稍后重试")?;
+    if body.get("code").and_then(Value::as_i64) == Some(401) { return Ok(false); }
+    if body.get("code").and_then(Value::as_i64) != Some(0) { return Err("小米官网暂时无法验证登录，请稍后重试".into()); }
+    Ok(true)
+}
+
 /// 把 Credits 格式化成人能一眼看懂的量级（41 亿 > 4100000000）
 fn fmt_quota(v: f64) -> String {
     if v.abs() >= 1.0e8 {

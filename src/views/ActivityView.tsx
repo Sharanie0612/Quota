@@ -15,7 +15,7 @@ import type { ActivityGroup, ActivityOptions, ActivityReport } from "../lib/type
 import type { ActivityMetric, ActivityRange } from "../lib/activityCharts";
 
 const number = (n: number) => new Intl.NumberFormat("zh-CN").format(n);
-const sourceNames: Record<string, string> = { codex: "Codex", zcode: "ZCode", harness: "DeepSeek Harness" };
+const sourceNames: Record<string, string> = { codex: "Codex", zcode: "ZCode", harness: "DeepSeek Harness", trae: "Trae（同步记录）" };
 
 function ActivityNumber({value,compact}:{value:number|undefined;compact:boolean}) {
   const element=useRef<HTMLElement>(null);
@@ -61,7 +61,7 @@ function Breakdown({ title, rows, calls = false, onModel, format = number }: { f
   </section>;
 }
 
-export function ActivityView() {
+export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}) {
   const [compactNumbers,setCompactNumbers]=useState(true);
   const format=(n:number)=>compactNumbers?new Intl.NumberFormat("zh-CN",{notation:"compact",maximumFractionDigits:2}).format(n):number(n);
   const [device, setDevice] = useState("");
@@ -139,9 +139,9 @@ export function ActivityView() {
     } finally { setBusy(null); }
   };
 
-  const choose = async (key: "syncDir" | "codexHome" | "zcodeHome" | "harnessHome") => {
+  const choose = async (key: "codexHome" | "zcodeHome" | "harnessHome") => {
     try {
-      const path = await open({ directory: true, multiple: false, title: key === "syncDir" ? "选择各设备共用的同步目录" : "选择日志目录" });
+      const path = await open({ directory: true, multiple: false, title: "选择日志目录" });
       if (typeof path === "string") setOptions(current => current ? { ...current, [key]: path } : current);
     } catch (e) { toast(errText(e), "error"); }
   };
@@ -151,7 +151,7 @@ export function ActivityView() {
     setBusy("save");
     try {
       const current=await api.getActivityOptions();
-      await api.saveActivityOptions({...options,autoCollect:current.autoCollect,collectIntervalSeconds:current.collectIntervalSeconds,syncAccounts:current.syncAccounts});
+      await api.saveActivityOptions({...options,syncDir:current.syncDir,autoCollect:current.autoCollect,collectIntervalSeconds:current.collectIntervalSeconds,syncAccounts:current.syncAccounts});
       setOptions(null);
       // A collection failure must not be reported as a failed settings save.
       try {
@@ -181,7 +181,8 @@ export function ActivityView() {
     <div className="activity-action-bar">
       <span className="hint" role="status">{status}</span><div>
         <Button disabled={!!busy} onClick={() => void refresh()}><IconRefresh size={13} className={busy === "collect" ? "spin" : ""} />{busy === "collect" ? "同步中…" : "立即同步"}</Button>
-        <Button disabled={!!busy || !data} onClick={() => setOptions(options ? null : data ? { ...data.options } : null)}><IconGear size={13} />{options ? "收起设置" : "同步设置"}</Button>
+        <Button disabled={!!busy || !data} onClick={() => setOptions(options ? null : data ? { ...data.options } : null)}><IconGear size={13} />{options ? "收起设置" : "采集设置"}</Button>
+        <Button onClick={onOpenSyncSettings}>跨设备同步</Button>
       </div>
     </div>
 
@@ -197,14 +198,10 @@ export function ActivityView() {
     </Notice>}
 
     {options && <section className="card activity-settings">
-      <h3>自动采集与跨设备同步</h3>
+      <h3>本机采集设置</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
       <p className="hint">采集频率和账户跨设备同步在「设置」调整。</p>
-      <Field label="共享目录" hint="在每台设备选择同一个 iCloud Drive、OneDrive 或 NAS 目录；同步用量和已开启的账户展示资料，不同步密钥。"><div className="activity-path">
-        <input className="input" aria-label="共享目录" readOnly value={options.syncDir} placeholder="尚未开启跨设备同步" />
-        <Button disabled={!!busy} onClick={() => void choose("syncDir")}>选择目录</Button>
-        <Button disabled={!!busy || !options.syncDir} onClick={() => setOptions({ ...options, syncDir: "" })}>关闭同步</Button>
-      </div></Field>
+      <p className="hint">跨设备同步统一在「设置」中管理。</p>
       <details><summary>日志位置</summary>{(["codexHome", "zcodeHome", "harnessHome"] as const).map(key => {
         const label = key === "codexHome" ? "Codex" : key === "zcodeHome" ? "智谱 ZCode" : "DeepSeek Harness";
         return <Field key={key} label={label}><div className="activity-path">

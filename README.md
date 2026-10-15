@@ -19,6 +19,7 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 | **模型库** | 查看模型资料、官方价格与来源，隐藏或恢复型号 |
 | **AI 模型天梯** | 图表、列表、六维能力图；自适应价格与评分区间，筛选模型，点击查看能力、价格及推出日期 |
 | **Token 活动** | 汇总 Codex、智谱 ZCode 和 DeepSeek Harness 用量；按设备、来源、模型或厂商筛选，查看小时曲线与缓存命中情况 |
+| **模型使用价格** | 按实际 Token 构成计算费用与综合单价；精确匹配已核实资料，支持本机费率与按统计范围保存的实付账单，估算与实付分别标注 |
 | **设置** | 调整刷新、采集频率、通知和共享目录同步，导出备份并选择导入内容 |
 
 ### 模型天梯
@@ -67,7 +68,7 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 
 ### 当前版本与安装包
 
-当前源码版本为 **1.0.1301**，已生成 Windows NSIS 本地安装包。版本、WebView2Loader.dll 哈希及解包后的隔离配置启动检查通过；**实际覆盖升级未验证**。本轮 macOS 安装包未构建。
+当前源码版本为 **1.0.1700**。「我的使用」移到账户总览下方，排除 Trae，支持全局与所选时间统计、自然日费用分摊及固定月度汇率参考。跨设备同步改为三步设置与一个立即同步按钮，修复和空间优化收进高级项。Windows 安装包、隔离启动、计算及同步回归通过；实际覆盖升级和跨设备云盘传输仍需实测，本轮 macOS 未构建。详见 [1.0.1700 交付说明](docs/release-1.0.1700.md)。
 
 安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
 
@@ -130,8 +131,7 @@ npm run tauri dev
 本仓库使用 `stable-x86_64-pc-windows-gnu` 工具链及 WebView2。打包前退出构建产物位置正在运行的 `quota.exe`，使用 rustup 自带 MinGW，避免系统中的旧 MinGW：
 
 ```powershell
-$env:Path = "$env:USERPROFILE\.rustup\toolchains\stable-x86_64-pc-windows-gnu\lib\rustlib\x86_64-pc-windows-gnu\bin;$env:USERPROFILE\.cargo\bin;$env:Path"
-npm run tauri build
+npm run package:windows
 ```
 
 产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。

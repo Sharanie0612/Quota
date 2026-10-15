@@ -10,7 +10,7 @@ const SERVICE: &str = "Quota";
 // legacy compatibility: existing Windows Credential Manager entries use this service.
 const LEGACY_SERVICE: &str = "AgentPrice";
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretBlob {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -204,4 +204,57 @@ pub fn delete(account_id: &str) -> Result<(), String> {
     // An empty new-service entry prevents a deleted account's legacy key from reappearing.
     // The legacy entry is deliberately preserved for rollback.
     write(account_id, &SecretBlob::default())
+}
+
+fn present(value: &Option<String>) -> bool { value.as_ref().is_some_and(|v| !v.trim().is_empty()) }
+impl SecretBlob {
+    pub fn has_connection(&self) -> bool {
+        present(&self.api_key) || present(&self.admin_key) || present(&self.console_cookie)
+            || present(&self.subscription_account) || (present(&self.access_key_id) && present(&self.access_key_secret))
+    }
+    pub fn compatible(&self, other: &Self) -> bool {
+        [(&self.api_key, &other.api_key), (&self.admin_key, &other.admin_key),
+         (&self.console_cookie, &other.console_cookie), (&self.subscription_account, &other.subscription_account),
+         (&self.access_key_id, &other.access_key_id), (&self.access_key_secret, &other.access_key_secret)]
+            .iter().all(|(a,b)| !present(a) || !present(b) || a == b)
+    }
+    // Equality is evaluated in memory only; no credential or credential-derived ID is shared.
+    pub fn same_login(&self, other: &Self) -> bool {
+        self.compatible(other) && ([(&self.api_key, &other.api_key), (&self.console_cookie, &other.console_cookie),
+            (&self.subscription_account, &other.subscription_account)].iter().any(|(a,b)| present(a) && a == b)
+            || (present(&self.access_key_id) && present(&self.access_key_secret)
+                && self.access_key_id == other.access_key_id && self.access_key_secret == other.access_key_secret))
+    }
+}
+pub struct ConnectionTransfer { pub changed: bool, pub use_source_config: bool }
+/// Local-only, additive transfer. Original entries are never deleted, and an existing
+/// target connection always wins. AccessKey pairs are copied together, never spliced.
+pub fn inherit_connection_with(
+    source: &str, target: &str,
+    read: impl Fn(&str) -> Result<SecretBlob, String>,
+    save: impl Fn(&str, &SecretBlob) -> Result<(), String>,
+) -> Result<ConnectionTransfer, String> {
+    let from = read(source)?;
+    let before = read(target)?;
+    let use_source_config = !before.has_connection() && from.has_connection();
+    let mut next = before.clone();
+    if before.compatible(&from) {
+        for (dst, src) in [(&mut next.api_key, &from.api_key), (&mut next.admin_key, &from.admin_key),
+            (&mut next.console_cookie, &from.console_cookie), (&mut next.subscription_account, &from.subscription_account)] {
+            if !present(dst) && present(src) { *dst = src.clone(); }
+        }
+        if (!present(&next.access_key_id) || !present(&next.access_key_secret))
+            && present(&from.access_key_id) && present(&from.access_key_secret) {
+            next.access_key_id = from.access_key_id.clone(); next.access_key_secret = from.access_key_secret.clone();
+        }
+    }
+    let changed = next != before;
+    if changed {
+        save(target, &next)?;
+        if read(target)? != next { return Err("凭据继承核验失败，原账户及凭据保留".into()); }
+    }
+    Ok(ConnectionTransfer { changed, use_source_config: use_source_config && changed })
+}
+pub fn inherit_connection(source: &str, target: &str) -> Result<ConnectionTransfer, String> {
+    inherit_connection_with(source, target, get_secrets, restore)
 }

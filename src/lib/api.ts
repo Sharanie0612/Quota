@@ -111,6 +111,7 @@ export const api = {
 };
 
 export const events = {
+  onActivityUpdated: (cb: () => void) => listen("activity-updated", cb),
   onAccountsUpdated: (cb: () => void) => listen("accounts-updated", cb),
   /** 刷新时检测到余额明显上涨（疑似充值） */
   onRechargeDetected: (cb: (e: RechargeEvent) => void) =>

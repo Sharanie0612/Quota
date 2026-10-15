@@ -2,6 +2,7 @@ mod aliyun;
 pub mod activity;
 pub mod usage_costs;
 pub mod vendor_costs;
+pub mod usage_sync;
 pub mod usage_fx;
 pub mod account_sync;
 pub mod data_export;

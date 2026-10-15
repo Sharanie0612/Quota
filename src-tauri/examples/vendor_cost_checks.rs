@@ -71,7 +71,7 @@ fn main() {
             tool: String::new(),
             timestamp: at,
             kind: "tokens".into(),
-            revision: 0,
+            harness_identity: 0, revision: 0,
             tokens: activity::Tokens {
                 input: total - 100,
                 output: 100,

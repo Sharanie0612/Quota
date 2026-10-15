@@ -314,6 +314,29 @@ pub(crate) fn saved_finance_status(dir:&Path,account:&Account)->Option<AccountSt
     if !snapshot.valid(){return None}
     let mut status=AccountStatus::default();snapshot.apply(&mut status);Some(status)
 }
+/// Explicitly associated display IDs only; this never inspects credentials.
+pub(crate) fn finance_ids(dir: &Path, account: &Account) -> BTreeSet<String> {
+    let mut ids = BTreeSet::from([account.id.clone()]);
+    let Ok(local) = read::<Local>(&dir.join("account-sync-state.json")) else { return ids; };
+    if local.associations.len() + local.links.len() > 2000 { return ids; }
+    for _ in 0..1000 {
+        let before = ids.len();
+        for edge in &local.associations {
+            if edge.provider == account.provider && (ids.contains(&edge.source) || ids.contains(&edge.target))
+                && uuid::Uuid::parse_str(&edge.source).is_ok() && uuid::Uuid::parse_str(&edge.target).is_ok() {
+                ids.insert(edge.source.clone()); ids.insert(edge.target.clone());
+            }
+        }
+        for (source, target) in &local.links {
+            if (ids.contains(source) || ids.contains(target)) && local.records.get(source).is_some_and(|r| r.profile.provider == account.provider)
+                && uuid::Uuid::parse_str(source).is_ok() && uuid::Uuid::parse_str(target).is_ok() {
+                ids.insert(source.clone()); ids.insert(target.clone());
+            }
+        }
+        if ids.len() == before || ids.len() >= 1000 { break; }
+    }
+    ids
+}
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Packet {

@@ -1,4 +1,4 @@
-//! Metrics-only reader for DeepSeek Harness canonical v2-v4 JSONL sessions.
+//! Metrics-only reader for released DeepSeek Harness v0-v4 JSONL sessions.
 //! Sources: official session-persistence-jsonl and token-meter/usage-projection.
 use super::{cursor, hash, label, merge_metric, save_cursor, Cursor, Metric, Tokens};
 use std::{collections::BTreeMap, fs, io::{ErrorKind, Read}, path::{Path, PathBuf}};
@@ -77,9 +77,24 @@ fn stream_usage(data: &Value) -> Option<&Value> {
     })
 }
 
+fn packed_span(row: &Value, kind: &str) -> Result<(u64,u64),String> {
+    let invalid = || "Harness 历史压缩行无效，未采集此会话".to_string();
+    let first = row.get("seq0").and_then(Value::as_u64).ok_or_else(invalid)?;
+    let mut time = row.get("time0").and_then(Value::as_i64).ok_or_else(invalid)?;
+    let data = row.get("data").ok_or_else(invalid)?;
+    let members = data.get(if kind == "tool-call-chunks" { "args" } else { "texts" }).and_then(Value::as_array).ok_or_else(invalid)?;
+    let gaps = data.get("dt").and_then(Value::as_array).ok_or_else(invalid)?;
+    if members.is_empty() || members.iter().any(|v|!v.is_string()) || gaps.len() != members.len()-1
+        || ["turn","step","index"].iter().any(|k|data.get(k).and_then(Value::as_u64).is_none())
+        || (kind == "tool-call-chunks" && data.get("id").and_then(Value::as_str).is_none_or(str::is_empty)) { return Err(invalid()); }
+    for gap in gaps { time = time.checked_add(gap.as_i64().ok_or_else(invalid)?).ok_or_else(invalid)?; }
+    let last = first.checked_add(members.len() as u64 - 1).filter(|n|*n < 1_000_000_000).ok_or_else(invalid)?;
+    Ok((first,last))
+}
+
 /// Reads only metadata/usage into Metric; conversation and tool arguments never enter storage.
 pub(super) fn parse(bytes: &[u8], version: u32, device: &str) -> Result<Vec<Metric>, String> {
-    if !(2..=4).contains(&version) { return Err("Harness 会话版本暂不支持（支持 v2–v4），未采集此会话".into()); }
+    if version > 4 { return Err(format!("Harness 会话 v{version} 尚未适配（支持 v0–v4），未回退到旧会话；请更新 Quota")); }
     let mut rows = Vec::new();
     for raw in bytes.split_inclusive(|b| *b == b'\n') {
         if raw.last() != Some(&b'\n') { break; }
@@ -89,37 +104,50 @@ pub(super) fn parse(bytes: &[u8], version: u32, device: &str) -> Result<Vec<Metr
     let header = rows.first().ok_or("Harness 会话缺少完整头记录")?;
     let session = header.get("id").and_then(Value::as_str).filter(|s| !s.is_empty()).ok_or("Harness 会话头记录无效")?;
     if header.get("type").and_then(Value::as_str) != Some("session") || header.get("version").and_then(Value::as_u64) != Some(version as u64) { return Err("Harness 会话版本与文件名不一致".into()); }
-    let seeded = header.get("isSeeded").and_then(Value::as_bool).ok_or("Harness 会话缺少继承标识")?;
-    let cut = if seeded {
-        rows.iter().rposition(|v| v.get("type").and_then(Value::as_str) == Some("session/end-seed") && v.pointer("/data/inherited").and_then(Value::as_bool) == Some(true)).ok_or("Harness 分叉会话缺少继承边界，未采集此会话")? + 1
-    } else { header.get("seedLength").and_then(Value::as_u64).unwrap_or(0) as usize + 1 };
+    let cut = if version <= 1 {
+        header.get("seedLength").map_or(Some(0), Value::as_u64).ok_or("Harness 继承长度无效")?
+    } else if header.get("isSeeded").and_then(Value::as_bool).ok_or("Harness 会话缺少继承标识")? {
+        rows.iter().rev().find(|v| v.get("type").and_then(Value::as_str) == Some("session/end-seed") && v.pointer("/data/inherited").and_then(Value::as_bool) == Some(true))
+            .and_then(|v|v.get("seq")).and_then(Value::as_u64).and_then(|n|n.checked_add(1)).ok_or("Harness 分叉会话缺少继承边界，未采集此会话")?
+    } else { 0 };
     let agent = label(header.get("agentPreset").and_then(Value::as_str).unwrap_or(if header.get("origin").and_then(Value::as_str) == Some("subagent") { "子 Agent" } else { "主 Agent" }));
     let mut model = "未知模型".to_string(); let mut metrics = BTreeMap::new();
     let mut attempt = 0u64; let mut last_slot: Option<(u64,u64,u64)> = None;
     let mut last_seq = None;
-    for (index, event) in rows.iter().enumerate().skip(1) {
+    for event in rows.iter().skip(1) {
+        let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
+        // v0/v1 pack text/reasoning/tool argument deltas. They carry no
+        // usage, but their entire logical sequence span must be validated.
+        if version <= 1 && matches!(kind,"text-chunks"|"reasoning-chunks"|"tool-call-chunks") {
+            let (first,last) = packed_span(event,kind)?;
+            if last_seq.is_some_and(|old| first <= old) { return Err("Harness 会话序号重复或乱序，未采集此会话".into()); }
+            last_seq = Some(last); continue;
+        }
         let seq = event.get("seq").and_then(Value::as_u64).ok_or("Harness 会话序号无效")?;
         if last_seq.is_some_and(|old| seq <= old) { return Err("Harness 会话序号重复或乱序，未采集此会话".into()); } last_seq = Some(seq);
-        let kind = event.get("type").and_then(Value::as_str).unwrap_or("");
+        if seq >= 1_000_000_000 { return Err("Harness 会话序号超出上限".into()); }
         let data = event.get("data").ok_or("Harness 会话记录缺少数据")?;
         if kind == "request/context" { model = label(data.get("model").and_then(Value::as_str).unwrap_or("未知模型")); }
         if kind == "request/header" { if let Some(name) = data.pointer("/header/config/model").and_then(Value::as_str) { model = label(name); } }
-        if index < cut { continue; }
-        if kind == "llm/retry-started" { attempt = seq; last_slot = None; continue; }
+        // Retry ordinals remain stable when migration changes physical seqs.
+        if kind == "llm/retry-started" { attempt += 1; last_slot = None; continue; }
+        if seq < cut { continue; }
         let timestamp = event.get("time").and_then(Value::as_i64).ok_or("Harness 会话时间无效")?;
-        if matches!(kind, "assistant/message" | "assistant/attempt") {
-            let Some(tokens) = data.get("usage").or_else(|| stream_usage(data)).and_then(usage) else { continue; };
+        let revision = ((version as u64 + 1) << 32) | seq;
+        let chunk_usage = if version <= 1 && kind == "assistant/chunk" && data.pointer("/chunk/type").and_then(Value::as_str) == Some("usage") { data.pointer("/chunk/usage") } else { None };
+        if matches!(kind, "assistant/message" | "assistant/attempt") || chunk_usage.is_some() {
+            let Some(tokens) = data.get("usage").or_else(|| stream_usage(data)).or(chunk_usage).and_then(usage) else { continue; };
             let turn = data.get("turn").and_then(Value::as_u64).ok_or("Harness 请求编号无效")?;
             let step = data.get("step").and_then(Value::as_u64).ok_or("Harness 请求编号无效")?;
             let slot = match last_slot { Some((t,s,a)) if t == turn && s == step => (turn,step,a), _ => (turn,step,attempt) };
             last_slot = Some(slot);
             let route = data.pointer("/message/source/model").and_then(Value::as_str).map(label).unwrap_or_else(|| model.clone());
             let id = hash(&format!("harness:tokens:{session}:{turn}:{step}:{}",slot.2));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), channel:String::new(), tokens, revision:seq });
+            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), channel:String::new(), harness_identity:1, tokens, revision });
         } else if kind == "tool/call" {
             let call = data.get("callId").and_then(Value::as_str).ok_or("Harness 工具编号无效")?;
             let id = hash(&format!("harness:tool:{session}:{call}"));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), channel:String::new(), tokens:Tokens::default(), revision:seq });
+            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), channel:String::new(), harness_identity:1, tokens:Tokens::default(), revision });
         }
     }
     Ok(metrics.into_values().collect())
@@ -129,7 +157,8 @@ fn collect_file(db: &mut Connection, path: &Path, device: &str) -> Result<usize,
     let (version, compressed) = generation(&path.file_name().unwrap_or_default().to_string_lossy()).ok_or("Harness 文件名无效")?;
     let meta = fs::metadata(path).map_err(|_| "Harness 会话暂时无法读取")?;
     let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|t| t.as_nanos().to_string()).unwrap_or_default();
-    let key = format!("harness:{}",path.to_string_lossy()); let previous = cursor(db,&key)?;
+    // New cursor namespace re-reads existing v2-v4 once to migrate identities.
+    let key = format!("harness:stable-v1:{}",path.to_string_lossy()); let previous = cursor(db,&key)?;
     if previous.offset == meta.len() && previous.model == modified { return Ok(0); }
     let bytes = read_log(path, compressed)?; let events = parse(&bytes,version,device)?;
     let tx = db.transaction().map_err(|_| "统计资料库忙碌")?; let mut count = 0;

@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, path::Path};
 use tauri::State;
 pub const SOURCE: &str = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml";
 const LIMIT: usize = 16 * 1024 * 1024;
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MonthlyRate {
     pub month: String,
@@ -28,14 +28,14 @@ fn month(s: &str) -> Result<chrono::NaiveDate, String> {
     }
     Ok(d)
 }
-fn valid(r: &MonthlyRate) -> bool {
+pub(crate) fn valid(r: &MonthlyRate) -> bool {
     month(&r.month).is_ok()
         && r.cny_per_usd.is_finite()
         && (0.01..=100.0).contains(&r.cny_per_usd)
         && (r.source == SOURCE || r.source == "manual")
         && chrono::NaiveDate::parse_from_str(&r.date, "%Y-%m-%d").is_ok()
 }
-fn load(dir: &Path) -> Result<BTreeMap<String, MonthlyRate>, String> {
+pub(crate) fn load(dir: &Path) -> Result<BTreeMap<String, MonthlyRate>, String> {
     match std::fs::read(dir.join("monthly-usage-fx.json")) {
         Ok(b) => {
             if b.len() > 1024 * 1024 {
@@ -52,7 +52,7 @@ fn load(dir: &Path) -> Result<BTreeMap<String, MonthlyRate>, String> {
         Err(_) => Err("读取月度汇率失败".into()),
     }
 }
-fn save(dir: &Path, rows: &BTreeMap<String, MonthlyRate>) -> Result<(), String> {
+pub(crate) fn save(dir: &Path, rows: &BTreeMap<String, MonthlyRate>) -> Result<(), String> {
     crate::storage::write_atomic(
         &dir.join("monthly-usage-fx.json"),
         &serde_json::to_string(rows).map_err(|_| "编码月度汇率失败")?,

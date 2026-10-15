@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 use tauri::{AppHandle, Manager};
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Expense {
     pub vendor: String,
@@ -19,9 +19,9 @@ pub struct Expense {
     pub usage: Option<f64>,
     pub plan_id: Option<String>,
 }
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct Sample {
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct Sample {
     at: i64,
     currency: String,
     recharge: Option<f64>,
@@ -74,6 +74,72 @@ fn date(s: &str) -> Result<chrono::NaiveDate, String> {
 }
 fn key(v: &str, from: &str, to: &str, currency: &str) -> String {
     serde_json::json!([v, from, to, currency]).to_string()
+}
+
+pub(crate) fn expense_key(e: &Expense) -> String {
+    key(&e.vendor, &e.from, &e.to, &e.currency)
+}
+pub(crate) fn valid_sync_key(id: &str) -> bool {
+    let Ok([vendor, from, to, currency]) = serde_json::from_str::<[String; 4]>(id) else { return false; };
+    known_vendor(&vendor) && date(&from).is_ok() && date(&to).is_ok() && from <= to
+        && matches!(currency.as_str(), "CNY" | "USD") && key(&vendor, &from, &to, &currency) == id
+}
+pub(crate) fn valid_expense(e: &Expense) -> bool {
+    valid_sync_key(&expense_key(e)) && (e.subscription.is_some() || e.usage.is_some())
+        && [e.subscription, e.usage].iter().flatten().all(|n| n.is_finite() && (0.0..=1e9).contains(n))
+        && e.plan_id.as_ref().is_none_or(|id| plans().iter().any(|p| p.id == *id && p.vendor == e.vendor))
+}
+pub(crate) fn validate_expenses(rows: &BTreeMap<String, Expense>) -> Result<(), String> {
+    let mut ranges = BTreeMap::new();
+    for (id, e) in rows {
+        if expense_key(e) != *id || !valid_expense(e) { return Err("同步账期格式无效".into()); }
+        ranges.entry((&e.vendor, &e.currency)).or_insert_with(Vec::new).push(e);
+    }
+    for ((vendor, currency), mut group) in ranges {
+        group.sort_by_key(|e| &e.from);
+        for pair in group.windows(2) {
+            if pair[0].to >= pair[1].from {
+                return Err(format!("{vendor} {currency} 的账期 {}–{} 与 {}–{} 重叠；请在原设备调整或删除其中一条后同步，当前账期已保留", pair[0].from, pair[0].to, pair[1].from, pair[1].to));
+            }
+        }
+    }
+    Ok(())
+}
+pub(crate) type Samples = BTreeMap<String, Vec<Sample>>;
+pub(crate) fn valid_samples(rows: &Samples) -> bool {
+    rows.len() <= 1000 && rows.values().map(Vec::len).sum::<usize>() <= 50_000
+        && rows.iter().all(|(id, values)| uuid::Uuid::parse_str(id).is_ok() && values.iter().all(|s|
+            s.at > 0 && s.at <= chrono::Utc::now().timestamp() + 86400
+            && matches!(s.currency.as_str(), "CNY" | "USD") && (s.recharge.is_some() || s.spend.is_some())
+            && [s.recharge, s.spend].iter().flatten().all(|n| n.is_finite() && (0.0..=1e15).contains(n))))
+}
+pub(crate) fn sync_data(dir: &Path) -> Result<(BTreeMap<String, Expense>, Samples), String> {
+    let value = load(dir)?;
+    validate_expenses(&value.expenses)?;
+    if !valid_samples(&value.samples) { return Err("消费快照格式无效，原文件已保留".into()); }
+    Ok((value.expenses, value.samples))
+}
+pub(crate) fn apply_sync(dir: &Path, expenses: BTreeMap<String, Expense>, incoming: Samples) -> Result<(), String> {
+    validate_expenses(&expenses)?;
+    if !valid_samples(&incoming) { return Err("同步消费快照格式无效".into()); }
+    let mut file = load(dir)?;
+    file.expenses = expenses;
+    for (id, samples) in incoming {
+        let list = file.samples.entry(id).or_default();
+        list.extend(samples);
+        // A provider observation is identified by account/time/currency, never summed.
+        list.sort_by(|a,b| (a.at, &a.currency, serde_json::to_string(a).unwrap_or_default()).cmp(&(b.at, &b.currency, serde_json::to_string(b).unwrap_or_default())));
+        list.dedup_by(|a,b| a.at == b.at && a.currency == b.currency);
+        let mut compact: Vec<Sample> = Vec::new();
+        for sample in list.drain(..) {
+            let same = |a: &Sample, b: &Sample| a.currency == b.currency && a.recharge == b.recharge && a.spend == b.spend;
+            if compact.len() >= 2 && same(&compact[compact.len()-1], &sample) && same(&compact[compact.len()-2], &sample) { compact.pop(); }
+            compact.push(sample);
+        }
+        *list = compact;
+    }
+    if !valid_samples(&file.samples) { return Err("合并消费快照超过上限，原记录已保留".into()); }
+    save(dir, &file)
 }
 
 #[derive(Clone, Serialize)]
@@ -513,13 +579,13 @@ pub fn report(state: &AppState, from: &str, to: &str) -> Result<Report, String> 
     let mut rows = Vec::new();
     for a in accounts {
         let status = status_for(state, &a)?;
+        let ids = crate::account_sync::finance_ids(state.store.dir(), &a);
+        let mut merged_samples: Vec<_> = ids.iter().filter_map(|id| file.samples.get(id)).flatten().collect();
+        merged_samples.sort_by(|a,b| (a.at, &a.currency, serde_json::to_string(a).unwrap_or_default()).cmp(&(b.at, &b.currency, serde_json::to_string(b).unwrap_or_default())));
+        merged_samples.dedup_by(|a,b| a.at == b.at && a.currency == b.currency);
         let current =
-            sample(&a, &status).or_else(|| file.samples.get(&a.id).and_then(|s| s.last()).cloned());
-        let samples: Vec<_> = file
-            .samples
-            .get(&a.id)
-            .into_iter()
-            .flatten()
+            sample(&a, &status).or_else(|| merged_samples.last().map(|s| (*s).clone()));
+        let samples: Vec<_> = merged_samples.into_iter()
             .filter(|s| in_range(s.at))
             .collect();
         let mut issues = Vec::new();

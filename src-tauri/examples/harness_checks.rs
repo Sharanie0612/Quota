@@ -15,6 +15,7 @@ fn setup(dir: &Path, logs: &Path, shared: &Path, device: &str) {
 }
 fn main() {
     let root=Path::new(env!("CARGO_MANIFEST_DIR")).join("target/harness-checks").join(uuid::Uuid::new_v4().to_string());
+    legacy_checks(&root.join("legacy"));
     let logs=root.join("logs"); let local=root.join("local"); let remote=root.join("remote"); let shared=root.join("shared");
     let device="00000000-0000-4000-8000-000000000001";
     setup(&local,&logs,&shared,device);
@@ -65,4 +66,40 @@ fn main() {
     // Old settings must preserve device identity when the optional new field is absent.
     let mut previous=serde_json::to_value(activity::options(&local)).unwrap();previous.as_object_mut().unwrap().remove("harnessHome");fs::write(local.join("activity-settings.json"),previous.to_string()).unwrap();assert_eq!(activity::options(&local).device_id,device);assert!(activity::options(&local).harness_home.is_empty());
     println!("PASS Harness: official usage buckets, last stream sample, top-level precedence, retries, downward replacement, copied logs, forks, v2-v4, Zstandard concatenation, torn final frame, checksum rejection, generation selection, raw tail, sync, privacy, settings migration");
+}
+
+fn legacy_checks(root: &Path) {
+    let local=root.join("local");let logs=root.join("logs");let shared=root.join("shared");
+    let device="00000000-0000-4000-8000-000000000001";
+    setup(&local,&logs,&shared,device);
+    activity::report(&local,None,None,None).unwrap();
+    // A pre-upgrade record already in the database must be replaced, and
+    // replaying an old cloud packet afterwards must not restore its count.
+    let old:activity::Metric=serde_json::from_value(json!({"id":"f".repeat(64),"device":device,"source":"harness","session":"legacy-a","model":"deepseek-v4","agent":"主 Agent","tool":"","timestamp":1791000000000i64,"kind":"tokens","tokens":{"input":999,"output":0,"cached":0,"cacheWrite":0,"reasoning":0,"total":999},"revision":12})).unwrap();
+    let db=rusqlite::Connection::open(local.join("activity.sqlite")).unwrap();activity::merge_metric(&db,&old,true).unwrap();
+    let legacy_header=|id:&str,version:u32,seed:Option<u64>| {let mut h=json!({"type":"session","version":version,"id":id,"createdAt":1791000000000i64,"delegationDepth":0});if let Some(seed)=seed{h["seedLength"]=json!(seed);}line(h)};
+    let context=event("request/context",0,json!({"model":"deepseek-v4"}));
+    let packed=line(json!({"type":"text-chunks","seq0":1,"time0":1791000000001i64,"data":{"turn":0,"step":0,"index":0,"dt":[1,1],"texts":["PRIVATE","TEXT","DELTA"]}}));
+    let chunk=event("assistant/chunk",4,json!({"turn":0,"step":0,"chunk":{"type":"usage","usage":usage(100,20,10,50)}}));
+    let message=event("assistant/message",5,json!({"turn":0,"step":0,"usage":usage(60,10,0,20),"message":{"source":{"model":"deepseek-v4"},"content":"PRIVATE"}}));
+    let retry=event("llm/retry-started",6,json!({"turn":0,"step":0}));
+    let second=event("assistant/chunk",7,json!({"turn":0,"step":0,"chunk":{"type":"usage","usage":usage(10,0,0,2)}}));
+    let tool=event("tool/call",8,json!({"callId":"legacy-tool","name":"read_file","arguments":"PRIVATE"}));
+    let body=context.clone()+&packed+&chunk+&message+&retry+&second+&tool;
+    put(&logs,"v0","session.jsonl",(legacy_header("legacy-a",0,None)+&body).as_bytes());
+    activity::collect(&local).unwrap();assert_eq!(report(&local).totals.tokens.total,102);assert_eq!(report(&local).totals.calls,1);
+    assert!(!activity::merge_metric(&db,&old,false).unwrap());assert_eq!(report(&local).totals.tokens.total,102);
+    put(&logs,"v1-copy","session.v1.jsonl.zstd",&frame((legacy_header("legacy-a",1,None)+&body).as_bytes()));
+    activity::collect(&local).unwrap();assert_eq!(report(&local).totals.tokens.total,102);
+    // The official v1->v2 migration replaces many chunk seqs with one stream
+    // event. Attempt identity remains unchanged despite remapped retry seqs.
+    let migrated=header("legacy-a",false,2)+&context+&event("assistant/message",1,json!({"turn":0,"step":0,"usage":usage(60,10,0,20)}))+&event("llm/retry-started",2,json!({"turn":0,"step":0}))+&event("assistant/attempt",3,json!({"turn":0,"step":0,"stream":[{"type":"chunk","chunk":{"type":"usage","usage":usage(10,0,0,2)}}]}))+&event("tool/call",4,json!({"callId":"legacy-tool","name":"read_file"}));
+    put(&logs,"v2-migrated","session.v2.jsonl",migrated.as_bytes());activity::collect(&local).unwrap();assert_eq!(report(&local).totals.tokens.total,102);
+    // Numeric inheritance counts logical events, not physical packed rows.
+    let fork=legacy_header("legacy-fork",0,Some(5))+&context+&packed+&chunk+&event("assistant/message",5,json!({"turn":1,"step":0,"usage":usage(5,0,0,2)}));
+    put(&logs,"fork","session.jsonl",fork.as_bytes());activity::collect(&local).unwrap();assert_eq!(report(&local).totals.tokens.total,109);
+    let malformed=packed.replace("[1,1]","[1]");put(&logs,"bad","session.v1.jsonl",(legacy_header("bad",1,None)+&context+&malformed+&chunk).as_bytes());
+    activity::collect(&local).unwrap();assert_eq!(report(&local).totals.tokens.total,109);assert!(!report(&local).errors.is_empty());
+    let exported=activity::cloud_packets(&local).unwrap();assert!(exported.iter().all(|(_,body)|!body.contains("PRIVATE")));
+    println!("PASS Harness legacy: v0/v1 raw and Zstandard, packed sequence spans, streamed usage replacement, retries, numeric inheritance, v2 migration deduplication, legacy metric replacement and stale cloud rejection");
 }

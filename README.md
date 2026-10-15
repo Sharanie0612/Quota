@@ -68,7 +68,7 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 
 ### 当前版本与安装包
 
-当前源码版本为 **1.0.1700**。「我的使用」移到账户总览下方，排除 Trae，支持全局与所选时间统计、自然日费用分摊及固定月度汇率参考。跨设备同步改为三步设置与一个立即同步按钮，修复和空间优化收进高级项。Windows 安装包、隔离启动、计算及同步回归通过；实际覆盖升级和跨设备云盘传输仍需实测，本轮 macOS 未构建。详见 [1.0.1700 交付说明](docs/release-1.0.1700.md)。
+当前源码版本为 **1.0.1800**。「我的使用」支持按自然月统计、独立订阅账期、自然日费用分摊及固定月度汇率参考，完整排除 Trae。统一跨设备同步入口，保留共享账户关联、小米安全会话与 Token 活动的 Trae 通道。Windows 重建、10 项 Rust 回归以及现有 1.0.1800 同版本覆盖更新与安装版启动通过；跨版本升级和真实跨设备云盘传输仍需实测，本轮 macOS 未构建。详见 [1.0.1800 交付说明](docs/release-1.0.1800.md)。
 
 安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
 
@@ -128,13 +128,13 @@ npm run tauri dev
 
 ### Windows
 
-本仓库使用 `stable-x86_64-pc-windows-gnu` 工具链及 WebView2。打包前退出构建产物位置正在运行的 `quota.exe`，使用 rustup 自带 MinGW，避免系统中的旧 MinGW：
+准备好 Node.js、rustup 的 Windows GNU 工具链及 WebView2 后，双击根目录的 **build-installer.cmd**，或运行一条命令：
 
 ```powershell
 npm run package:windows
 ```
 
-产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。
+入口自动同步锁定依赖、配置 GNU 路径、执行检查并保留构建缓存。打包前退出构建产物位置正在运行的 Quota。产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。
 
 ### macOS（Apple Silicon）
 

@@ -10,7 +10,7 @@ fn main(){
     let root=std::env::temp_dir().join(format!("quota-cloud-check-{}",uuid::Uuid::new_v4()));fs::create_dir_all(&root).unwrap();
     let a=root.join("a");let b=root.join("b");fs::create_dir_all(&a).unwrap();fs::create_dir_all(&b).unwrap();activity::report(&a,None,None,None).unwrap();activity::report(&b,None,None,None).unwrap();
     let id=activity::options(&a).device_id;let db=rusqlite::Connection::open(a.join("activity.sqlite")).unwrap();
-    let event=activity::Metric{id:"1".repeat(64),device:id,source:"codex".into(),session:"synthetic".into(),model:"test".into(),agent:"主 Agent".into(),tool:String::new(),timestamp:1791072000000,kind:"tokens".into(),revision:0,tokens:activity::Tokens{input:80,output:20,cached:40,reasoning:5,total:100,..Default::default()}};
+    let event=activity::Metric{id:"1".repeat(64),device:id,source:"codex".into(),session:"synthetic".into(),model:"test".into(),agent:"主 Agent".into(),tool:String::new(),timestamp:1791072000000,kind:"tokens".into(),channel:String::new(),revision:0,tokens:activity::Tokens{input:80,output:20,cached:40,reasoning:5,total:100,..Default::default()}};
     activity::merge_metric(&db,&event,true).unwrap();drop(db);
     let packets=activity::cloud_packets(&a).unwrap();assert_eq!(packets.len(),1);let body=packets[0].1.as_bytes();assert_eq!(activity::import_cloud_packet(&b,body).unwrap(),1);assert_eq!(activity::import_cloud_packet(&b,body).unwrap(),0);assert_eq!(activity::report(&b,None,None,None).unwrap().totals.tokens.total,100);
     assert!(activity::cloud_packets(&b).unwrap().is_empty());assert!(activity::import_cloud_packet(&b,&[0;1024]).is_err());

@@ -49,6 +49,17 @@ fn main() {
     assert_eq!(account_sync::repair_connections(&auto).unwrap(),0);
     let unknown=account();let planner=quota_lib::account_sync::automatic_connection_pairs(&[e.clone(),unknown],&[(e.id.clone(),get_secrets(&e.id).unwrap())].into(),&Default::default());assert!(planner.is_empty());
     println!("PASS same-login duplicate auto-repair, different-login and unknown-login separation; no user pairing needed");
+    let mut conflicting = get_secrets(&e.id).unwrap();
+    conflicting.api_key = Some("SYNTHETIC-CONFLICTING-KEY".into());
+    let original = get_secrets(&e.id).unwrap();
+    assert!(!original.same_login(&conflicting));
+    assert!(!conflicting.same_login(&original));
+    let mixed = quota_lib::account_sync::automatic_connection_pairs(
+        &[e.clone(), f.clone()],
+        &[(e.id.clone(), original), (f.id.clone(), conflicting)].into(),
+        &Default::default());
+    assert!(mixed.is_empty());
+    println!("PASS matching AccessKeys do not bypass another conflicting credential");
     // Never combine a partial AccessKey from one identity with another identity's secret.
     let x=account();let y=account();put(&x.id,json!({"accessKeyId":"A","accessKeySecret":"SECRET-A"}));put(&y.id,json!({"accessKeyId":"B"}));
     let ak=state(&root.join("access-key"),vec![x.clone(),y.clone()]);account_sync::resolve(&ak,&x.id,Some(&y.id)).unwrap();

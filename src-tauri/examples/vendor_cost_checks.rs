@@ -61,6 +61,7 @@ fn main() {
             at = (chrono::Utc::now() + chrono::Duration::days(1)).timestamp_millis();
         }
         let e = activity::Metric {
+            channel: String::new(),
             id: format!("{id:064x}"),
             device: uuid::Uuid::new_v4().to_string(),
             source: "codex".into(),

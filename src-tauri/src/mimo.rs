@@ -254,18 +254,35 @@ fn get_json(client: &reqwest::Client, url: &str, cookie: &str) -> reqwest::Reque
         .header("x-timezone", "Asia/Shanghai")
 }
 
-/// Authentication is independent of whether this account owns a Token Plan.
-/// Use one bounded request; never return URLs/headers containing login secrets.
-pub async fn validate_login(client: &reqwest::Client, cookie: &str) -> Result<bool, String> {
-    let response = get_json(client, &format!("{CONSOLE_BASE}/balance"), cookie)
+async fn console_response(client:&reqwest::Client,url:&str,cookie:&mut String,updates:&mut Vec<String>)->Result<reqwest::Response,reqwest::Error> {
+    let response=get_json(client,url,cookie).send().await?;
+    if response.url().scheme()=="https" && response.url().host_str()==Some("platform.xiaomimimo.com") {
+        for header in response.headers().get_all(reqwest::header::SET_COOKIE) {
+            if let Ok(raw)=header.to_str() {if let Some(saved)=crate::mimo_session::merge_header(cookie,raw) {updates.push(saved);}}
+        }
+    }
+    Ok(response)
+}
+
+/// Verify authentication without requiring an active Token Plan, retaining rotated cookies.
+pub async fn validate_login_tracked(client:&reqwest::Client,cookie:&mut String,updates:&mut Vec<String>)->Result<bool,String> {
+    let response=get_json(client,&format!("{CONSOLE_BASE}/balance"),cookie)
         .timeout(std::time::Duration::from_secs(10)).send().await
-        .map_err(|e| if e.is_timeout() { "小米登录验证超时，请检查网络后重试" } else { "无法连接小米官网，请检查网络或系统代理" })?;
-    if matches!(response.status().as_u16(), 401 | 403) { return Ok(false); }
-    if !response.status().is_success() { return Err("小米官网暂时无法验证登录，请稍后重试".into()); }
-    let body: Value = response.json().await.map_err(|_| "小米登录验证返回格式异常，请稍后重试")?;
-    if body.get("code").and_then(Value::as_i64) == Some(401) { return Ok(false); }
-    if body.get("code").and_then(Value::as_i64) != Some(0) { return Err("小米官网暂时无法验证登录，请稍后重试".into()); }
-    Ok(true)
+        .map_err(|e| if e.is_timeout(){"小米登录验证超时，请检查网络后重试"}else{"无法连接小米官网，请检查网络或系统代理"})?;
+    if matches!(response.status().as_u16(),401|403){return Ok(false)}
+    if !response.status().is_success(){return Err("小米官网暂时无法验证登录，请稍后重试".into())}
+    if response.url().scheme()=="https"&&response.url().host_str()==Some("platform.xiaomimimo.com") {
+        for header in response.headers().get_all(reqwest::header::SET_COOKIE) {
+            if let Ok(raw)=header.to_str(){if let Some(saved)=crate::mimo_session::merge_header(cookie,raw){updates.push(saved);}}
+        }
+    }
+    let body:Value=response.json().await.map_err(|_|"小米登录验证返回格式异常，请稍后重试")?;
+    match body.get("code").and_then(Value::as_i64){Some(0)=>Ok(true),Some(401)=>Ok(false),_=>Err("小米官网暂时无法验证登录，请稍后重试".into())}
+}
+
+async fn console_text(response:reqwest::Response)->String {
+    if response.status().as_u16()==401 {return "{\"code\":401}".into()}
+    response.text().await.unwrap_or_default()
 }
 
 /// 把 Credits 格式化成人能一眼看懂的量级（41 亿 > 4100000000）
@@ -283,19 +300,13 @@ fn fmt_quota(v: f64) -> String {
 ///
 /// 两个接口用的都是同一个小米账号的 Cookie，所以同账号下两个账户读到的是同一份数据；
 /// `provider_id` 决定卡片上「大数字」放什么：按量付费看现金余额（元），订阅读套餐剩余额度（Credits）。
-pub async fn fetch_console(
-    client: &reqwest::Client,
-    cookie: &str,
-    provider_id: &str,
-) -> Result<Balance, String> {
+pub async fn fetch_console_tracked(client:&reqwest::Client,cookie:&mut String,updates:&mut Vec<String>,provider_id:&str)->Result<Balance,String> {
     // 1) 余额（balance / cashBalance / giftBalance / frozenBalance）
     let mut money: Option<MimoMoney> = None;
     let mut money_err: Option<String> = None;
-    match get_json(client, &format!("{CONSOLE_BASE}/balance"), cookie)
-        .send()
-        .await
+    match console_response(client, &format!("{CONSOLE_BASE}/balance"), cookie, updates).await
     {
-        Ok(resp) => match parse_balance(&resp.text().await.unwrap_or_default()) {
+        Ok(resp) => match parse_balance(&console_text(resp).await) {
             Ok(m) => money = Some(m),
             Err(e) => money_err = Some(e),
         },
@@ -304,8 +315,8 @@ pub async fn fetch_console(
 
     // 2) 套餐额度 + 本月用量
     let usage_url = format!("{CONSOLE_BASE}/tokenPlan/usage");
-    let usage_text = match get_json(client, &usage_url, cookie).send().await {
-        Ok(response) => response.text().await.unwrap_or_default(),
+    let usage_text = match console_response(client, &usage_url, cookie, updates).await {
+        Ok(response) => console_text(response).await,
         Err(_) if money.is_some() && provider_id == "mimo" => String::new(),
         Err(_) => return Err("同步失败，请稍后重试".into()),
     };
@@ -316,11 +327,9 @@ pub async fn fetch_console(
     };
 
     // 3) 套餐详情（套餐名 / 到期时间 / 自动续费），没有套餐就跳过
-    let plan_info = match get_json(client, &format!("{CONSOLE_BASE}/tokenPlan/detail"), cookie)
-        .send()
-        .await
+    let plan_info = match console_response(client, &format!("{CONSOLE_BASE}/tokenPlan/detail"), cookie, updates).await
     {
-        Ok(resp) => parse_plan_detail(&resp.text().await.unwrap_or_default()).ok().flatten(),
+        Ok(resp) => parse_plan_detail(&console_text(resp).await).ok().flatten(),
         Err(_) => None,
     };
 

@@ -41,15 +41,25 @@ function dependenciesMatch() {
 }
 async function main() {
   if (process.platform !== 'win32') throw Error('此入口仅用于 Windows GNU + NSIS 打包');
-  if (!npmCli) throw Error('请使用 npm run package:windows');
-  const rustc = execFileSync('rustup', ['which', '--toolchain', env.RUSTUP_TOOLCHAIN, 'rustc'], { encoding: 'utf8', windowsHide: true }).trim();
+  if (!npmCli) throw Error('请双击 build-installer.cmd 或运行 npm run package:windows');
+  if (env.CARGO_TARGET_DIR) throw Error('请清除 CARGO_TARGET_DIR 后重试，以使用项目内的标准安装包路径');
+  let rustc;
+  try { rustc = execFileSync('rustup', ['which', '--toolchain', env.RUSTUP_TOOLCHAIN, 'rustc'], { encoding: 'utf8', windowsHide: true }).trim(); }
+  catch { throw Error('需要 rustup 和 Windows GNU 工具链；请运行 rustup toolchain install stable-x86_64-pc-windows-gnu'); }
   const toolchain = path.dirname(path.dirname(rustc));
   const gnuBin = path.join(toolchain, 'lib/rustlib/x86_64-pc-windows-gnu/bin');
-  env.PATH = [path.join(toolchain, 'bin'), path.join(gnuBin, 'self-contained'), gnuBin, process.env.PATH].join(path.delimiter);
+  env.PATH = [path.join(toolchain, 'bin'), gnuBin, process.env.PATH].join(path.delimiter);
+  // Keep Rust's linker explicit; self-contained/dlltool has no companion assembler.
+  env.CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = path.join(gnuBin, 'self-contained/x86_64-w64-mingw32-gcc.exe');
+  for (const key of Object.keys(env)) if (key !== 'PATH' && key.toUpperCase() === 'PATH') delete env[key];
+  if (!fs.existsSync(env.CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER)) throw Error('缺少 rustup 自带的 GNU 链接器');
+  try { execFileSync('dlltool', ['--version'], { env, stdio: 'ignore', windowsHide: true }); }
+  catch { throw Error('需要 PATH 中可用的 MinGW binutils（dlltool）；链接器仍固定使用 rustup 自带版本'); }
   const running = JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-Command', 'ConvertTo-Json -InputObject @((Get-Process quota -ErrorAction SilentlyContinue).Path) -Compress'], { encoding: 'utf8', windowsHide: true }).trim());
   const releaseExe = path.join(root, 'src-tauri/target/release/quota.exe').toLowerCase();
   if (running.some(file => file && path.resolve(file).toLowerCase() === releaseExe)) throw Error('请先退出构建产物位置正在运行的 Quota，再打包');
-  if (!fs.existsSync(path.join(root, 'src-tauri/WebView2Loader.dll'))) throw Error('缺少 WebView2Loader.dll');
+  const config = JSON.parse(fs.readFileSync(path.join(root, 'src-tauri/tauri.conf.json')));
+  if (!fs.existsSync(path.join(root, 'src-tauri/WebView2Loader.dll')) || config.bundle?.resources?.['WebView2Loader.dll'] !== '.') throw Error('缺少 WebView2Loader.dll 或安装包资源配置');
   if (!dependenciesMatch()) await run('同步前端锁定依赖', process.execPath, [npmCli, 'ci', '--no-audit', '--no-fund']);
   else console.log('[复用] 前端依赖与 lockfile 一致');
   const checks = await Promise.allSettled([
@@ -61,7 +71,13 @@ async function main() {
   const failures = checks.filter(check => check.status === 'rejected');
   if (failures.length) throw Error(failures.map(check => check.reason.message).join('\n'));
   // Tauri's beforeBuildCommand builds the frontend exactly once.
-  await run('Release 编译与 NSIS 打包', process.execPath, [npmCli, 'run', 'tauri', '--', 'build']);
-  console.log(`[完成] 总耗时 ${((Date.now() - started) / 1000).toFixed(1)}s；安装包位于 src-tauri/target/release/bundle/nsis`);
+  await run('Release 编译与 NSIS 打包', process.execPath, [npmCli, 'run', 'tauri', '--', 'build', '--bundles', 'nsis', '--ci']);
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json')));
+  const [a, b, patch] = pkg.version.split('.');
+  const installer = path.join(root, `src-tauri/target/release/bundle/nsis/Quota_${a}.${b}.${patch.padStart(4, '0')}_x64-setup.exe`);
+  if (!fs.existsSync(installer)) throw Error(`未找到预期安装包：${installer}`);
+  console.log(`\n[完成] 总耗时 ${((Date.now() - started) / 1000).toFixed(1)}s`);
+  console.log(`安装包：${installer}`);
+  console.log(`便携版：${path.join(root, 'src-tauri/target/release/quota.exe')}`);
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

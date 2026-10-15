@@ -11,7 +11,7 @@ fn put(root: &Path, folder: &str, name: &str, bytes: &[u8]) { let dir=root.join(
 fn frame(bytes: &[u8]) -> Vec<u8> { let mut encoder=zstd::stream::write::Encoder::new(Vec::new(),1).unwrap();encoder.include_checksum(true).unwrap();encoder.write_all(bytes).unwrap();encoder.finish().unwrap() }
 fn setup(dir: &Path, logs: &Path, shared: &Path, device: &str) {
     fs::create_dir_all(dir).unwrap();
-    activity::save_options(dir,&Options { device_id:device.into(),device_name:device.into(),auto_collect:false,collect_interval_seconds:30,sync_accounts:true,codex_home:dir.join("absent").to_string_lossy().into(),zcode_home:dir.join("absent").to_string_lossy().into(),harness_home:logs.to_string_lossy().into(),sync_dir:shared.to_string_lossy().into() }).unwrap();
+    activity::save_options(dir,&Options { device_id:device.into(),device_name:device.into(),auto_collect:false,collect_interval_seconds:30,sync_accounts:true,codex_home:dir.join("absent").to_string_lossy().into(),zcode_home:dir.join("absent").to_string_lossy().into(),harness_home:logs.to_string_lossy().into(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:shared.to_string_lossy().into() }).unwrap();
 }
 fn main() {
     let root=Path::new(env!("CARGO_MANIFEST_DIR")).join("target/harness-checks").join(uuid::Uuid::new_v4().to_string());

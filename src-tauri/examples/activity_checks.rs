@@ -4,6 +4,20 @@ use serde_json::json;
 use chrono::TimeZone;
 fn envelope(kind:&str,payload:serde_json::Value,ordinal:u64)->String{json!({"timestamp":"2026-10-04T00:00:00Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
 fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into()}).unwrap()}
+fn check_trae_vendor(root:&Path) {
+ let dir=root.join("trae-vendor");fs::create_dir_all(&dir).unwrap();activity::report(&dir,None,None,None).unwrap();
+ let db=rusqlite::Connection::open(dir.join("activity.sqlite")).unwrap();
+ for (i,source,channel,total) in [(1,"codex","",10),(2,"trae","trae",20),(3,"trae","api",30),(4,"trae","",40)] {
+  let event:activity::Metric=serde_json::from_value(json!({"id":format!("{i:064x}"),"device":"00000000-0000-4000-8000-000000000001","source":source,"session":format!("session-{i}"),"model":"deepseek-v4-pro","agent":"main","tool":"","timestamp":chrono::Local::now().timestamp_millis(),"kind":"tokens","channel":channel,"tokens":{"input":total,"output":0,"cached":0,"cacheWrite":0,"reasoning":0,"total":total}})).unwrap();
+  assert!(activity::merge_metric(&db,&event,false).unwrap());
+ }
+ let report=|filter:&str|activity::report_filtered(&dir,None,None,None,Some(filter.into())).unwrap();
+ assert_eq!(report("").totals.tokens.total,100);
+ for(filter,total)in[("vendor:trae",90),("channel:trae",20),("channel:api",30),("channel:unknown",40),("vendor:deepseek",10),("deepseek-v4-pro",10)]{assert_eq!(report(filter).totals.tokens.total,total,"{filter}");}
+ assert!(report("").available_models.iter().any(|m|m.key=="deepseek-v4-pro\u{1f}unknown"));
+ assert_eq!(report("vendor:trae").channels.iter().map(|r|r.tokens.total).sum::<u64>(),90);
+ println!("PASS Trae vendor, own quota/API/unknown channels and official model isolation");
+}
 fn check_model_calendar_reports(root:&Path) {
  let dir=root.join("report-filters");fs::create_dir_all(&dir).unwrap();
  activity::report(&dir,None,None,None).unwrap();
@@ -90,6 +104,6 @@ fn main(){
  assert_eq!(quota_lib::parse_macos_proxy("HTTPEnable : 1\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897"),Some("http://127.0.0.1:7897".into()));
  assert!(quota_lib::parse_macos_proxy("HTTPEnable : 0\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897").is_none());
  println!("PASS: task-index detection, macOS proxy, legacy updates, repeated counters, append, partial tail, truncation, inherited fork, cross-device dedup, filters, private-field exclusion, duplicate ZCode databases");
- check_model_calendar_reports(&root);
+ check_model_calendar_reports(&root);check_trae_vendor(&root);
  if std::env::args().any(|a|a=="--live"){let dir=root.join("live");fs::create_dir_all(&dir).unwrap();let mut o=activity::options(&dir);o.sync_dir.clear();activity::save_options(&dir,&o).unwrap();activity::collect(&dir).unwrap();let r=report(&dir);println!("Live read-only sources: {} token records/models, {} tools, {} sessions, errors={:?}",r.models.len(),r.tools.len(),r.totals.sessions,r.errors);activity::collect(&dir).unwrap();let after=report(&dir);assert!(after.errors.is_empty());assert!(after.totals.tokens.total>=r.totals.tokens.total);println!("PASS: live repeat scan, {} new Token while sources remain active",after.totals.tokens.total-r.totals.tokens.total);}
 }

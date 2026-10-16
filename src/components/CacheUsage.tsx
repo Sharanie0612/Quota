@@ -5,7 +5,15 @@ import { ModelLogo } from "./ModelLogo";
 import { Button } from "./ui";
 export function CacheUsage({rows,format,onModel}: {rows:ActivityGroup[];format:(n:number)=>string;onModel:(key:string)=>void}) {
   const [expanded,setExpanded] = useState(false);
-  const models = [...rows].filter(row=>row.tokens.input>0).sort((a,b)=>b.tokens.input-a.tokens.input);
+  const grouped = new Map<string, ActivityGroup>();
+  for (const row of rows) {
+    const channel=activityModelChannel(row.key);
+    const key=channel?`channel:${channel}`:row.key;
+    const current=grouped.get(key);
+    if(current){for(const field of Object.keys(current.tokens) as (keyof typeof current.tokens)[])current.tokens[field]+=field==="cached"?Math.min(row.tokens.input,Math.max(0,row.tokens.cached)):row.tokens[field];}
+    else grouped.set(key,{...row,key,tokens:{...row.tokens,cached:Math.min(row.tokens.input,Math.max(0,row.tokens.cached))}});
+  }
+  const models = [...grouped.values()].filter(row=>row.tokens.input>0).sort((a,b)=>b.tokens.input-a.tokens.input);
   const input = models.reduce((sum,row)=>sum+row.tokens.input,0);
   const cached = models.reduce((sum,row)=>sum+Math.min(row.tokens.input,Math.max(0,row.tokens.cached)),0);
   const rate = input ? cached/input : 0;
@@ -14,8 +22,7 @@ export function CacheUsage({rows,format,onModel}: {rows:ActivityGroup[];format:(
     <div className="cache-model-list">{(expanded ? models : models.slice(0,6)).map(row=>{
       const hit = Math.min(row.tokens.input,Math.max(0,row.tokens.cached));
       const rate = hit/row.tokens.input;
-      const name = activityModelName(row.key) || "未知模型";
-      const channel = activityChannelName(activityModelChannel(row.key));
-      return <button className="cache-model-row" key={row.key} title={`${name}${channel ? ` · ${channel}` : ""} · 命中 ${format(hit)} · 未命中 ${format(row.tokens.input-hit)}`} onClick={()=>onModel(row.key)}><ModelLogo name={name} size={18}/><span className="cache-model-content"><span className="cache-model-label"><span>{name}{channel && <span className="activity-channel-tag">{channel}</span>}</span><b>{(rate*100).toFixed(1)}%</b></span><span className="cache-bar" aria-hidden="true"><span style={{width:`${rate*100}%`}}/></span><span className="cache-model-values">命中 {format(hit)} · 未命中 {format(row.tokens.input-hit)}</span></span></button>;
-    })}</div>{models.length>6&&<Button variant="quiet" size="sm" onClick={()=>setExpanded(value=>!value)}>{expanded ? "收起" : `展开全部 ${models.length} 个模型`}</Button>}{!models.length&&<p className="hint">当前范围暂无输入记录</p>}</section>;
+      const name = row.key.startsWith("channel:") ? activityChannelName(row.key.slice(8)) : activityModelName(row.key) || "未知模型";
+      return <button className="cache-model-row" key={row.key} title={`${name} · 命中 ${format(hit)} · 未命中 ${format(row.tokens.input-hit)}`} onClick={()=>onModel(row.key)}><ModelLogo name={name} size={18}/><span className="cache-model-content"><span className="cache-model-label"><span>{name}</span><b>{(rate*100).toFixed(1)}%</b></span><span className="cache-bar" aria-hidden="true"><span style={{width:`${rate*100}%`}}/></span><span className="cache-model-values">命中 {format(hit)} · 未命中 {format(row.tokens.input-hit)}</span></span></button>;
+    })}</div>{models.length>6&&<Button variant="quiet" size="sm" onClick={()=>setExpanded(value=>!value)}>{expanded ? "收起" : `展开全部 ${models.length} 项`}</Button>}{!models.length&&<p className="hint">当前范围暂无输入记录</p>}</section>;
 }

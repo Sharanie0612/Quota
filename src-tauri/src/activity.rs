@@ -355,13 +355,13 @@ const CHANNEL_SEPARATOR:char='\u{1f}';
 fn model_key(model:&str,channel:&str)->String{if channel.is_empty(){model.into()}else{format!("{model}{CHANNEL_SEPARATOR}{channel}")}}
 fn model_matches(filter:&str,e:&Metric)->bool{
     if filter.is_empty(){return true}
-    if let Some(vendor)=filter.strip_prefix("vendor:"){return vendor==model_vendor(&e.model)}
-    if let Some(channel)=filter.strip_prefix("channel:"){return channel==e.channel}
-    match filter.split_once(CHANNEL_SEPARATOR){Some((model,channel))=>model==e.model&&channel==e.channel,None=>filter==e.model}
+    if let Some(vendor)=filter.strip_prefix("vendor:"){return if vendor=="trae" {e.source=="trae"} else {e.source!="trae"&&vendor==model_vendor(&e.model)}}
+    if let Some(channel)=filter.strip_prefix("channel:"){return e.source=="trae"&&channel==channel_id(e)}
+    match filter.split_once(CHANNEL_SEPARATOR){Some((model,channel))=>model==e.model&&channel==channel_id(e),None=>e.source!="trae"&&filter==e.model}
 }
 fn aggregate_models(events:&[Metric])->Vec<Group>{
     let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
-    for e in events{let k=model_key(&e.model,&e.channel);let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
+    for e in events{let k=model_key(&e.model,if e.source=="trae"&&e.channel.is_empty(){"unknown"}else{&e.channel});let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
     result.into_values().map(|(mut g,s)|{g.sessions=s.len() as u64;g}).collect()
 }
 // Only Trae distinguishes how usage was obtained; "unknown" keeps the sum complete.

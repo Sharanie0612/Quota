@@ -7,6 +7,7 @@ use crate::{commands::AppState, model::ModelPrice};
 
 const SOURCE: &str = "https://aitier.net/zh";
 const TTL: i64 = 86400;
+const PRICE_POLICY_VERSION: u32 = 1;
 
 fn supported_vendor(vendor: &str) -> bool {
     matches!(vendor, "OpenAI" | "Anthropic" | "Google" | "DeepSeek" | "Kimi" | "Z AI" | "Xiaomi" | "Alibaba" | "SpaceXAI" | "Meta")
@@ -53,6 +54,8 @@ pub struct Entry {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    #[serde(default)]
+    pub price_policy_version: u32,
     pub updated_at: String,
     pub checked_at: Option<String>,
     pub source: String,
@@ -67,6 +70,9 @@ pub fn load(dir: &std::path::Path) -> Snapshot {
     let base:Snapshot=serde_json::from_str(include_str!("../data/ladder.json")).expect("valid ladder");
     for e in base.entries {if !snapshot.entries.iter().any(|v|v.id==e.id){snapshot.entries.push(e)}}
     snapshot.entries.retain(|e| supported_vendor(&e.vendor));
+    // A successful check by an old parser must not suppress the upgrade repair
+    // for another day. Preserve user opt-out; normal refresh performs the check.
+    if snapshot.price_policy_version < PRICE_POLICY_VERSION { snapshot.checked_at=None; }
     snapshot
 }
 
@@ -236,6 +242,7 @@ pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
     }
     let mut snapshot=state.ladder.lock().map_err(|_|"天梯暂不可用")?;
     snapshot.entries=entries;snapshot.checked_at=Some(now.to_rfc3339());snapshot.error=error;
+    snapshot.price_policy_version=PRICE_POLICY_VERSION;
     if snapshot.error.is_none(){snapshot.updated_at=now.to_rfc3339();}
     let output = snapshot.clone();
     let saved = serde_json::to_string_pretty(&output).map_err(|_| "保存天梯失败".to_string())

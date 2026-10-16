@@ -67,6 +67,7 @@ async function main() {
     run('Rust 类型检查', 'cargo', ['check', '--locked'], path.join(root, 'src-tauri')),
     run('纯逻辑', process.execPath, ['scripts/verify-logic.cjs']),
     run('组件渲染', process.execPath, ['scripts/verify-ui-render.cjs']),
+    run('悬浮窗过渡', process.execPath, ['scripts/verify-widget-motion.cjs']),
   ]);
   const failures = checks.filter(check => check.status === 'rejected');
   if (failures.length) throw Error(failures.map(check => check.reason.message).join('\n'));

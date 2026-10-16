@@ -24,8 +24,8 @@ const { LadderChart } = load(path.resolve(__dirname, '../src/components/LadderCh
 const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input, unit: '每百万 Token' }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
 const entries = [entry('model-yuan', 'CNY', 1), entry('model-dollar', 'USD', 1), { ...entry('unknown', 'CNY', null), verifiedAt: null }];
 const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, layout:'combined', exchange:null});
-assert.match(noExchange,/可切换人民币或美元/);
-assert.match(noExchange,/model-dollar · 未标注 · 等待可用汇率/);
+assert.match(noExchange,/按原币种分别绘图/);
+assert.equal((noExchange.match(/role="group"/g)||[]).length,2); assert.match(noExchange,/能力排名 · 价格待确认/);
 const props = { entries, domain: 'general', focused: null, onFocus: () => {}, exchange: { cnyPerUsd:7, date:"2026-10-02", error:null } };
 const split = render(LadderChart, { ...props, layout: 'split' });
 const combined = render(LadderChart, { ...props, layout: 'combined' });
@@ -38,7 +38,7 @@ for (const html of [combined]) {
 assert.match(combined, /1 USD = 7.0000 CNY/);
 assert.match(combined, /CNY统一价格与性能坐标图/);
 const noRate = render(LadderChart,{...props,layout:'combined',exchange:null});
-assert.equal((noRate.match(/role="button"/g)||[]).length,1);
+assert.equal((noRate.match(/role="button"/g)||[]).length,2);
 console.log('PASS one normalized price axis, original prices, FX-unavailable fallback and exclusion of unknown prices');
 const onlyUsd=render(LadderChart,{...props,entries:[entry('usd-only','USD',1)],exchange:null});
 assert.match(onlyUsd,/USD统一价格与性能坐标图/);
@@ -46,6 +46,20 @@ assert.equal((onlyUsd.match(/role="button"/g)||[]).length,1);
 const unpriced=render(LadderChart,{...props,entries:[{...entry('unknown','CNY',null),verifiedAt:null}],onShowList:()=>{}});
 assert.match(unpriced,/查看模型列表/);
 console.log('PASS USD-only chart without exchange rate and actionable missing-price state');
+const otherDomain={...entry('audio-only','USD',1),rankings:{audio:{rank:1,score:80}}};
+const retained=render(LadderChart,{...props,entries:[...entries,otherDomain]});
+assert.match(retained,/能力排名 · 价格待确认/);
+assert.match(retained,/unknown/);
+assert.ok(!retained.includes('audio-only'));
+const {applyPricing}=load(path.resolve(__dirname,'../src/lib/ladderPricing.ts'));
+const tiered={...entry('haiku','USD',0.1),priceOptions:[{id:'long',label:'长输入',price:{currency:'USD',unit:'每百万 Token',input:0.5,output:2.5}}]};
+assert.equal(applyPricing(tiered,'long').price.input,0.5);
+assert.equal(applyPricing(tiered,'standard').price.input,0.1);
+assert.equal(applyPricing(tiered,'batch').price.input,null);
+assert.equal(applyPricing(tiered,'off-peak').price.input,0.1);
+assert.equal(tiered.price.input,0.1);
+assert.equal(applyPricing({...tiered,verifiedAt:null},'long').price.input,null);
+console.log('PASS unknown prices retain ranked models, unrelated domains excluded, verified scenarios never invent discounts');
 
 const { AccountCard } = load(path.resolve(__dirname, '../src/components/AccountCard.tsx'));
 const balance = { total: 10, currency: 'CNY', source: 'api', usable: true, note: 'synthetic note', amounts: [{ kind: 'granted', label: '赠送余额', value: 0 }, { kind: 'cumulative_spend', label: '累计消费', value: 25 }] };
@@ -82,7 +96,7 @@ assert.equal(pointTags.length,3);
 for(const [,cost,score,x,y] of pointTags){assert.equal(Number(x),scale.x(Number(cost)));assert.equal(Number(y),scale.y(Number(score)));}
 const precise=render(LadderChart,{...props,entries:[entry('micro','CNY',0.000001)],focused:entry('micro','CNY',0.000001)});
 assert.match(precise,/¥0.000002/);
-for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/可切换人民币或美元/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,1);}
+for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/按原币种分别绘图/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,2);}
 console.log('PASS overlapping markers keep exact numeric coordinates and all models selectable; small-price precision and invalid-FX fallback retained');
 
 const {activityModelChoices,activityModelIdentity}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));

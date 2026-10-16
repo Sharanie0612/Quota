@@ -8,6 +8,7 @@ import { toast } from "../lib/store";
 import type { LadderEntry, LadderSnapshot } from "../lib/types";
 import { currencyTitle, LadderChart } from "../components/LadderChart";
 import { plotPrice } from "../lib/ladderPlot";
+import { applyPricing, pricingOptions } from "../lib/ladderPricing";
 
 import { compareNames, modelFamilies, modelFamily, reasoningLabel, releasedWithin, releaseDates } from "../lib/ladderModels";
 import { AbilityRadar, abilityAxes, modelColors } from "../components/AbilityRadar";
@@ -23,7 +24,7 @@ function PriceReview({ entry, onClose }: { entry: LadderEntry; onClose: () => vo
     <p className="hint">{entry.price.note ?? "官网暂无可确认的标准 Token 价格"}</p>
     <div className="usage-selected"><span>输入 <b>{priceText(entry.price.input,entry.price.currency)}</b></span><span>输出 <b>{priceText(entry.price.output,entry.price.currency)}</b></span><span>缓存命中 <b>{priceText(entry.price.cachedInput,entry.price.currency)}</b></span></div>
     <p className="hint">{entry.price.unit} · 核实时间 {entry.verifiedAt ? new Date(entry.verifiedAt).toLocaleString("zh-CN") : "暂无成功核实记录"}</p>
-    {entry.offPeak && <div className="card section"><b>已核实闲时优惠</b><p>输入 {priceText(entry.offPeak.input,entry.offPeak.currency)} · 输出 {priceText(entry.offPeak.output,entry.offPeak.currency)} · 缓存命中 {priceText(entry.offPeak.cachedInput,entry.offPeak.currency)}</p><p className="hint">{entry.offPeak.note}</p></div>}
+    {pricingOptions(entry).map(option=><div key={option.id} className="card section"><b>{option.label}</b><p>输入 {priceText(option.price.input,option.price.currency)} · 输出 {priceText(option.price.output,option.price.currency)} · 缓存命中 {priceText(option.price.cachedInput,option.price.currency)}</p><p className="hint">{option.price.note}</p></div>)}
     {entry.candidate?.error && <Notice tone="warn">{entry.candidate.error}</Notice>}
     <p className="hint">最近自动检查 {entry.candidate?.checkedAt ? new Date(entry.candidate.checkedAt).toLocaleString("zh-CN") : "尚未检查"}。可在天梯顶部重新更新排名与价格。</p>
     <Button disabled={!entry.priceSource} onClick={() => void api.openExternal(entry.priceSource).catch(e=>toast(errText(e),"error"))}>查看官网来源</Button>
@@ -84,7 +85,7 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   const dates = useMemo(() => releaseDates(data?.entries ?? []), [data]);
   const entries = useMemo(() => {
     const list = (data?.entries ?? []).filter((e) => supported.includes(e.vendor) && (releaseWindow === "all" || releasedWithin(dates.get(modelFamily(e)), Number(releaseWindow))) && (vendor === "all" || e.vendor === vendor) && (currency === "all" || e.price.currency === currency) && `${e.name} ${e.vendor}`.toLowerCase().includes(search.toLowerCase()));
-    const priced=list.map(e=>scenario==="offer"&&e.verifiedAt&&e.offPeak?{...e,price:e.offPeak}:e);
+    const priced=list.map(e=>applyPricing(e,scenario));
     return priced.sort((a, b) => {
       if (sort === "price") {
         const cost = (e: LadderEntry) => !e.verifiedAt ? Infinity : plotPrice(e,"total",currency==="all"?"CNY":currency,exchange)??Infinity;
@@ -101,21 +102,21 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   useEffect(() => { setSelected(current => current.map(id => entries.some(e => e.id === id) ? id : "")); }, [entries]);
   const compare = selected.map(id=>entries.find(e=>e.id===id)).filter((entry):entry is LadderEntry=>!!entry);
   return <div className="content-inner ladder-page">
-    <div className="ladder-hero"><span className="hint">十家厂商 · 官方标准价格</span>
-      <div className="ladder-sync"><span className="hint">更新于 {timeAgo(data?.updatedAt)}{autoUpdate ? " · 每日检查" : " · 手动更新"}</span><Button disabled={busy} onClick={() => void refresh(true)}><IconRefresh size={14} className={busy ? "spin" : ""} />{busy ? "更新中…" : "更新排名与价格"}</Button></div></div>
+    <div className="ladder-hero"><span className="hint">十家厂商 · 官方条件定价</span>
+      <div className="ladder-sync"><span className="hint">排名更新于 {timeAgo(data?.updatedAt)}{autoUpdate ? " · 每日检查" : " · 手动更新"}</span><Button disabled={busy} onClick={() => void refresh(true)}><IconRefresh size={14} className={busy ? "spin" : ""} />{busy ? "更新中…" : "更新排名与价格"}</Button></div></div>
     {error || data?.error ? <Notice tone="warn" actions={<Button size="sm" onClick={() => void refresh(true)} disabled={busy}>重试</Button>}>{error ?? data?.error}</Notice> : null}
 
     <div className="ladder-toolbar"><Seg value={mode} options={[{value:"chart",label:"图表"},{value:"table",label:"列表"},{value:"ability",label:"能力图"}]} onChange={setMode}/><select className="select" aria-label="能力分类" value={domain} onChange={e=>setDomain(e.target.value)}>{DOMAINS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select>
       <input className="input ladder-search" aria-label="搜索模型" placeholder="搜索模型" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-    <div className="ladder-release-filter"><Seg value={scenario} onChange={setScenario} options={[{value:"standard",label:"标准价格"},{value:"offer",label:"已核实优惠"}]}/><span className="hint">{modelFamilies(entries).length} 款模型 · {entries.length} 个评测档位</span></div>
-    {scenario==="offer"&&<p className="hint" role="status">有官方闲时价的模型按该条件比较，其余保留标准价。点击模型查看适用条件；未核实的套餐与折扣不参与计算。</p>}
+    <div className="ladder-release-filter"><select className="select" aria-label="计费场景" value={scenario} onChange={e=>setScenario(e.target.value)}><option value="standard">标准价格</option><option value="off-peak">闲时优惠 · 其余标准价</option><option value="batch">异步批量 Batch</option><option value="flex">弹性服务 Flex</option><option value="long">长输入 · 厂商分档</option><option value="batch-long">长输入 · 批量</option><option value="flex-long">长输入 · 弹性</option></select><span className="hint">{modelFamilies(tableEntries).length} 款模型 · {tableEntries.length} 个评测档位</span></div>
+    {scenario!=="standard"&&<p className="hint" role="status">{scenario==="off-peak"?"按厂商已核实的闲时价格比较，其余使用标准价。":"仅使用官网已核实的所选计费档位；未支持该档的型号仍显示能力评分。"} 点击模型查看价格与适用条件。</p>}
     <details className="ladder-filter-details"><summary>筛选与排序{vendor!=="all"||currency!=="all"||releaseWindow!=="all"||sort!=="rank"?" · 已筛选":""}</summary><div className="ladder-filters">
       <label>推出时间 <select className="select" aria-label="模型推出时间" value={releaseWindow} onChange={e=>setReleaseWindow(e.target.value)}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option><option value="365">近 1 年</option><option value="all">全部</option></select></label>
       <select className="select" aria-label="筛选厂商" value={vendor} onChange={(e) => setVendor(e.target.value)}><option value="all">全部厂商</option>{vendors.map((v) => <option key={v}>{v}</option>)}</select>
       <select className="select" aria-label="价格币种" value={currency} onChange={(e) => setCurrency(e.target.value)}><option value="all">原厂币种</option><option value="CNY">人民币</option><option value="USD">美元</option></select>
       <select className="select" aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value)}><option value="rank">能力排名</option><option value="price">统一币种 · 价格从低到高</option></select>
       <Button size="sm" variant="quiet" onClick={()=>{setVendor("all");setCurrency("all");setReleaseWindow("all");setSort("rank");setSearch("");}}>重置筛选</Button>
-      <span className="hint">原厂标准价格 · 缓存价格独立</span>
+      <span className="hint">原厂价格 · 缓存价格独立</span>
     </div></details>
     {mode === "chart" && !data && <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div>}
     {mode==="chart" && data && (entries.length ? <LadderChart entries={entries} domain={domain} focused={focused} onFocus={setFocused} exchange={exchange} onShowList={()=>setMode("table")} /> : <div className="card"><EmptyState icon={<IconLayers size={24}/>} title="没有匹配的模型" desc="试试更长的推出时间范围或其他筛选条件"/></div>)}
@@ -139,7 +140,7 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
       <label>推理强度<select className="select" aria-label={`模型 ${i+1} 推理强度`} value={entry?.id ?? ""} disabled={!family || family.variants.length<2} onChange={event=>choose(event.target.value)}>{family ? family.variants.map(e=><option key={e.id} value={e.id} disabled={inUse(e.id)}>{reasoningLabel(e)}{family.variants.filter(v=>reasoningLabel(v)===reasoningLabel(e)).length>1 ? ` · ${e.name}` : ""}</option>) : <option value="">先选择模型</option>}</select></label></div>;
     })}</div>{compare.length ? <><AbilityRadar entries={compare}/><div className="ability-legend">{compare.map((e,i)=><button key={e.id} onClick={()=>setFocused(e)} style={{color:modelColors[i]}}><ModelLogo name={e.name} size={20}/>{e.name}</button>)}</div><table className="ladder-table"><thead><tr><th>维度</th>{compare.map(e=><th key={e.id}>{e.name}</th>)}</tr></thead><tbody>{abilityAxes.map(a=><tr key={a.key}><td>{a.label}</td>{compare.map(e=><td key={e.id}>{e.rankings[a.key]?.score.toFixed(1) ?? "暂无评测"}</td>)}</tr>)}</tbody></table></> : <EmptyState icon={<IconLayers size={24}/>} title="选择模型，比较六维能力" desc="综合、编程、数学、科学、推理与智能体"/>}</section>}
     {focused && <Modal title={focused.name} onClose={()=>setFocused(null)} footer={<Button onClick={()=>setFocused(null)}>关闭</Button>}><div className="model-mini-card"><AbilityRadar entries={[focused]}/><div><p><ModelLogo name={focused.name} size={24}/> {focused.vendor}</p><p>推出时间 {releasedWithin(dates.get(modelFamily(focused)),7)&&<Badge tone="blue">7 天内新模型</Badge>} <b>{dates.get(modelFamily(focused)) ?? "暂无资料"}</b></p><p className="hint">日期来源 AITier · 每百万 Token · {focused.price.currency}</p><dl><dt>输入</dt><dd>{priceText(focused.price.input,focused.price.currency)}</dd><dt>缓存命中</dt><dd>{priceText(focused.price.cachedInput,focused.price.currency)}</dd><dt>输出</dt><dd>{priceText(focused.price.output,focused.price.currency)}</dd></dl><Button size="sm" onClick={()=>{setReview(focused);setFocused(null);}}>价格与来源</Button></div></div><div className="radar-values">{abilityAxes.map(a=><span key={a.key}>{a.label} <b>{focused.rankings[a.key]?.score.toFixed(1) ?? "—"}</b></span>)}</div></Modal>}
-    <div className="ladder-source"><span>AITier 能力评分 · 官方标准价格</span><Button size="sm" variant="quiet" onClick={() => void api.openExternal(data?.source ?? "https://aitier.net/zh").catch((e) => toast(errText(e), "error"))}>查看排名来源</Button></div>
+    <div className="ladder-source"><span>AITier 能力评分 · 厂商官方价格</span><Button size="sm" variant="quiet" onClick={() => void api.openExternal(data?.source ?? "https://aitier.net/zh").catch((e) => toast(errText(e), "error"))}>查看排名来源</Button></div>
     {review ? <PriceReview entry={data?.entries.find(e=>e.id===review.id) ?? review} onClose={() => setReview(null)} /> : null}
   </div>;
 }

@@ -936,7 +936,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1900",
+            version: "1.0.2000",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

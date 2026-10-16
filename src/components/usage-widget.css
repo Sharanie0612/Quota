@@ -34,3 +34,9 @@ html:has(.usage-widget),body:has(.usage-widget),body:has(.usage-widget) #root { 
 .widget-heading { cursor:grab; touch-action:none; user-select:none; }
 .widget-heading:active { cursor:grabbing; }
 .widget-panel,.widget-handle { will-change:transform,opacity; backface-visibility:hidden; }
+.widget-panel { transition:opacity 200ms ease,transform 300ms cubic-bezier(.22,1,.36,1); transform:translate3d(32px,-50%,0) scale(.98); contain:layout paint; }
+.side-left .widget-panel { transform:translate3d(-32px,-50%,0) scale(.98); }
+.is-expanded .widget-panel { transform:translate3d(0,-50%,0) scale(1); }
+.widget-handle { transition:opacity 160ms ease; }
+.is-expanded .widget-handle { transform:translateY(-50%); }
+@media (prefers-reduced-motion:reduce) { .widget-panel,.widget-handle { transition:none; } }

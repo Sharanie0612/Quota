@@ -10,11 +10,39 @@ fn dollar(s:&str)->Option<f64>{num(s.trim().strip_prefix('$')?)}
 fn price(currency:&str,i:f64,o:f64,hit:Option<f64>,note:&str)->ModelPrice { ModelPrice{currency:currency.into(),unit:"每百万 tokens".into(),input:Some(i),output:Some(o),cached_input:hit,note:Some(format!("官方自动核实 · {note}")),..Default::default()} }
 fn markdown_rows(body:&str)->impl Iterator<Item=Vec<&str>> { body.lines().filter(|l|l.starts_with('|')).map(|l|l.trim_matches('|').split('|').map(str::trim).collect()) }
 pub fn anthropic(body:&str)->Prices {
+ anthropic_context(body,false)
+}
+pub fn anthropic_context(body:&str,long:bool)->Prices {
  let mut out=Prices::new();let Some(section)=body.split("## Model pricing").nth(1)else{return out};let section=section.split("## Cloud platform pricing").next().unwrap_or(section);
  if !body.contains("All prices are in USD") || !markdown_rows(section).any(|c|c==["Model","Base input tokens","5m cache writes","1h cache writes","Cache hits and refreshes","Output tokens"]) {return out}
  let rate=|s:&str| dollar(s.split(" / MTok").next().unwrap_or(""));
- for c in markdown_rows(section){if c.len()!=6||!c[0].starts_with("Claude ")||c[0].contains("retired"){continue}let id=c[0].split(" (").next().unwrap_or(c[0]).to_lowercase().replace(' ',"-");
-  if let (Some(i),Some(o))=(rate(c[1]),rate(c[5])){let mut p=price("USD",i,o,rate(c[4]),"Claude API 标准档；缓存写入分别为 5 分钟 / 1 小时");p.cache_write=rate(c[2]);p.cache_write_long=rate(c[3]);out.insert(id,p);}
+ for c in markdown_rows(section){if c.len()!=6||!c[0].starts_with("Claude ")||c[0].contains("retired"){continue}
+  let tier=if c[0].contains("(for prompts up to 100,000 tokens)"){Some(false)}else if c[0].contains("(for prompts over 100,000 tokens)"){Some(true)}else{None};
+  if tier.is_some_and(|t|t!=long)||long&&tier!=Some(true)||c[0].contains("for prompts")&&tier.is_none(){continue}
+  let id=c[0].split(" (").next().unwrap_or(c[0]).to_lowercase().replace(' ',"-");
+  let note=match tier {Some(false)=>"Claude API；单次输入 ≤10 万 Token（含缓存读取与写入）；缓存写入分别为 5 分钟 / 1 小时",Some(true)=>"Claude API；单次输入 >10 万 Token（含缓存读取与写入），整次请求使用该档价格",None=>"Claude API 标准档；缓存写入分别为 5 分钟 / 1 小时"};
+  if let (Some(i),Some(o))=(rate(c[1]),rate(c[5])){let mut p=price("USD",i,o,rate(c[4]),note);p.cache_write=rate(c[2]);p.cache_write_long=rate(c[3]);if out.insert(id,p).is_some(){return Prices::new()}}
+ }out
+}
+pub fn anthropic_batch(body:&str,long:bool)->Prices {
+ let mut out=Prices::new();
+ if !body.contains("All prices are in USD")||!body.contains("50% discount on both input and output tokens"){return out}
+ let Some(section)=body.split("### Batch processing").nth(1)else{return out};let section=section.split("### ").next().unwrap_or(section);
+ if !markdown_rows(section).any(|c|c==["Model","Batch input","Batch output"]){return out}
+ let standard=anthropic_context(body,long);
+ for c in markdown_rows(section){
+  if c.len()!=3||!c[0].starts_with("Claude ")||c[0].contains("retired"){continue}
+  let over=c[0].contains("(for prompts over 100,000 tokens)");
+  if over!=long||c[0].contains("for prompts")&&!over&&!c[0].contains("(for prompts up to 100,000 tokens)"){continue}
+  let id=c[0].split(" (").next().unwrap_or(c[0]).to_lowercase().replace(' ',"-");
+  let Some(base)=standard.get(&id)else{continue};
+  let rate=|s:&str|s.split_once(" / MTok").and_then(|(s,_)|dollar(s));
+  if let(Some(i),Some(o))=(rate(c[1]),rate(c[2])){
+   if base.input.is_none_or(|v|(v-2.*i).abs()>1e-9)||base.output.is_none_or(|v|(v-2.*o).abs()>1e-9){continue}
+   let mut p=price("USD",i,o,None,if long{"Claude 异步 Batch；单次输入 >10 万 Token，非实时请求"}else{"Claude 异步 Batch 五折，非实时请求；Haiku 5.5 单次输入 ≤10 万 Token"});
+   if body.contains("These multipliers stack with other pricing modifiers, including the Batch API discount and data residency.") {p.cached_input=base.cached_input.map(|v|v/2.);p.cache_write=base.cache_write.map(|v|v/2.);p.cache_write_long=base.cache_write_long.map(|v|v/2.);}
+   if out.insert(id,p).is_some(){return Prices::new()}
+  }
  }out
 }
 pub fn zhipu(body:&str)->Prices {
@@ -65,16 +93,37 @@ pub fn xai(body:&str)->Prices {
  }out
 }
 pub fn meta(body:&str)->Prices {
+ let current=meta_current(body);if !current.is_empty(){return current}
  let mut out=Prices::new();let Some(s)=body.split("id=\"standard-tier\"").nth(1)else{return out};let s=s.split("id=\"contributor-tier\"").next().unwrap_or(s);let doc=Html::parse_fragment(s);let Some(t)=doc.select(&sel("table")).next()else{return out};let r=rows(t);
  if r.first().map(|v|v.join("|"))!=Some("Usage|Price per 1M tokens".into()){return out}let get=|key:&str|r.iter().find(|c|c.len()==2&&c[0]==key).and_then(|c|dollar(&c[1]));
  if let(Some(i),Some(o))=(get("Input"),get("Output")){for c in doc.select(&sel("code")){let id=text(c);if id.starts_with("muse-spark-")&&id.split_whitespace().count()==1{out.insert(id,price("USD",i,o,get("Cached input"),"Meta API Standard tier"));}}}out
+}
+fn meta_current(body:&str)->Prices {
+ let mut out=Prices::new();
+ for family in ["muse-wonder","muse-spark"] {
+  let marker=format!("id=\"{family}-pricing\"");let Some(section)=body.split(&marker).nth(1)else{continue};
+  let section=section.split("<h3").next().unwrap_or(section);let doc=Html::parse_fragment(section);
+  let Some(table)=doc.select(&sel("table")).next()else{continue};let r=rows(table);
+  if r.first().map(|v|v.join("|"))!=Some("Usage|Standard mode (per 1M tokens)|Contributor mode (per 1M tokens)".into()){continue}
+  let get=|key:&str|r.iter().find(|c|c.len()==3&&c[0]==key).and_then(|c|dollar(&c[1]));
+  if let(Some(i),Some(o))=(get("Input"),get("Output")) {
+   let p=price("USD",i,o,get("Cached input"),"Meta 官方 API Standard mode；Contributor 为独立模型端点及数据使用条件，不自动混算");
+   for code in doc.select(&sel("code")){let id=text(code);if id.starts_with(&format!("{family}-"))&&!id.contains("contributor")&&id.split_whitespace().count()==1{out.insert(id,p.clone());}}
+  }
+ }out
 }
 // Accept only explicitly understood textual rates; image/audio and ambiguous cells remain absent.
 fn google_rate(s:&str,today:chrono::NaiveDate)->Option<f64>{
  for modality in [" (text / image / video / audio)"," (text / image / video)"] {
   if let Some((rate,rest))=s.split_once(modality){let rest=rest.trim();if rest.is_empty()||rest.strip_suffix(" (audio)").and_then(dollar).is_some(){return dollar(rate)}return None}
  }
- if let Some((current,future))=s.split_once(" through December 31, 2026."){let future=future.trim();let future=future.strip_suffix(" starting January 1, 2027.")?;return if today<=chrono::NaiveDate::from_ymd_opt(2026,12,31)?{dollar(current)}else{dollar(future)}}
+ if let Some((current,rest))=s.split_once(" through "){
+  let(end,rest)=rest.split_once(". ")?;let(future,start)=rest.split_once(" starting ")?;
+  let end=chrono::NaiveDate::parse_from_str(end,"%B %e, %Y").ok()?;
+  let start=chrono::NaiveDate::parse_from_str(start.strip_suffix('.')?,"%B %e, %Y").ok()?;
+  if end.succ_opt()!=Some(start){return None}
+  return if today<=end{dollar(current)}else{dollar(future)}
+ }
  if let Some((short,long))=s.split_once(", prompts <= 200k tokens"){if long.trim().starts_with('$')&&long.contains("prompts > 200k"){return dollar(short)}}
  if let Some((short,long))=s.split_once(", prompts ≤ 200k tokens"){if long.trim().starts_with('$')&&long.contains("prompts > 200k"){return dollar(short)}}
  dollar(s)
@@ -88,12 +137,15 @@ fn google_cache(s:&str,today:chrono::NaiveDate)->Option<f64>{
  google_rate(&rate,today)
 }
 pub fn google(body:&str)->Prices {
+ google_tier(body,"Standard")
+}
+pub fn google_tier(body:&str,tier:&str)->Prices {
  let mut out=Prices::new();let today=chrono::Utc::now().date_naive();
  for chunk in body.split("<div class=\"models-section\">").skip(1){let doc=Html::parse_fragment(chunk);let Some(code)=doc.select(&sel(".heading-group code")).next()else{continue};let id=text(code);if !id.starts_with("gemini-"){continue}
-  let Some(section)=doc.select(&sel("section")).find(|s|s.select(&sel("h3")).next().is_some_and(|h|text(h)=="Standard"))else{continue};let Some(t)=section.select(&sel("table")).next()else{continue};let r=rows(t);if !r.first().is_some_and(|c|c.len()==3&&c[2]=="Paid Tier, per 1M tokens in USD"){continue}
+  let Some(section)=doc.select(&sel("section")).find(|s|s.select(&sel("h3")).next().is_some_and(|h|text(h)==tier))else{continue};let Some(t)=section.select(&sel("table")).next()else{continue};let r=rows(t);if !r.first().is_some_and(|c|c.len()==3&&c[2]=="Paid Tier, per 1M tokens in USD"){continue}
   let get=|label:&str|r.iter().find(|c|c.len()==3&&c[0]==label).and_then(|c|google_rate(&c[2],today));
-  let cached=r.iter().find(|c|c.len()==3&&c[0]=="Context caching price").and_then(|c|google_cache(&c[2],today));
-  if let(Some(i),Some(o))=(get("Input price").or_else(||get("Input price (text, image, video)")),get("Output price (including thinking tokens)")){let p=price("USD",i,o,cached,"Gemini API Standard；文本输入与输出、短上下文，按官网当前生效日期；缓存存储另计");for code in doc.select(&sel(".heading-group code")){let id=text(code);if id.starts_with("gemini-")&&id.split_whitespace().count()==1{out.insert(id,p.clone());}}}
+  let cached=r.iter().find(|c|c.len()==3&&c[0]=="Context caching price").and_then(|c|google_cache(&c[2],today).or_else(||google_rate(c[2].split(" Implicit caching only").next().unwrap_or(&c[2]),today)));
+  if let(Some(i),Some(o))=(get("Input price").or_else(||get("Input price (text, image, video)")),get("Output price (including thinking tokens)")){let terms=r.iter().filter(|c|c.len()==3&&matches!(c[0].as_str(),"Input price"|"Output price (including thinking tokens)")).map(|c|format!("{}: {}",c[0],c[2])).collect::<Vec<_>>().join("；");let p=price("USD",i,o,cached,&format!("Gemini API {tier}；文本短上下文，按官网生效日期；Batch 为异步批量、Flex 为弹性服务；缓存存储另计。{terms}"));for code in doc.select(&sel(".heading-group code")){let id=text(code);if id.starts_with("gemini-")&&id.split_whitespace().count()==1{out.insert(id,p.clone());}}}
  }out
 }
 pub fn alibaba(body:&str)->Prices {
@@ -108,8 +160,11 @@ pub fn alibaba(body:&str)->Prices {
  }out
 }
 pub fn xiaomi(body:&str)->Prices {
+ xiaomi_tier(body,false)
+}
+pub fn xiaomi_tier(body:&str,batch:bool)->Prices {
  let mut out=Prices::new();if !body.contains("元 / 百万 tokens"){return out}let doc=Html::parse_fragment(body);let Some(t)=doc.select(&sel("table")).next()else{return out};let r=rows(t);if r.first().map(|v|v.join("|"))!=Some("推理类型|模型名称|输入（命中缓存）|输入（未命中缓存）|输出".into()){return out}
  let mut realtime=false;
- for c in r.iter().skip(1){if c.len()==5{realtime=c[0]=="实时推理"}if !realtime||!(4..=5).contains(&c.len()){continue}let start=c.len()-4;let n=|j:usize|num(c[start+j].strip_prefix('¥').unwrap_or(""));if let(Some(h),Some(i),Some(o))=(n(1),n(2),n(3)){for id in c[start].split('、').map(str::trim){let id=id.split_whitespace().next().unwrap_or("");if id.starts_with("mimo-"){out.insert(id.into(),price("CNY",i,o,Some(h),"国内实时推理标准档；缓存写入限时免费但 TTL 未明确"));}}}
+ for c in r.iter().skip(1){if c.len()==5{realtime=c[0]==if batch{"批量推理"}else{"实时推理"}}if !realtime||!(4..=5).contains(&c.len()){continue}let start=c.len()-4;let n=|j:usize|num(c[start+j].strip_prefix('¥').unwrap_or(""));if let(Some(h),Some(i),Some(o))=(n(1),n(2),n(3)){for id in c[start].split('、').map(str::trim){let id=id.split_whitespace().next().unwrap_or("");if id.starts_with("mimo-"){if out.insert(id.into(),price("CNY",i,o,Some(h),if batch{"国内批量推理，异步请求；按官网独立列价，非实时调用"}else{"国内实时推理标准档；缓存写入限时免费但 TTL 未明确"})).is_some(){return Prices::new()}}}}
  }out
 }

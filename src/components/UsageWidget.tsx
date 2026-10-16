@@ -32,8 +32,16 @@ export function UsageWidget() {
     return moving.current;
   };
   const desired=useRef(false);const working=useRef(false);const live=useRef(true);
+  const interrupt=useRef<(()=>void)|null>(null);
+  const settle=()=>new Promise<void>(resolve=>{
+    const done=()=>{clearTimeout(timeout);interrupt.current=null;resolve();};
+    const timeout=setTimeout(done,matchMedia('(prefers-reduced-motion: reduce)').matches?0:300);
+    interrupt.current=done;
+  });
   const expand=async(next:boolean)=>{
-    clearTimeout(timer.current);desired.current=next;
+    clearTimeout(timer.current);const changed=desired.current!==next;desired.current=next;
+    // Reverse the CSS transition immediately; never queue a full collapse first.
+    if(native.current){setExpanded(next);if(changed)interrupt.current?.();}
     if(working.current)return;
     if(native.current===next)return;
     working.current=true;
@@ -42,14 +50,14 @@ export function UsageWidget() {
       do {
         target=desired.current;
         if(target){
-          await api.setWidgetExpanded(true);
+          if(!native.current)await api.setWidgetExpanded(true);
           if(!live.current)break;
           native.current=true;setNativeExpanded(true);
           await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
           if(live.current)setExpanded(desired.current);
         }else{
           setExpanded(false);
-          await new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?0:260));
+          await settle();
           if(!live.current)break;
           if(desired.current)continue;
           await api.setWidgetExpanded(false);
@@ -68,7 +76,7 @@ export function UsageWidget() {
     const activity=listen('activity-updated',()=>void load());
     void un.then(()=>api.widgetReady()).then(()=>load()).catch(e=>{if(!stopped)setError(errText(e));});
     const interval=setInterval(()=>void load(),30000);
-    return()=>{stopped=true;live.current=false;clearInterval(interval);clearTimeout(timer.current);if(frame.current)cancelAnimationFrame(frame.current);void un.then(f=>f());void activity.then(f=>f());};
+    return()=>{stopped=true;live.current=false;interrupt.current?.();clearInterval(interval);clearTimeout(timer.current);if(frame.current)cancelAnimationFrame(frame.current);void un.then(f=>f());void activity.then(f=>f());};
   },[]);
   useEffect(()=>{if(expanded&&focusValue.current){focusValue.current=false;root.current?.querySelector<HTMLButtonElement>('.widget-value')?.focus();}},[expanded]);
   const value=usage?(total?usage.total:usage.today):null;

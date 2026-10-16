@@ -1,6 +1,8 @@
 //! A local-only, edge-docked usage surface. It never collects or syncs its own metrics.
 use serde::{Deserialize, Serialize};
-use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
+#[cfg(not(windows))]
+use tauri::PhysicalSize;
 use crate::commands::AppState;
 
 pub const LABEL: &str = "usage-widget";
@@ -32,8 +34,17 @@ fn place(app: &tauri::AppHandle, expanded: bool, initial: bool) -> Result<(), St
     let o = options(app); let area = monitor.work_area();
     let (x,y,w,h) = bounds(area.position.x, area.position.y, area.size.width, area.size.height, monitor.scale_factor(), expanded, o.side == "left", o.height_percent);
     // Keep the native hit area as small as the visible handle while collapsed.
-    win.set_size(PhysicalSize::new(w,h)).map_err(|_| "无法调整悬浮窗大小")?;
-    win.set_position(PhysicalPosition::new(x,y)).map_err(|_| "无法贴合屏幕边缘")?;
+    #[cfg(windows)] {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos,SWP_NOACTIVATE,SWP_NOZORDER};
+        let hwnd=win.hwnd().map_err(|_|"无法读取悬浮窗句柄")?;
+        // One native transaction prevents the right-docked window from jumping
+        // between the old position and the new size on separate paints.
+        if unsafe { SetWindowPos(hwnd.0 as _,std::ptr::null_mut(),x,y,w as i32,h as i32,SWP_NOACTIVATE|SWP_NOZORDER) } == 0 {return Err("无法调整悬浮窗位置".into());}
+    }
+    #[cfg(not(windows))] {
+        win.set_size(PhysicalSize::new(w,h)).map_err(|_| "无法调整悬浮窗大小")?;
+        win.set_position(PhysicalPosition::new(x,y)).map_err(|_| "无法贴合屏幕边缘")?;
+    }
     win.emit("widget-state", serde_json::json!({"expanded":expanded,"side":o.side,"enabled":o.enabled})).map_err(|_| "无法更新悬浮窗")?;
     Ok(())
 }

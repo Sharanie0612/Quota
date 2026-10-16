@@ -205,9 +205,10 @@ textarea {
 
 /* 极细滚动条 */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 0;
+  height: 0;
 }
+* { scrollbar-width:none; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border: 3px solid transparent;

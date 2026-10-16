@@ -1,5 +1,15 @@
 use quota_lib::official_prices;
 fn main(){
+ let body=include_str!("../data/pricing-fixtures/deepseek-en.html");
+ let standard=official_prices::parse("DeepSeek",body);
+ let discount=quota_lib::official_tables::deepseek_band(body,true);
+ assert_eq!(standard["deepseek-flash"].input,Some(0.3));
+ assert_eq!(discount["deepseek-flash"].input,Some(0.15));
+ assert_eq!(discount["deepseek-v4-pro-0813"].output,Some(1.98));
+ assert!(quota_lib::official_tables::deepseek_band(&body.replace("excluding Chinese public holidays","including Chinese public holidays"),true).is_empty());
+ assert!(official_prices::parse("DeepSeek",&body.replace("1M INPUT TOKENS","1K INPUT TOKENS")).is_empty());
+ assert!(quota_lib::official_tables::deepseek_band(&body.replace("$0.15","$0.16"),true).get("deepseek-flash").is_none());
+ println!("PASS DeepSeek exact model, standard and conditional half-price, changed policy/unit/rate rejection");
  for (vendor,file) in [("OpenAI","openai"),("Kimi","kimi"),("Anthropic","anthropic"),("DeepSeek","deepseek"),("Z AI","zhipu"),("Google","google"),("Alibaba","alibaba"),("SpaceXAI","xai"),("Meta","meta"),("Xiaomi","xiaomi-html")]{
   let body=std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("data/pricing-fixtures/{file}.txt"))).unwrap();
   let prices=official_prices::parse(vendor,&body);

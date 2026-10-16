@@ -38,7 +38,7 @@ export function activityModelChoices(rows: ActivityGroup[], search: string) {
 /** Channels present in the given rows, in a stable order. */
 export function activityChannels(rows: ActivityGroup[]) {
   const present = new Set(rows.map(row => activityModelChannel(row.key)).filter(Boolean));
-  return (["trae", "api", "unknown"] as const).filter(channel => present.has(channel));
+  return present.size ? (["trae", "api", "unknown"] as const).filter(channel => channel!=="unknown"||present.has(channel)) : [];
 }
 
 /** Readable label for the current model/channel/vendor filter value. */

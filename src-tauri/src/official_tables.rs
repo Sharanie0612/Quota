@@ -28,10 +28,34 @@ pub fn zhipu(body:&str)->Prices {
  }out
 }
 pub fn deepseek(body:&str)->Prices {
+ let english=deepseek_band(body,false);if !english.is_empty(){return english}
  let mut out=Prices::new();let doc=Html::parse_document(body);
  for t in doc.select(&sel("table")){let r=rows(t);let Some(models)=r.first().filter(|r|r.len()==3&&r[0]=="模型")else{continue};let hits:Vec<_>=r.iter().filter(|r|r.first().is_some_and(|c|c=="高峰时段")&&r.len()==3).collect();
   let full=text(t);if hits.len()!=3||!full.contains("百万tokens输入")||!full.contains("缓存未命中")||!full.contains("百万tokens输出"){continue}
   for col in 1..=2{let n=|row:usize|num(hits[row][col].strip_suffix('元').unwrap_or(""));if let(Some(h),Some(i),Some(o))=(n(0),n(1),n(2)){let p=price("CNY",i,o,Some(h),"标准高峰时段，非闲时折扣");out.insert(models[col].split_whitespace().next().unwrap_or("").into(),p.clone());if let Some(versions)=r.iter().find(|r|r.len()==3&&r[0]=="模型版本"){out.insert(versions[col].to_lowercase(),p);}}}
+ }out
+}
+/// Peak and off-peak remain separate. A changed table or timing policy fails closed.
+pub fn deepseek_band(body:&str,off_peak:bool)->Prices {
+ let mut out=Prices::new();let doc=Html::parse_document(body);
+ let full=text(doc.root_element());
+ if !full.contains("per 1M tokens") {return out}
+ if off_peak && !["Off-peak rates are half of the peak rates.","01:00 - 04:00 and 06:00 - 10:00 UTC, Monday through Friday, excluding Chinese public holidays.","All other hours are off-peak"].iter().all(|s|full.contains(s)){return out}
+ for table in doc.select(&sel("table")) {
+  let r=rows(table);let Some(models)=r.first().filter(|r|r.len()==3&&r[0]=="MODEL")else{continue};
+  let labels=["1M INPUT TOKENS (CACHE HIT)","1M INPUT TOKENS (CACHE MISS)","1M OUTPUT TOKENS"];
+  let found:Vec<_>=r.iter().flatten().filter(|s|labels.contains(&s.as_str())).map(String::as_str).collect();
+  if found!=labels{continue}
+  // Row spans omit category cells on PEAK rows. OFF-PEAK rows have 4 or 5 cells.
+  let band=if off_peak{"OFF-PEAK"}else{"PEAK"};
+  let hits:Vec<_>=r.iter().filter_map(|row|row.iter().position(|v|v==band).filter(|&i|row.len()==i+3).map(|i|&row[i+1..])).collect();
+  if hits.len()!=3{continue}
+  for col in 0..2 {if let(Some(h),Some(i),Some(o))=(dollar(&hits[0][col]),dollar(&hits[1][col]),dollar(&hits[2][col])) {
+   if off_peak {let peaks:Vec<_>=r.iter().filter(|r|r.len()==3&&r[0]=="PEAK").collect();if peaks.len()!=3||[h,i,o].iter().enumerate().any(|(j,n)|dollar(&peaks[j][col+1]).is_none_or(|p|(p-2.0*n).abs()>1e-9)){continue}}
+   let p=price("USD",i,o,Some(h),if off_peak{"DeepSeek 闲时价；高峰为北京时间周一至周五 09–12、14–18 点（中国法定节假日除外），其余时段半价；仅适用官方 API"}else{"DeepSeek 官方 API 标准高峰价；闲时优惠另列"});
+   let id=models[col+1].split_whitespace().next().unwrap_or("");if !id.starts_with("deepseek-"){continue}out.insert(id.into(),p.clone());
+   if let Some(versions)=r.iter().find(|r|r.len()==3&&r[0]=="MODEL VERSION"){out.insert(versions[col+1].to_lowercase(),p);}
+  }}
  }out
 }
 pub fn xai(body:&str)->Prices {

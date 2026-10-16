@@ -7,6 +7,7 @@ import { priceText, timeAgo } from "../lib/format";
 import { toast } from "../lib/store";
 import type { LadderEntry, LadderSnapshot } from "../lib/types";
 import { currencyTitle, LadderChart } from "../components/LadderChart";
+import { plotPrice } from "../lib/ladderPlot";
 
 import { compareNames, modelFamilies, modelFamily, reasoningLabel, releasedWithin, releaseDates } from "../lib/ladderModels";
 import { AbilityRadar, abilityAxes, modelColors } from "../components/AbilityRadar";
@@ -19,10 +20,10 @@ const DOMAINS = [
 
 function PriceReview({ entry, onClose }: { entry: LadderEntry; onClose: () => void }) {
   return <Modal title={`官方价格 · ${entry.name}`} onClose={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
-    <p>系统自动读取厂商官网，无需填写或人工采用价格。</p>
     <p className="hint">{entry.price.note ?? "官网暂无可确认的标准 Token 价格"}</p>
     <div className="usage-selected"><span>输入 <b>{priceText(entry.price.input,entry.price.currency)}</b></span><span>输出 <b>{priceText(entry.price.output,entry.price.currency)}</b></span><span>缓存命中 <b>{priceText(entry.price.cachedInput,entry.price.currency)}</b></span></div>
-    <p className="hint">每百万 Token · 核实时间 {entry.verifiedAt ? new Date(entry.verifiedAt).toLocaleString("zh-CN") : "暂无成功核实记录"}</p>
+    <p className="hint">{entry.price.unit} · 核实时间 {entry.verifiedAt ? new Date(entry.verifiedAt).toLocaleString("zh-CN") : "暂无成功核实记录"}</p>
+    {entry.offPeak && <div className="card section"><b>已核实闲时优惠</b><p>输入 {priceText(entry.offPeak.input,entry.offPeak.currency)} · 输出 {priceText(entry.offPeak.output,entry.offPeak.currency)} · 缓存命中 {priceText(entry.offPeak.cachedInput,entry.offPeak.currency)}</p><p className="hint">{entry.offPeak.note}</p></div>}
     {entry.candidate?.error && <Notice tone="warn">{entry.candidate.error}</Notice>}
     <p className="hint">最近自动检查 {entry.candidate?.checkedAt ? new Date(entry.candidate.checkedAt).toLocaleString("zh-CN") : "尚未检查"}。可在天梯顶部重新更新排名与价格。</p>
     <Button disabled={!entry.priceSource} onClick={() => void api.openExternal(entry.priceSource).catch(e=>toast(errText(e),"error"))}>查看官网来源</Button>
@@ -56,6 +57,7 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   const [vendor, setVendor] = useState("all");
   const [currency, setCurrency] = useState("all");
   const [sort, setSort] = useState("rank");
+  const [scenario,setScenario]=useState("standard");
   const [releaseWindow, setReleaseWindow] = useState("all");
   const [abilitySort, setAbilitySort] = useState("vendor");
   const [search, setSearch] = useState("");
@@ -80,20 +82,20 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
   const supported = ["OpenAI", "Anthropic", "Google", "DeepSeek", "Kimi", "Z AI", "Xiaomi", "Alibaba", "SpaceXAI", "Meta"];
   const vendors = supported.filter((v) => data?.entries.some((e) => e.vendor === v));
   const dates = useMemo(() => releaseDates(data?.entries ?? []), [data]);
-  const recent = useMemo(() => modelFamilies((data?.entries ?? []).filter(e => supported.includes(e.vendor) && releasedWithin(dates.get(modelFamily(e)), 7))), [data, dates]);
   const entries = useMemo(() => {
     const list = (data?.entries ?? []).filter((e) => supported.includes(e.vendor) && (releaseWindow === "all" || releasedWithin(dates.get(modelFamily(e)), Number(releaseWindow))) && (vendor === "all" || e.vendor === vendor) && (currency === "all" || e.price.currency === currency) && `${e.name} ${e.vendor}`.toLowerCase().includes(search.toLowerCase()));
-    return list.sort((a, b) => {
+    const priced=list.map(e=>scenario==="offer"&&e.verifiedAt&&e.offPeak?{...e,price:e.offPeak}:e);
+    return priced.sort((a, b) => {
       if (sort === "price") {
-        const cost = (e: LadderEntry) => e.price.input == null || e.price.output == null ? Infinity : e.price.input + e.price.output;
+        const cost = (e: LadderEntry) => !e.verifiedAt ? Infinity : plotPrice(e,"total",currency==="all"?"CNY":currency,exchange)??Infinity;
         if ((cost(a) === Infinity) !== (cost(b) === Infinity)) return cost(a) === Infinity ? 1 : -1;
-        if (currency === "all" && a.price.currency !== b.price.currency) return a.price.currency.localeCompare(b.price.currency);
         return cost(a) - cost(b) || (a.rankings[domain]?.rank ?? Infinity) - (b.rankings[domain]?.rank ?? Infinity);
       }
       return (a.rankings[domain]?.rank ?? Infinity) - (b.rankings[domain]?.rank ?? Infinity);
     });
-  }, [data, vendor, currency, sort, search, domain, releaseWindow, dates]);
-  const tableGroups = [{ key: "combined", title: "模型排名", entries }];
+  }, [data, vendor, currency, sort, search, domain, releaseWindow, dates,exchange,scenario]);
+  const tableEntries=entries.filter(e=>e.rankings[domain]);
+  const tableGroups = [{ key: "combined", title: "模型排名", entries:tableEntries }];
   useEffect(() => { setFocused(current => current ? entries.find(e => e.id === current.id) ?? null : null); }, [entries]);
   const families = useMemo(() => modelFamilies(entries, abilitySort), [entries, abilitySort]);
   useEffect(() => { setSelected(current => current.map(id => entries.some(e => e.id === id) ? id : "")); }, [entries]);
@@ -105,17 +107,20 @@ export function LadderView({ autoUpdate }: { autoUpdate: boolean }) {
 
     <div className="ladder-toolbar"><Seg value={mode} options={[{value:"chart",label:"图表"},{value:"table",label:"列表"},{value:"ability",label:"能力图"}]} onChange={setMode}/><select className="select" aria-label="能力分类" value={domain} onChange={e=>setDomain(e.target.value)}>{DOMAINS.map(d=><option key={d.value} value={d.value}>{d.label}</option>)}</select>
       <input className="input ladder-search" aria-label="搜索模型" placeholder="搜索模型" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-    <div className="ladder-release-filter"><label>推出时间 <select className="select" aria-label="模型推出时间" value={releaseWindow} onChange={e=>setReleaseWindow(e.target.value)}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option><option value="365">近 1 年</option><option value="all">全部</option></select></label><span className="hint">{modelFamilies(entries).length} 款模型 · {entries.length} 个评测档位{releaseWindow !== "all" ? " · 未知推出日期不纳入" : ""}</span>{recent.length > 0 && <Button size="sm" variant="quiet" onClick={()=>setReleaseWindow("7")}><Badge tone="blue">7 天内新模型</Badge>{recent.length} 款 · 查看</Button>}</div>
-    <details className="ladder-filter-details"><summary>更多筛选</summary><div className="ladder-filters">
+    <div className="ladder-release-filter"><Seg value={scenario} onChange={setScenario} options={[{value:"standard",label:"标准价格"},{value:"offer",label:"已核实优惠"}]}/><span className="hint">{modelFamilies(entries).length} 款模型 · {entries.length} 个评测档位</span></div>
+    {scenario==="offer"&&<p className="hint" role="status">有官方闲时价的模型按该条件比较，其余保留标准价。点击模型查看适用条件；未核实的套餐与折扣不参与计算。</p>}
+    <details className="ladder-filter-details"><summary>筛选与排序{vendor!=="all"||currency!=="all"||releaseWindow!=="all"||sort!=="rank"?" · 已筛选":""}</summary><div className="ladder-filters">
+      <label>推出时间 <select className="select" aria-label="模型推出时间" value={releaseWindow} onChange={e=>setReleaseWindow(e.target.value)}><option value="7">近 7 天</option><option value="30">近 30 天</option><option value="90">近 90 天</option><option value="365">近 1 年</option><option value="all">全部</option></select></label>
       <select className="select" aria-label="筛选厂商" value={vendor} onChange={(e) => setVendor(e.target.value)}><option value="all">全部厂商</option>{vendors.map((v) => <option key={v}>{v}</option>)}</select>
       <select className="select" aria-label="价格币种" value={currency} onChange={(e) => setCurrency(e.target.value)}><option value="all">原厂币种</option><option value="CNY">人民币</option><option value="USD">美元</option></select>
-      <select className="select" aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value)}><option value="rank">能力排名</option><option value="price">按币种 · 价格从低到高</option></select>
+      <select className="select" aria-label="排序" value={sort} onChange={(e) => setSort(e.target.value)}><option value="rank">能力排名</option><option value="price">统一币种 · 价格从低到高</option></select>
+      <Button size="sm" variant="quiet" onClick={()=>{setVendor("all");setCurrency("all");setReleaseWindow("all");setSort("rank");setSearch("");}}>重置筛选</Button>
       <span className="hint">原厂标准价格 · 缓存价格独立</span>
     </div></details>
     {mode === "chart" && !data && <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div>}
-    {mode==="chart" && data && (entries.length ? <LadderChart entries={entries} domain={domain} focused={focused} onFocus={setFocused} exchange={exchange} /> : <div className="card"><EmptyState icon={<IconLayers size={24}/>} title="没有匹配的模型" desc="试试更长的推出时间范围或其他筛选条件"/></div>)}
+    {mode==="chart" && data && (entries.length ? <LadderChart entries={entries} domain={domain} focused={focused} onFocus={setFocused} exchange={exchange} onShowList={()=>setMode("table")} /> : <div className="card"><EmptyState icon={<IconLayers size={24}/>} title="没有匹配的模型" desc="试试更长的推出时间范围或其他筛选条件"/></div>)}
     <div className={`ladder-layout${mode==="chart"?" chart-layout":""}`}><div className="ladder-tables" hidden={mode!=="table"}>
-      {!data ? <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div> : !entries.length ? <div className="card"><EmptyState icon={<IconLayers size={24} />} title="没有匹配的模型" desc="试试其他筛选条件" /></div> : tableGroups.map(group => <section className="card ladder-table-wrap" key={group.key}>
+      {!data ? <div className="card section" role={error ? undefined : 'status'}>{error ? '暂时无法显示天梯，重试后更新。' : '读取中…'}</div> : !tableEntries.length ? <div className="card"><EmptyState icon={<IconLayers size={24} />} title="当前分类没有匹配的评测" desc="试试其他能力分类或重置筛选" /></div> : tableGroups.map(group => <section className="card ladder-table-wrap" key={group.key}>
         <div className="ladder-table-heading"><h3>{group.title}</h3><span>{group.entries.length} 个模型 · 每百万 Token</span></div>
         <LadderTable entries={group.entries} domain={domain} onReview={setFocused} label={`${group.title}模型天梯`} />
       </section>)}

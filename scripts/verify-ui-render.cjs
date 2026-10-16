@@ -40,6 +40,12 @@ assert.match(combined, /CNY统一价格与性能坐标图/);
 const noRate = render(LadderChart,{...props,layout:'combined',exchange:null});
 assert.equal((noRate.match(/role="button"/g)||[]).length,1);
 console.log('PASS one normalized price axis, original prices, FX-unavailable fallback and exclusion of unknown prices');
+const onlyUsd=render(LadderChart,{...props,entries:[entry('usd-only','USD',1)],exchange:null});
+assert.match(onlyUsd,/USD统一价格与性能坐标图/);
+assert.equal((onlyUsd.match(/role="button"/g)||[]).length,1);
+const unpriced=render(LadderChart,{...props,entries:[{...entry('unknown','CNY',null),verifiedAt:null}],onShowList:()=>{}});
+assert.match(unpriced,/查看模型列表/);
+console.log('PASS USD-only chart without exchange rate and actionable missing-price state');
 
 const { AccountCard } = load(path.resolve(__dirname, '../src/components/AccountCard.tsx'));
 const balance = { total: 10, currency: 'CNY', source: 'api', usable: true, note: 'synthetic note', amounts: [{ kind: 'granted', label: '赠送余额', value: 0 }, { kind: 'cumulative_spend', label: '累计消费', value: 25 }] };

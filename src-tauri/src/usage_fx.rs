@@ -219,10 +219,14 @@ pub async fn get_monthly_usage_fx(
 }
 #[tauri::command]
 pub fn save_monthly_usage_fx(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     month: String,
     rate: Option<f64>,
 ) -> Result<(), String> {
     let _guard = state.billing_lock.lock().map_err(|_| "汇率记录忙碌")?;
-    save_manual(state.store.dir(), &month, rate)
+    save_manual(state.store.dir(), &month, rate)?;
+    drop(_guard);
+    crate::usage_sync::queue(app);
+    Ok(())
 }

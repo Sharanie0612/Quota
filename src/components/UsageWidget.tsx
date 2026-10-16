@@ -35,7 +35,8 @@ export function UsageWidget() {
   const interrupt=useRef<(()=>void)|null>(null);
   const settle=()=>new Promise<void>(resolve=>{
     const done=()=>{clearTimeout(timeout);interrupt.current=null;resolve();};
-    const timeout=setTimeout(done,matchMedia('(prefers-reduced-motion: reduce)').matches?0:300);
+    // CSS completion is authoritative; the timer covers hidden/disabled views.
+    const timeout=setTimeout(done,matchMedia('(prefers-reduced-motion: reduce)').matches?0:420);
     interrupt.current=done;
   });
   const expand=async(next:boolean)=>{
@@ -53,7 +54,6 @@ export function UsageWidget() {
           if(!native.current)await api.setWidgetExpanded(true);
           if(!live.current)break;
           native.current=true;setNativeExpanded(true);
-          await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
           if(live.current)setExpanded(desired.current);
         }else{
           setExpanded(false);
@@ -83,7 +83,7 @@ export function UsageWidget() {
   const fullValue=value==null?(error?'暂无可用用量':'正在读取用量'):`${value.toLocaleString('zh-CN')} Token`;
   const compact=(n:number)=>Intl.NumberFormat('zh-CN',{notation:'compact',maximumFractionDigits:2}).formatToParts(n).map((part,index)=><span key={index} className={part.type==='compact'?'widget-number-unit':undefined}>{part.value}</span>);
   return <div ref={root} className={`usage-widget ${expanded?'is-expanded':''} ${nativeExpanded?'native-expanded':''} side-${side}`} onMouseEnter={()=>{hovered.current=true;void expand(true);}} onMouseLeave={()=>{hovered.current=false;collapse(true);}} onFocusCapture={()=>{if(!expanded)focusValue.current=true;void expand(true);}} onBlurCapture={()=>collapse()} onKeyDown={e=>{if(e.key==='Escape'){(document.activeElement as HTMLElement)?.blur();void expand(false);}}}>
-    <button className="widget-handle" tabIndex={expanded?-1:0} aria-hidden={expanded} aria-label={`展开${total?'累计':'今日'}用量`} onClick={()=>void expand(true)}><span className="widget-handle-dot"/><span>用量</span><IconChart size={13}/></button><section className="widget-panel" aria-hidden={!expanded} aria-label="Token 用量悬浮窗">
+    <button className="widget-handle" tabIndex={expanded?-1:0} aria-hidden={expanded} aria-label={`展开${total?'累计':'今日'}用量`} onClick={()=>void expand(true)}><span className="widget-handle-dot"/><span>用量</span><IconChart size={13}/></button><section className="widget-panel" aria-hidden={!expanded} aria-label="Token 用量悬浮窗" onTransitionEnd={e=>{if(e.propertyName==='clip-path'&&e.target===e.currentTarget&&!desired.current)interrupt.current?.();}}>
       <div className="widget-heading" title="拖动调整位置，松开贴边" onPointerDown={e=>{
         if(e.button!==0||(e.target as HTMLElement).closest('button'))return;
         clearTimeout(timer.current);dragging.current={x:e.screenX,y:e.screenY,dx:0,dy:0};e.currentTarget.setPointerCapture(e.pointerId);

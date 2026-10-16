@@ -6,8 +6,13 @@ fn amount(text:&str,currency:char)->Option<f64>{
     text.trim().strip_prefix(currency)?.parse::<f64>().ok().filter(|n|n.is_finite()&&*n>=0.0)
 }
 pub fn openai(markdown:&str)->HashMap<String,ModelPrice>{
+    openai_tier(markdown,"Standard",false)
+}
+pub fn openai_tier(markdown:&str,tier:&str,long:bool)->HashMap<String,ModelPrice>{
     let mut result=HashMap::new();
-    let Some(section)=markdown.split("### Standard pricing data").nth(1)else{return result};
+    if long&&!markdown.contains("Short context: ≤272K input tokens. Long context: >272K input tokens."){return result}
+    let marker=format!("### {tier} pricing data");
+    let Some(section)=markdown.split(&marker).nth(1)else{return result};
     let section=section.split("### ").next().unwrap_or(section);
     let header="| Model | Short context input | Short context cached input | Short context cache writes | Short context output | Long context input | Long context cached input | Long context cache writes | Long context output |";
     if !markdown.contains("Prices per 1M tokens.")||!section.contains(header){return result}
@@ -16,9 +21,11 @@ pub fn openai(markdown:&str)->HashMap<String,ModelPrice>{
         if cells.len()!=9 {continue}
         let id=cells[0].strip_suffix(" (<272K context length)").unwrap_or(cells[0]);
         if !id.starts_with("gpt-")&&!matches!(id,"o1"|"o1-pro"|"o3"|"o3-pro"|"o4-mini"|"o3-mini"){continue}
-        let (Some(input),Some(output))=(amount(cells[1],'$'),amount(cells[4],'$'))else{continue};
+        let column=if long{5}else{1};
+        let (Some(input),Some(output))=(amount(cells[column],'$'),amount(cells[column+3],'$'))else{continue};
         // The table does not specify write TTL; do not mislabel a generic write rate as 5min.
-        let p=ModelPrice{currency:"USD".into(),unit:"每百万 tokens".into(),input:Some(input),output:Some(output),cached_input:amount(cells[2],'$'),note:Some("官方自动核实 · Standard 短上下文；缓存写入 TTL 未明确".into()),..Default::default()};
+        let context=if long{"长输入 >272K Token"}else{"短上下文"};
+        let p=ModelPrice{currency:"USD".into(),unit:"每百万 tokens".into(),input:Some(input),output:Some(output),cached_input:amount(cells[column+1],'$'),note:Some(format!("官方自动核实 · OpenAI {tier} {context}；Batch 为异步批量，Flex 为弹性服务；缓存写入 TTL 未明确")),..Default::default()};
         if result.insert(id.into(),p).is_some(){return HashMap::new()}
     }
     result
@@ -48,7 +55,7 @@ pub const SOURCES: &[(&str,&str)] = &[
  ("OpenAI","https://developers.openai.com/api/docs/pricing.md"),
  ("Kimi","https://platform.kimi.com/docs/pricing/chat.md"),
  ("Anthropic","https://platform.claude.com/docs/en/about-claude/pricing.md"),
- ("DeepSeek","https://api-docs.deepseek.com/zh-cn/quick_start/pricing"),
+ ("DeepSeek","https://api-docs.deepseek.com/quick_start/pricing/"),
  ("Z AI","https://docs.bigmodel.cn/cn/guide/start/pricing.md"),
  ("Google","https://ai.google.dev/gemini-api/docs/pricing"),
  ("Xiaomi","https://mimo.mi.com/docs/price/pay-as-you-go"),
@@ -60,7 +67,22 @@ pub fn parse(vendor:&str,body:&str)->HashMap<String,ModelPrice>{
  use crate::official_tables::*;
  match vendor {"OpenAI"=>openai(body),"Kimi"=>kimi(body),"Anthropic"=>anthropic(body),"DeepSeek"=>deepseek(body),"Z AI"=>zhipu(body),"Google"=>google(body),"Xiaomi"=>xiaomi(body),"Alibaba"=>alibaba(body),"SpaceXAI"=>xai(body),"Meta"=>meta(body),_=>HashMap::new()}
 }
-pub struct Check {pub prices:HashMap<String,ModelPrice>,pub source:String,pub error:Option<String>}
+#[derive(Clone,serde::Serialize,serde::Deserialize)]
+pub struct PriceOption {pub id:String,pub label:String,pub price:ModelPrice}
+pub struct Check {pub prices:HashMap<String,ModelPrice>,pub off_peak:HashMap<String,ModelPrice>,pub options:HashMap<String,Vec<PriceOption>>,pub source:String,pub error:Option<String>}
+pub fn price_options(vendor:&str,body:&str)->HashMap<String,Vec<PriceOption>> {
+ let mut result:HashMap<String,Vec<PriceOption>>=HashMap::new();
+ let tiers=match vendor {
+  "Anthropic"=>vec![("long","输入超过 10 万",crate::official_tables::anthropic_context(body,true)),("batch","异步批量",crate::official_tables::anthropic_batch(body,false)),("batch-long","批量 · 输入超过 10 万",crate::official_tables::anthropic_batch(body,true))],
+  "DeepSeek"=>vec![("off-peak","闲时半价",crate::official_tables::deepseek_band(body,true))],
+  "Google"=>vec![("batch","异步批量",crate::official_tables::google_tier(body,"Batch")),("flex","弹性服务",crate::official_tables::google_tier(body,"Flex"))],
+  "Xiaomi"=>vec![("batch","异步批量",crate::official_tables::xiaomi_tier(body,true))],
+  "OpenAI"=>vec![("batch","异步批量",openai_tier(body,"Batch",false)),("flex","弹性服务",openai_tier(body,"Flex",false)),("long","输入超过 272K",openai_tier(body,"Standard",true)),("batch-long","批量 · 输入超过 272K",openai_tier(body,"Batch",true)),("flex-long","弹性 · 输入超过 272K",openai_tier(body,"Flex",true))],
+  _=>vec![],
+ };
+ for(id,label,prices)in tiers {for(model,price)in prices{result.entry(key(&model)).or_default().push(PriceOption{id:id.into(),label:label.into(),price});}}
+ result
+}
 async fn download_http(client:&reqwest::Client,url:&str)->Result<String,String>{
  let mut response=client.get(url).header(reqwest::header::USER_AGENT,"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36").timeout(std::time::Duration::from_secs(25)).send().await.map_err(|e|if e.is_timeout(){"官网连接超时"}else{"官网连接失败"})?;
  if !response.status().is_success(){return Err(format!("官网返回 HTTP {}",response.status().as_u16()))}
@@ -118,10 +140,11 @@ pub async fn fetch(client:&reqwest::Client)->HashMap<String,Check>{
  let limiter=std::sync::Arc::new(tokio::sync::Semaphore::new(4));
  let tasks:Vec<_>=SOURCES.iter().map(|&(vendor,url)|{let client=client.clone();let limiter=limiter.clone();tauri::async_runtime::spawn(async move{
   let _permit=limiter.acquire_owned().await.ok();
-  let result=async{let body=download(&client,url).await?;let body=if vendor=="Xiaomi"{xiaomi_document(&client,&body).await?}else{body};let parsed=parse(vendor,&body);if parsed.is_empty(){return Err("官网定价表结构变化或暂无可自动确认的标准 Token 价格".into())}Ok(parsed)}.await;
-  let (prices,error)=match result{Ok(prices)=>(prices,None),Err(e)=>(HashMap::new(),Some(e))};
+  let result=async{let body=download(&client,url).await?;let body=if vendor=="Xiaomi"{xiaomi_document(&client,&body).await?}else{body};let parsed=parse(vendor,&body);if parsed.is_empty(){return Err("官网定价表结构变化或暂无可自动确认的标准 Token 价格".into())}let offers=if vendor=="DeepSeek"{crate::official_tables::deepseek_band(&body,true)}else{HashMap::new()};let options=price_options(vendor,&body);Ok((parsed,offers,options))}.await;
+  let (prices,offers,options,error)=match result{Ok((prices,offers,options))=>(prices,offers,options,None),Err(e)=>(HashMap::new(),HashMap::new(),HashMap::new(),Some(e))};
   let mut normalized=HashMap::new();for(id,p)in prices{let k=key(&id);if normalized.insert(k,p).is_some(){normalized.clear();break}}
-  (vendor.into(),Check{prices:normalized,source:url.trim_end_matches(".md").into(),error})
+  let mut off_peak=HashMap::new();for(id,p)in offers{let k=key(&id);if off_peak.insert(k,p).is_some(){off_peak.clear();break}}
+  (vendor.into(),Check{prices:normalized,off_peak,options,source:url.trim_end_matches(".md").into(),error})
  })}).collect();
  let mut results=HashMap::new();for task in tasks{if let Ok((vendor,check))=task.await{results.insert(vendor,check);}}results
 }

@@ -131,6 +131,12 @@ fn fixture() {
     assert_eq!(total(&channels, "trae"), 50);
     assert_eq!(total(&channels, "api"), 50);
     assert_eq!(total(&channels, "unknown"), 50);
+    // Older readers omit classification at the same settlement revision.
+    // Preserve known channel instead of silently merging it into unknown.
+    source.execute("UPDATE chat_turn SET context=?1,updated_at=1791072002 WHERE turn_id='turn-a'",[context(40,10,json!({"config_name":"glm-5.3"}))]).unwrap();
+    activity::collect(&local).unwrap();
+    assert_eq!(total(&report().channels,"trae"),50);
+    source.execute("UPDATE chat_turn SET context=?1 WHERE turn_id='turn-a'",[context(40,10,builtin.clone())]).unwrap();
     let api_only = activity::report_filtered(&local, None, Some("trae".into()), None, Some("channel:api".into())).unwrap();
     assert_eq!(api_only.totals.tokens.total, 50);
     assert_eq!(api_only.models.len(), 1);

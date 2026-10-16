@@ -163,6 +163,11 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
     next.device=owner;
     if let Some(text)=&old {
         let previous:Metric=serde_json::from_str(text).map_err(|_| "统计记录损坏")?;
+        // Old clients omit channel metadata. Replaying their packet must not
+        // erase an explicit classification for the same turn/model.
+        if next.source == "trae" && next.channel.is_empty() && next.model == previous.model {
+            next.channel = previous.channel.clone();
+        }
         // A deterministic owner keeps device subtotals consistent even if identical logs exist on both devices.
         next.device=previous.device.clone().min(next.device);
         // Harness replaces the latest settlement for an attempt; older synced samples must
@@ -425,6 +430,26 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
 }
 #[tauri::command]
 pub async fn get_activity(app:AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();report_range(state.store.dir(),device,source,days,model,from,to)}).await.map_err(|_|"读取统计失败")?}
+#[tauri::command]
+pub async fn get_sync_overview(app:AppHandle)->Result<Value,String>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let dir=state.store.dir();let db=database(dir)?;
+        let devices=db.prepare("SELECT id,name FROM devices ORDER BY name").map_err(|_|"读取设备失败")?.query_map([],|r|Ok(OptionsDevice{id:r.get(0)?,name:r.get(1)?})).map_err(|_|"读取设备失败")?.collect::<Result<Vec<_>,_>>().map_err(|_|"读取设备失败")?;
+        let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+        let mut errors:Vec<String>=status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();errors.extend(crate::usage_sync::errors(dir));
+        Ok(serde_json::json!({"devices":devices,"updatedAt":status.get("at"),"syncErrors":errors}))
+    }).await.map_err(|_|"读取同步状态失败")?
+}
+#[tauri::command]
+pub async fn sync_activity_now(app:AppHandle)->Result<(),String>{
+    tauri::async_runtime::spawn_blocking(move||{
+        let state=app.state::<AppState>();let _guard=state.activity_lock.lock().map_err(|_|"同步忙碌")?;let dir=state.store.dir();
+        let result=database(dir).and_then(|mut db|sync(&mut db,&options(dir)));
+        let previous:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+        crate::storage::write_atomic(&dir.join("activity-status.json"),&serde_json::json!({"at":now(),"errors":previous.get("errors").cloned().unwrap_or(serde_json::json!([])),"syncErrors":result.as_ref().err().into_iter().collect::<Vec<_>>()} ).to_string())?;
+        let _=app.emit("activity-updated",());result
+    }).await.map_err(|_|"同步用量失败")?
+}
 #[tauri::command]
 pub async fn refresh_activity(app:AppHandle)->Result<usize,String>{
     tauri::async_runtime::spawn_blocking(move ||{let state=app.state::<AppState>();let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;let count=collect(state.store.dir())?;let _=crate::usage_sync::sync(&state);let _=app.emit("activity-updated", ());Ok(count)}).await.map_err(|_| "采集统计失败")?

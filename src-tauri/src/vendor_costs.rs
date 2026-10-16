@@ -709,7 +709,10 @@ pub async fn save_vendor_expense(
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         let _guard = state.billing_lock.lock().map_err(|_| "支出记录忙碌")?;
-        update_expense(state.store.dir(), input, previous)
+        update_expense(state.store.dir(), input, previous)?;
+        drop(_guard);
+        crate::usage_sync::queue(app.clone());
+        Ok(())
     })
     .await
     .map_err(|_| "保存实际支出失败")?

@@ -1,5 +1,5 @@
 import type { LadderEntry } from "./types";
-export type LadderMetric = "total" | "input" | "output";
+export type LadderMetric = "total" | "input" | "output" | "cached";
 export type LadderExchange = { cnyPerUsd: number; date: string; error: string | null };
 export const plotBounds = { left: 62, right: 842, top: 44, bottom: 500 };
 
@@ -12,7 +12,7 @@ export function tokenUnitMultiplier(unit: string): number | null {
 }
 export function comparisonPrice(entry: LadderEntry, metric: LadderMetric): number | null {
   const factor = tokenUnitMultiplier(entry.price.unit);
-  const values = metric === "input" ? [entry.price.input] : metric === "output" ? [entry.price.output] : [entry.price.input, entry.price.output];
+  const values = metric === "input" ? [entry.price.input] : metric === "output" ? [entry.price.output] : metric === "cached" ? [entry.price.cachedInput] : [entry.price.input, entry.price.output];
   if (factor == null || values.some(value => value == null || !Number.isFinite(value) || value < 0)) return null;
   const value = values.reduce<number>((sum, price) => sum + price!, 0) * factor;
   return Number.isFinite(value) ? value : null;

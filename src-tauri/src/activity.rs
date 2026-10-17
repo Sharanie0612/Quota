@@ -38,16 +38,27 @@ pub struct Options {
     pub codex_ssh_host: String,
     #[serde(default)]
     pub codex_ssh_home: String,
+    #[serde(default)]
+    pub codex_ssh_devices: Option<Vec<ssh::Device>>,
+}
+impl Options {
+    pub fn ssh_devices(&self)->Vec<ssh::Device>{
+        self.codex_ssh_devices.clone().unwrap_or_else(||if self.codex_ssh_host.is_empty(){vec![]}else{vec![ssh::Device{
+            host:self.codex_ssh_host.clone(),home:self.codex_ssh_home.clone(),device_id:String::new(),name:String::new(),included:true,aliases:vec![self.codex_ssh_host.clone()]
+        }]})
+    }
+    pub fn excluded_devices(&self)->std::collections::BTreeSet<String>{ssh::excluded(&self.ssh_devices())}
 }
 fn default_interval() -> u64 { 30 }
 fn sync_accounts_default() -> bool { true }
 pub fn options(dir: &Path) -> Options {
-    fs::read(dir.join("activity-settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| {
+    let mut result:Options=fs::read(dir.join("activity-settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| {
         let home = std::env::var_os("USERPROFILE").map(PathBuf::from).or_else(dirs::home_dir).unwrap_or_default();
         Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
             codex_home: std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).to_string_lossy().into(),
-            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new() }
-    })
+            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![]) }
+    });
+    result.codex_ssh_devices=Some(result.ssh_devices());result
 }
 pub fn save_options(dir: &Path, o: &Options) -> Result<(), String> {
     crate::storage::write_atomic(&dir.join("activity-settings.json"), &serde_json::to_string_pretty(o).map_err(|_| "保存统计设置失败")?)
@@ -377,11 +388,11 @@ pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub session
 pub struct UsageSummary { pub today:u64, pub total:u64, pub date:String, pub updated_at:Option<i64>, pub partial:bool }
 /// Read existing deduplicated metrics without building the full chart/report payload.
 pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
-    let today=chrono::Local::now().date_naive();let db=database(dir)?;
-    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae'").map_err(|_|"读取用量失败")?;
-    let rows=stmt.query_map([],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?))).map_err(|_|"读取用量失败")?;
+    let today=chrono::Local::now().date_naive();let db=database(dir)?;let excluded=options(dir).excluded_devices();
+    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total'),json_extract(body,'$.device') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae'").map_err(|_|"读取用量失败")?;
+    let rows=stmt.query_map([],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?,r.get::<_,String>(2)?))).map_err(|_|"读取用量失败")?;
     let mut result=UsageSummary{today:0,total:0,date:today.to_string(),updated_at:None,partial:false};
-    for row in rows {let(timestamp,total)=row.map_err(|_|"用量记录损坏")?;let total=u64::try_from(total).map_err(|_|"用量记录损坏")?;if let Some(t)=chrono::DateTime::from_timestamp_millis(timestamp){let date=t.with_timezone(&chrono::Local).date_naive();if date<=today {result.total=result.total.saturating_add(total);if date==today{result.today=result.today.saturating_add(total);}}}}
+    for row in rows {let(timestamp,total,device)=row.map_err(|_|"用量记录损坏")?;if excluded.contains(&device){continue}let total=u64::try_from(total).map_err(|_|"用量记录损坏")?;if let Some(t)=chrono::DateTime::from_timestamp_millis(timestamp){let date=t.with_timezone(&chrono::Local).date_naive();if date<=today {result.total=result.total.saturating_add(total);if date==today{result.today=result.today.saturating_add(total);}}}}
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     result.updated_at=status.get("at").and_then(Value::as_i64);
     result.partial=status.get("errors").and_then(Value::as_array).is_some_and(|e|!e.is_empty())||status.get("syncErrors").and_then(Value::as_array).is_some_and(|e|!e.is_empty());
@@ -430,7 +441,7 @@ pub fn model_vendor(key:&str)->&'static str {
 pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{
     let date=|value:Option<String>|->Result<Option<chrono::NaiveDate>,String>{value.filter(|s|!s.is_empty()).map(|s|chrono::NaiveDate::parse_from_str(&s,"%Y-%m-%d").map_err(|_|"日期格式无效".to_string())).transpose()};
     let from=date(from)?;let to=date(to)?;if from.zip(to).is_some_and(|(a,b)|a>b){return Err("开始日期不能晚于结束日期".into())}
-    let db=database(dir)?;let o=options(dir);let mut events=Vec::new();
+    let db=database(dir)?;let o=options(dir);let excluded=o.excluded_devices();let mut events=Vec::new();
     // Calendar dates agree with the daily chart, including the first day in full.
     // Subtract dates rather than 24-hour durations so daylight-saving days work too.
     let today=chrono::Local::now().date_naive();
@@ -438,7 +449,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
+        if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
     let devices=db.prepare("SELECT id,name FROM devices ORDER BY name").map_err(|_| "读取设备失败")?.query_map([],|r|Ok(OptionsDevice{id:r.get(0)?,name:r.get(1)?})).map_err(|_| "读取设备失败")?.collect::<Result<_,_>>().map_err(|_| "读取设备失败")?;
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
@@ -454,14 +465,16 @@ pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)
 }
 fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
-    let o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
+    let mut o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
     let mut errors=Vec::new();let mut count=0;
     count+=collect_codex(&mut db,Path::new(&o.codex_home),&o.device_id,&mut errors);
     for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
     if o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
-    match ssh::collect(&mut db,&o.codex_ssh_host,&o.codex_ssh_home,&mut errors){Ok(n)=>count+=n,Err(error)=>errors.push(error)}
+    let mut devices=o.ssh_devices();
+    count+=ssh::collect_devices(&mut db,&mut devices,&mut errors);
+    o.codex_ssh_devices=Some(devices);save_options(dir,&o)?;
     let sync_errors:Vec<String>=if sync_enabled {
         sync(&mut db,&o).err().into_iter().collect()
     } else {
@@ -504,13 +517,31 @@ pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),S
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
     let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;
     let previous=options(state.store.dir());
-    input.device_id=previous.device_id;input.device_name=label(&input.device_name);
+    input.device_id=previous.device_id.clone();input.device_name=label(&input.device_name);
     input.codex_ssh_host=input.codex_ssh_host.trim().to_string();input.codex_ssh_home=input.codex_ssh_home.trim().to_string();
     ssh::validate(&input.codex_ssh_host,&input.codex_ssh_home)?;
+    let mut devices=input.ssh_devices();
+    for device in &mut devices {
+        device.host=device.host.trim().into();device.home=device.home.trim().into();
+        if device.device_id.is_empty(){if let Some(known)=previous.ssh_devices().iter().find(|p|p.host==device.host&&p.home==device.home&&!p.device_id.is_empty()) {
+            device.device_id=known.device_id.clone();device.name=known.name.clone();
+        }}
+    }
+    // Dropping a row must never silently re-include its stored history.
+    for old in previous.ssh_devices(){
+        if !old.device_id.is_empty()&&!devices.iter().any(|d|d.device_id==old.device_id){devices.push(ssh::Device{included:false,..old});}
+    }
+    ssh::validate_devices(&devices)?;
+    if devices.iter().any(|d|d.included&&d.device_id.is_empty()&&!previous.ssh_devices().iter().any(|p|p.included&&p.host==d.host&&p.home==d.home&&p.device_id.is_empty())) {
+        return Err("请先识别 SSH 设备，再选择是否纳入统计".into())
+    }
+    input.codex_ssh_devices=Some(devices);
+    input.codex_ssh_host.clear();input.codex_ssh_home.clear();
     if !(5..=3600).contains(&input.collect_interval_seconds) { return Err("采集间隔应为 5–3600 秒".into()); }
     for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.trae_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
     if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT OR IGNORE INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}
-    save_options(state.store.dir(),&input)
+    save_options(state.store.dir(),&input)?;
+    let _=app.emit("activity-updated",());Ok(())
     }).await.map_err(|_|"保存统计设置失败")?
 }
 pub fn spawn(app:AppHandle){tauri::async_runtime::spawn(async move{

@@ -811,7 +811,12 @@
           const test = new URLSearchParams(location.search).get("sshCase");
           if (test === "slow") await new Promise(resolve => setTimeout(resolve, 1200));
           if (test === "error") throw new Error("示例：SSH 配置暂时无法读取");
-          return {hosts: test === "empty" ? [] : test === "multi" ? ["ubuntu-vm", "devbox"] : ["ubuntu-vm"], warnings:[]};
+          return {hosts: test === "empty" ? [] : test === "multi" ? ["ubuntu-vm", "vm-alias", "devbox", "offline"] : ["ubuntu-vm"], warnings:[]};
+        }
+        case "identify_codex_ssh_devices": {
+          const test=new URLSearchParams(location.search).get("sshCase");
+          if(test==="slow")await new Promise(resolve=>setTimeout(resolve,1200));
+          return args.targets.map(t=>({...t,deviceId:t.host==="offline"?"":t.host==="devbox"?"11111111-1111-5111-8111-111111111111":"22222222-2222-5222-8222-222222222222",name:t.host==="offline"?"":t.host==="devbox"?"ubuntu-dev":"ubuntu-work",error:t.host==="offline"?"SSH 连接失败：设备离线，请检查连接后重新识别。":null}));
         }
         case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""};
         case "get_account_sync_candidates": return structuredClone(syncCandidates);
@@ -942,7 +947,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2200",
+            version: "1.0.2300",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

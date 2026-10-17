@@ -5,6 +5,7 @@ import { api, errText } from "../lib/api";
 import { activityChannelName, activityFilterLabel, activityModelChannel, activityModelName } from "../lib/activityModels";
 import { toast } from "../lib/store";
 import { newActivityIssues } from "../lib/activityIssues";
+import { mergeSshDevices } from "../lib/sshDevices";
 import { Button, EmptyState, Field, Notice, Seg } from "../components/ui";
 import { ActivityCharts } from "../components/ActivityCharts";
 import { ModelLogo } from "../components/ModelLogo";
@@ -87,9 +88,9 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const [sshDetecting, setSshDetecting] = useState(false);
   const [sshNotice, setSshNotice] = useState("");
   const [sshWarning, setSshWarning] = useState("");
-  const [sshManual, setSshManual] = useState(false);
+  const [sshHost, setSshHost] = useState("");
+  const [sshHome, setSshHome] = useState("");
   const sshRequest = useRef(0);
-  const sshTouched = useRef(false);
   useEffect(() => () => { sshRequest.current++; }, []);
   const [detail, setDetail] = useState("models");
   useEffect(()=>{setDetail(model==="vendor:trae"||model.startsWith("channel:")||source==="trae"?"channels":"models");},[model,source]);
@@ -163,21 +164,34 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     } catch (e) { toast(errText(e), "error"); }
   };
 
-  const detectSsh = async () => {
+  const detectSsh = async (identify=false, manual=false) => {
     const id = ++sshRequest.current;
     setSshDetecting(true); setSshWarning(""); setSshNotice("");
     try {
-      const result = await api.discoverSshHosts();
+      const result = manual ? {hosts:[sshHost.trim()],warnings:[]} : await api.discoverSshHosts();
       if (id !== sshRequest.current) return;
-      setSshHosts(result.hosts);
+      if(!manual)setSshHosts(result.hosts);
       setSshWarning(result.warnings.join("；"));
-      setSshNotice(result.hosts.length === 1 ? "识别到 1 个主机，空白时自动填入；保存后开始采集。"
-        : result.hosts.length ? `识别到 ${result.hosts.length} 个主机，选择需要采集的设备。`
-        : "未在 SSH 配置中找到主机别名，可手动填写 Codex 使用的别名。");
-      if (result.hosts.length === 1) setOptions(current => current && !current.codexSshHost && !sshTouched.current
-        ? { ...current, codexSshHost: result.hosts[0] } : current);
+      setSshNotice(result.hosts.length ? `发现 ${result.hosts.length} 个 SSH 连接，识别设备后可选择纳入统计。`
+        : "未在 SSH 配置中找到连接，可手动添加 Codex 使用的主机别名。");
+      if(identify){
+        const targets=manual ? [{host:sshHost.trim(),home:sshHome.trim()}] : [
+          ...result.hosts.map(host=>({host,home:""})),
+          ...(options?.codexSshDevices??[]).map(d=>({host:d.host,home:d.home}))
+        ];
+        const unique=targets.filter((t,i)=>targets.findIndex(other=>other.host.toLowerCase()===t.host.toLowerCase()&&other.home===t.home)===i);
+        if(unique.length>32){setSshWarning("发现的连接超过 32 个，请手动识别需要使用的主机。");return;}
+        if(!unique.length)return;
+        setSshNotice("正在连接并识别设备，暂不采集用量…");
+        const found=await api.identifySshDevices(unique);
+        if(id!==sshRequest.current)return;
+        setOptions(current=>current?{...current,codexSshDevices:mergeSshDevices(current.codexSshDevices??[],found)}:current);
+        const failures=found.filter(d=>d.error).length;
+        setSshNotice(`已识别 ${new Set(found.filter(d=>!d.error).map(d=>d.deviceId)).size} 台设备${failures?`，${failures} 个连接未完成`:""}。新设备默认不纳入统计。`);
+        if(manual){setSshHost("");setSshHome("");}
+      }
     } catch (e) {
-      if (id === sshRequest.current) setSshWarning(`自动识别未完成：${errText(e)}。仍可手动填写。`);
+      if (id === sshRequest.current) {setSshNotice("可重试识别设备，或手动添加连接。");setSshWarning(`自动识别未完成：${errText(e)}。仍可手动填写。`);}
     } finally { if (id === sshRequest.current) setSshDetecting(false); }
   };
   const closeOptions = () => { sshRequest.current++; setSshDetecting(false); setOptions(null); };
@@ -185,9 +199,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     if (options) { closeOptions(); return; }
     try {
       const current = await api.getActivityOptions();
-      sshTouched.current = false;
-      try { sshTouched.current = localStorage.getItem(`quota.ssh-autofill-off:${current.deviceId}`) === "1"; } catch { /* Optional UI preference. */ }
-      setSshManual(false); setSshHosts([]);
+      setSshHost("");setSshHome("");setSshHosts([]);
       setOptions(current); void detectSsh();
     }
     catch (e) { toast(errText(e), "error"); }
@@ -209,10 +221,6 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     try {
       const current=await api.getActivityOptions();
       await api.saveActivityOptions({...options,syncDir:current.syncDir,autoCollect:current.autoCollect,collectIntervalSeconds:current.collectIntervalSeconds,syncAccounts:current.syncAccounts});
-      try {
-        const key = `quota.ssh-autofill-off:${options.deviceId}`;
-        if (options.codexSshHost?.trim()) localStorage.removeItem(key); else localStorage.setItem(key, "1");
-      } catch { /* Optional UI preference. */ }
       closeOptions();
       // A collection failure must not be reported as a failed settings save.
       try {
@@ -261,22 +269,26 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     {options && <section className="card activity-settings">
       <h3>用量采集设置</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
-      <Field label="Codex SSH 远程主机" hint={sshDetecting ? "正在读取本机 SSH 配置…" : sshNotice || "保存后补采 Ubuntu 历史用量，并随自动采集持续更新。留空关闭。"}>
-        <div className="activity-path">
-          {sshHosts.length > 0 ? <select className="input" aria-label="识别到的 SSH 主机" disabled={!!busy}
-            value={sshManual || !!options.codexSshHost && !sshHosts.includes(options.codexSshHost) ? "__manual__" : options.codexSshHost ?? ""}
-            onChange={e => { sshTouched.current = true; setSshManual(e.target.value === "__manual__"); if (e.target.value !== "__manual__") setOptions({ ...options, codexSshHost: e.target.value }); }}>
-            <option value="">关闭 SSH 采集</option>{sshHosts.map(host => <option key={host} value={host}>{host}</option>)}<option value="__manual__">手动填写…</option>
-          </select> : <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy}
-            onChange={e => { sshTouched.current = true; setOptions({ ...options, codexSshHost: e.target.value }); }} />}
-          <Button disabled={!!busy || sshDetecting} onClick={() => void detectSsh()}>{sshDetecting ? "识别中…" : "重新识别"}</Button>
-        </div>
-        {sshHosts.length > 0 && (sshManual || !!options.codexSshHost && !sshHosts.includes(options.codexSshHost)) && <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy}
-          onChange={e => { sshTouched.current = true; setOptions({ ...options, codexSshHost: e.target.value }); }} />}
+      <Field label="SSH 设备" hint="识别连接后，勾选需要纳入统计的设备，也可以全部不选。保存后生效。">
+        <div className="ssh-device-toolbar"><span className="hint">已纳入 {(options.codexSshDevices??[]).filter(d=>d.included).length} 台设备</span>
+          <Button disabled={!!busy || sshDetecting} onClick={() => void detectSsh(true)}>{sshDetecting ? "识别中…" : "识别设备"}</Button></div>
+        <p className="hint" role="status">{sshNotice || (sshHosts.length?`发现 ${sshHosts.length} 个连接`:"正在读取本机 SSH 配置…")}</p>
+        <div className="ssh-device-list">{(options.codexSshDevices??[]).map((remote,index)=><div className="ssh-device" key={remote.deviceId||`${remote.host}:${remote.home}`}>
+          <label className="ssh-device-choice"><input type="checkbox" aria-label={`纳入统计 ${remote.name||remote.host} (${remote.host})`} checked={remote.included} disabled={!!busy||sshDetecting||!remote.deviceId}
+            onChange={e=>setOptions({...options,codexSshDevices:options.codexSshDevices?.map((d,i)=>i===index?{...d,included:e.target.checked}:d)})} />
+            <span><strong>{remote.name||remote.host}</strong><small>{remote.aliases.join(" · ")||remote.host}{remote.home?` · ${remote.home}`:""}</small></span>
+            <span className="ssh-device-state">{remote.included?"纳入统计":"不纳入统计"}</span></label>
+          {remote.error&&<p className="hint ssh-device-error" role="status">{remote.error}</p>}
+          {!remote.deviceId&&!remote.error&&<p className="hint">旧连接待识别，确认设备后可更改统计选择。</p>}
+        </div>)}</div>
+        <p className="hint">取消勾选会停止采集，并让该设备历史退出 Token 活动、我的使用和悬浮窗汇总；记录保留，重新勾选即可恢复。</p>
         {sshWarning && <p className="hint" role="status">{sshWarning}</p>}
       </Field>
-      <details><summary>远程日志位置（可选）</summary><Field label="Ubuntu Codex 数据目录" hint="默认使用远程 CODEX_HOME 或 ~/.codex。只传回用量指标；SSH 连接复用本机已有配置，不保存密码或私钥。">
-        <input className="input" aria-label="远程 Codex 数据目录" value={options.codexSshHome ?? ""} placeholder="自动识别远程数据目录" disabled={!!busy} onChange={e=>setOptions({...options,codexSshHome:e.target.value})} />
+      <details><summary>手动添加 SSH 连接</summary><Field label="主机别名" hint="使用本机 SSH 配置中的别名。远程设备需为 Ubuntu / Linux，并可免交互连接。">
+        <div className="activity-path"><input className="input" aria-label="Codex SSH 主机别名" value={sshHost} placeholder="例如 devbox" disabled={!!busy||sshDetecting} onChange={e=>setSshHost(e.target.value)} />
+          <Button disabled={!!busy||sshDetecting||!sshHost.trim()} onClick={()=>void detectSsh(true,true)}>识别并添加</Button></div>
+      </Field><Field label="远程 Codex 数据目录（可选）" hint="留空使用远程 CODEX_HOME 或 ~/.codex。识别只读取设备标识，勾选保存后才采集用量。">
+        <input className="input" aria-label="远程 Codex 数据目录" value={sshHome} placeholder="自动识别远程数据目录" disabled={!!busy||sshDetecting} onChange={e=>setSshHome(e.target.value)} />
       </Field></details>
       <Field label="Trae 本机用量" hint="首次连接需打开 Trae 或 Trae SOLO，之后可离线读取历史。只保存用量指标。">
         <Button disabled={!!busy || connectingTrae} onClick={() => void connectTrae()}>{options.traeEnabled ? "断开 Trae" : "连接本机 Trae"}</Button>

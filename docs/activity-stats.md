@@ -21,13 +21,15 @@
 
 远程日志若已通过现有工具同步或挂载到本机，可在「Token 活动 → 采集设置 → 日志位置」选择包含 `sessions` / `archived_sessions` 的根目录后手动采集。完整 JSONL 可能包含对话，应用只提取用量字段；原始日志的转移应留在用户控制的设备内，无需复制 `auth.json`。远程历史能否补采以源会话仍保留有效 Token 记录为准，不保证恢复已删除或上游未写入的用量。
 
-1.0.2100 新增可选的 **Ubuntu SSH 用量采集**（1.0.1900 本身不具备此入口）：在「Token 活动 → 采集设置 → Codex SSH 远程主机」填写 Codex 使用的既有 OpenSSH 主机别名并保存，远程目录一般留空。它在远程登录 shell 中读取 `CODEX_HOME`，未设置时使用 `~/.codex`；自定义目录填写 Ubuntu 绝对路径。保持自动采集开启即可持续更新；留空主机别名关闭远程采集。本机日志仍同时采集，目前支持一个远程别名。
+1.0.2100 新增可选的 **Ubuntu SSH 用量采集**（1.0.1900 本身不具备此入口）。远程登录 shell 中读取 `CODEX_HOME`，未设置时使用 `~/.codex`；自定义目录填写 Ubuntu 绝对路径。本机日志仍同时采集。
 
-1.0.2200 起，打开采集设置会静态识别本机用户与系统 OpenSSH 配置中的字面量 `Host` 别名，支持带引号、等号和普通通配符的 `Include`；重复别名忽略大小写。只有一个主机且未配置采集对象时自动填入草稿，多个主机由下拉选择，点击「保存并同步」后才连接。已保存的主机、当前手动编辑和本机界面中已保存的关闭选择不会被重新识别覆盖；取消不保存自动填入的草稿。
+1.0.2300 起，在「Token 活动 → 采集设置 → SSH 设备」点击「识别设备」，再按设备勾选需要纳入统计的对象并保存。新设备默认不勾选，也可全部不选；同一设备的多个别名按机器标识、远程用户及真实 Codex 目录合并。打开设置仅静态读取本机 OpenSSH 配置的字面量 `Host`（支持 `Include`、引号和等号）；点击识别才建立 SSH 连接，仅读取设备标识，不扫描日志。识别上限为 32 个连接，每连接最多 10 秒、并发 4 个。仅勾选并保存的设备会读取用量，仍可手动添加连接。
 
-识别阶段不调用 SSH、不执行 `Match exec` 或 `ProxyCommand`、不读取私钥，不按通配符猜测主机、不扫描网络。Windows 用户配置为 `%USERPROFILE%\.ssh\config`、系统配置为 `%ProgramData%\ssh\ssh_config`；其他系统使用用户配置及 `/etc/ssh/ssh_config`。限制为每文件 256 KiB、总计 4 MiB、128 文件、8 层 Include、128 主机；循环、动态路径/递归通配符、编码和权限问题会显示提示，保留手动入口。仅存于 Codex 内部且未写入 OpenSSH 配置的连接，以及仅有 `known_hosts` 记录的设备，不能据此推断登录别名、用户和端口。
+取消勾选会停止该设备采集，并让已有用量退出 Token 活动、我的使用（包括实际价格分母）及悬浮窗汇总。指标和同步记录保留，重新勾选恢复；选择仅作用于当前 Quota 主机，不同步排除其他客户端。旧单主机设置保留启用状态，首次识别或采集后绑定设备 ID；明确保存空列表不会重新启用旧主机。设备离线保留已保存选择，别名改指向另一设备时需重新识别选择，不将其用量静默算入原设备。
 
-配置语义依据 [OpenSSH ssh_config 手册](https://man.openbsd.org/ssh_config)，发现列表仅表示本机存在配置，连接可用性与远程 Codex 日志仍在保存采集后验证。隔离解析检查：`cargo run --release --example ssh_discovery_checks`。
+静态发现配置不调用 SSH、不执行 `Match exec` 或 `ProxyCommand`、不读取私钥，不按通配符猜测主机、不扫描网络；后续识别设备和采集实际调用 SSH，由 OpenSSH 使用已有连接配置。Windows 用户配置为 `%USERPROFILE%\.ssh\config`、系统配置为 `%ProgramData%\ssh\ssh_config`；其他系统使用用户配置及 `/etc/ssh/ssh_config`。限制为每文件 256 KiB、总计 4 MiB、128 文件、8 层 Include、128 主机；循环、动态路径/递归通配符、编码和权限问题会显示提示，保留手动入口。仅存于 Codex 内部且未写入 OpenSSH 配置的连接，以及仅有 `known_hosts` 记录的设备，不能据此推断登录别名、用户和端口。
+
+配置语义依据 [OpenSSH ssh_config 手册](https://man.openbsd.org/ssh_config)，发现列表仅表示本机存在配置，设备识别验证身份，远程日志是否存在和可读仍在勾选保存后采集时验证。隔离解析检查：`cargo run --release --example ssh_discovery_checks`；设备合并选择检查：`node scripts/verify-ssh-devices.cjs`。
 
 远程需 Python 3.7 或更新版本，本机需 OpenSSH 客户端；复用已配置的密钥、SSH agent 和 `known_hosts`。不弹出密码输入，不自动接受主机密钥，不复制、保存或刷新 SSH/Codex 凭据。连接及读取超过 25 秒会终止本轮 SSH 客户端并报告错误，本机已采集的指标保留。
 

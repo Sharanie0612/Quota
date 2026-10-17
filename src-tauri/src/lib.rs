@@ -122,6 +122,7 @@ pub fn run() {
             activity::refresh_activity,
             activity::save_activity_options,
             activity::ssh::discovery::discover_codex_ssh_hosts,
+            activity::ssh::identify_codex_ssh_devices,
             activity::sync_storage::get_activity_storage,
             activity::sync_storage::optimize_activity_storage,
             activity::sync_storage::get_activity_readers,

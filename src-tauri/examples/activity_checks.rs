@@ -3,7 +3,7 @@ use std::{fs,io::Write,path::Path};
 use serde_json::json;
 use chrono::TimeZone;
 fn envelope(kind:&str,payload:serde_json::Value,ordinal:u64)->String{json!({"timestamp":"2026-10-04T00:00:00Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
-fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into(),codex_ssh_host:String::new(),codex_ssh_home:String::new()}).unwrap()}
+fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into(),codex_ssh_host:String::new(),codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![])}).unwrap()}
 fn check_codex_fault_isolation(root:&Path) {
  let dir=root.join("codex-faults");let home=root.join("fault-logs");
  fs::create_dir_all(home.join("sessions")).unwrap();

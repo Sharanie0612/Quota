@@ -9,11 +9,14 @@ use std::{collections::BTreeMap, fs, io::Write, path::Path, process::{Command,St
 fn line(kind:&str,payload:Value,ordinal:u64)->String {json!({"timestamp":"2026-10-17T09:00:00.123Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
 fn token(input:u64)->String {line("event_msg",json!({"type":"token_count","info":{"total_token_usage":{"input_tokens":input,"output_tokens":20,"cached_input_tokens":50,"reasoning_output_tokens":5,"total_tokens":input+20,"future_counter":7}},"private":"PRIVATE_MESSAGE_MUST_NOT_TRANSFER"}),2)}
 fn projection(python:&str,logs:&Path,db:&Connection,host:&str)->Vec<u8>{
+    projection_mode(python,logs,db,host,"")
+}
+fn projection_mode(python:&str,logs:&Path,db:&Connection,host:&str,mode:&str)->Vec<u8>{
     let prefix=format!("ssh:{:x}:",Sha256::digest(format!("{host}\n/home/check").as_bytes()));
     let mut offsets=BTreeMap::new();let mut query=db.prepare("SELECT path,body FROM cursors").unwrap();
     for row in query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).unwrap(){let(path,body)=row.unwrap();if let Some(path)=path.strip_prefix(&prefix){offsets.insert(path.to_string(),serde_json::from_str::<Cursor>(&body).unwrap().offset);}}
     let mut child=Command::new(python).arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/codex-ssh-metrics.py")).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
-    child.stdin.take().unwrap().write_all(json!({"format":"quota-codex-ssh-v1","home":logs,"offsets":offsets}).to_string().as_bytes()).unwrap();
+    child.stdin.take().unwrap().write_all(json!({"format":"quota-codex-ssh-v1","home":logs,"offsets":offsets,"mode":mode}).to_string().as_bytes()).unwrap();
     let result=child.wait_with_output().unwrap();assert!(result.status.success(),"projection failed");assert!(result.stderr.is_empty());
     let text=std::str::from_utf8(&result.stdout).unwrap();for private in ["PRIVATE_MESSAGE","PRIVATE_ARGUMENT","PRIVATE_INSTRUCTION","PRIVATE_COOKIE"]{assert!(!text.contains(private));}
     result.stdout
@@ -30,6 +33,9 @@ fn main(){
     let read=|db:&Connection,host|projection(&python,&logs,db,host);
     let apply=|db:&mut Connection,host,bytes:&[u8]|{let mut errors=Vec::new();let count=ssh::apply(db,host,"/home/check",bytes,&mut errors).unwrap();(count,errors)};
     let bytes=read(&db,"vm");let response:Value=serde_json::from_slice(&bytes).unwrap();let remote=response["deviceId"].as_str().unwrap();
+    let probe=projection_mode(&python,&logs,&db,"vm","identity");let probe_json:Value=serde_json::from_slice(&probe).unwrap();
+    assert_eq!(ssh::identity(&probe).unwrap().0,remote);assert_eq!(probe_json["files"],json!([]));assert_eq!(probe_json["errors"],json!([]));
+    assert_eq!(projection_mode(&python,&logs.join("absent"),&db,"vm","identity").len()>0,true);
     assert_eq!(apply(&mut db,"vm",&bytes),(2,vec![]));
     let report=||activity::report(&data,None,None,None).unwrap();assert_eq!(report().totals.tokens.total,120);assert_eq!(report().totals.calls,1);
     // The remote full-object digest exactly matches existing local identities,
@@ -57,5 +63,23 @@ fn main(){
     // ledger, with a selectable fallback device name on older peers.
     let peer=root.join("peer");fs::create_dir_all(&peer).unwrap();for(_,packet)in activity::cloud_packets(&data).unwrap(){activity::import_cloud_packet(&peer,packet.as_bytes()).unwrap();}
     let peer_report=activity::report(&peer,None,None,None).unwrap();assert_eq!(peer_report.totals.tokens.total,540);assert!(peer_report.devices.iter().any(|d|d.id==remote));
+    // Exclusion is a read policy, never deletion, including explicit device views.
+    let mut options=activity::options(&data);
+    let saved=serde_json::to_value(&options).unwrap();let mut legacy=saved.clone();legacy.as_object_mut().unwrap().remove("codexSshDevices");legacy["codexSshHost"]=json!("vm");
+    let legacy:activity::Options=serde_json::from_value(legacy).unwrap();assert!(legacy.ssh_devices()[0].included);
+    options.codex_ssh_host="vm".into();options.codex_ssh_devices=Some(vec![]);assert!(options.ssh_devices().is_empty());
+    options.codex_ssh_devices=Some(vec![ssh::Device{host:"must-never-connect".into(),home:String::new(),device_id:remote.into(),name:"synthetic".into(),included:false,aliases:vec!["vm".into()]}]);
+    activity::save_options(&data,&options).unwrap();
+    let before:i64=db.query_row("SELECT COUNT(*) FROM metrics",[],|r|r.get(0)).unwrap();
+    let mut off=options.ssh_devices();let mut errors=vec![];assert_eq!(ssh::collect_devices(&mut db,&mut off,&mut errors),0);assert!(errors.is_empty());
+    let mut changed=off[0].clone();changed.device_id=uuid::Uuid::new_v4().to_string();
+    assert!(ssh::apply_device(&mut db,&mut changed,&bytes,&mut errors).unwrap_err().contains("设备标识已变化"));
+    assert_eq!(report().totals.tokens.total,0);assert_eq!(report().totals.calls,0);assert!(report().daily.is_empty());
+    assert_eq!(activity::report(&data,Some(remote.into()),None,None).unwrap().totals.tokens.total,0);
+    assert_eq!(activity::usage_summary(&data).unwrap().total,0);
+    assert_eq!(before,db.query_row("SELECT COUNT(*) FROM metrics",[],|r|r.get::<_,i64>(0)).unwrap());
+    options.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&data,&options).unwrap();
+    assert_eq!(report().totals.tokens.total,540);assert_eq!(activity::usage_summary(&data).unwrap().total,540);
+    assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
     println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync and injection validation");
 }

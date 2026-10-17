@@ -3,7 +3,7 @@
 use super::{cursor, hash, label, merge_metric, parse_codex, save_cursor, Cursor};
 use base64::Engine;
 use rusqlite::{params, Connection};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::{BTreeMap, BTreeSet}, io::{Read, Write}, process::{Command, Stdio}, time::{Duration, Instant}};
 
@@ -12,6 +12,68 @@ const MAX_OUTPUT: usize = 16 * 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(25);
 #[path = "activity_ssh_discovery.rs"]
 pub mod discovery;
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct Device {
+    pub host:String, pub home:String, pub device_id:String, pub name:String,
+    pub included:bool,
+    #[serde(default)] pub aliases:Vec<String>,
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Target { pub host:String, pub home:String }
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Identity { pub host:String, pub home:String, pub device_id:String, pub name:String, pub error:Option<String> }
+
+pub fn validate_devices(devices:&[Device])->Result<(),String>{
+    if devices.len()>32 {return Err("最多保存 32 台 SSH 设备".into())}
+    let mut ids=BTreeSet::new();
+    for device in devices {
+        validate(&device.host,&device.home)?;
+        if device.host.is_empty() || device.name.len()>640 || device.name.chars().any(char::is_control)
+            || device.aliases.len()>128 || device.aliases.iter().any(|a|a.is_empty()||validate(a,"").is_err())
+            || !device.device_id.is_empty() && (uuid::Uuid::parse_str(&device.device_id).is_err() || !ids.insert(device.device_id.clone())) {
+            return Err("SSH 设备列表格式无效，请重新识别设备".into())
+        }
+    }
+    Ok(())
+}
+
+pub fn excluded(devices:&[Device])->BTreeSet<String>{
+    devices.iter().filter(|d|!d.included&&!d.device_id.is_empty()).map(|d|d.device_id.clone()).collect()
+}
+
+pub fn identity(bytes:&[u8])->Result<(String,String),String>{
+    if bytes.len()>MAX_OUTPUT {return Err("SSH 设备响应过大".into())}
+    let response:Response=serde_json::from_slice(bytes).map_err(|_|"SSH 未返回有效设备信息，请检查 Python 环境及登录脚本输出")?;
+    if response.format!="quota-codex-ssh-v1" || uuid::Uuid::parse_str(&response.device_id).is_err() || response.device_name.len()>640 || response.device_name.chars().any(char::is_control) {
+        return Err("SSH 设备标识无效".into())
+    }
+    Ok((response.device_id,label(&response.device_name)))
+}
+
+#[tauri::command]
+pub async fn identify_codex_ssh_devices(targets:Vec<Target>)->Result<Vec<Identity>,String>{
+    if targets.len()>32 {return Err("每次最多识别 32 个 SSH 连接".into())}
+    for target in &targets {validate(&target.host,&target.home)?;if target.host.is_empty(){return Err("请填写 SSH 主机别名".into())}}
+    tauri::async_runtime::spawn_blocking(move||{
+        let mut result=Vec::new();
+        // Four bounded identity-only connections at a time; never scan logs here.
+        for batch in targets.chunks(4) {
+            std::thread::scope(|scope|{
+                let jobs:Vec<_>=batch.iter().map(|target|scope.spawn(move||{
+                    let request=serde_json::json!({"format":"quota-codex-ssh-v1","home":target.home,"mode":"identity"}).to_string().into_bytes();
+                    let found=run(&target.host,request,Duration::from_secs(10)).and_then(|bytes|identity(&bytes));
+                    let (device_id,name,error)=match found {Ok((id,name))=>(id,name,None),Err(e)=>(String::new(),String::new(),Some(e))};
+                    Identity{host:target.host.clone(),home:target.home.clone(),device_id,name,error}
+                })).collect();
+                for job in jobs {result.push(job.join().map_err(|_|"SSH 设备识别中断")?);} Ok::<(),String>(())
+            })?;
+        }
+        Ok(result)
+    }).await.map_err(|_|"SSH 设备识别未完成，请重试")?
+}
 
 pub fn validate(host: &str, home: &str) -> Result<(), String> {
     if !host.is_empty() && (host.len()>128 || !host.as_bytes()[0].is_ascii_alphanumeric()
@@ -46,7 +108,7 @@ fn request(db:&Connection,host:&str,home:&str)->Result<Vec<u8>,String>{
     if bytes.len()>4*1024*1024 {return Err("SSH 采集进度过大".into())} Ok(bytes)
 }
 
-fn run(host:&str,input:Vec<u8>)->Result<Vec<u8>,String>{
+fn run(host:&str,input:Vec<u8>,timeout:Duration)->Result<Vec<u8>,String>{
     let encoded=base64::engine::general_purpose::STANDARD.encode(PROJECTION_SCRIPT);
     // All remote code is fixed. Paths/offsets travel as JSON over stdin, never as
     // shell arguments. Existing OpenSSH keys and known_hosts remain in place.
@@ -69,15 +131,15 @@ fn run(host:&str,input:Vec<u8>)->Result<Vec<u8>,String>{
     let status=loop {
         match child.try_wait() {
             Ok(Some(status))=>break Ok(status),
-            Ok(None) if started.elapsed()<TIMEOUT=>std::thread::sleep(Duration::from_millis(50)),
+            Ok(None) if started.elapsed()<timeout=>std::thread::sleep(Duration::from_millis(50)),
             _=>{let _=child.kill();let _=child.wait();break Err("SSH 采集超时或中断，本机用量已保留，下次会重试");}
         }
     };
     let status=status?;
     // Do not join a pipe reader indefinitely if a configured ProxyCommand keeps
     // an inherited pipe open after ssh itself has already exited.
-    let output=reader_rx.recv_timeout(TIMEOUT.saturating_sub(started.elapsed())).map_err(|_|"SSH 响应读取超时，未推进采集进度")?.map_err(|_|"SSH 输出失败")?;
-    let written=writer_rx.recv_timeout(TIMEOUT.saturating_sub(started.elapsed())).map_err(|_|"SSH 请求发送超时")?;
+    let output=reader_rx.recv_timeout(timeout.saturating_sub(started.elapsed())).map_err(|_|"SSH 响应读取超时，未推进采集进度")?.map_err(|_|"SSH 输出失败")?;
+    let written=writer_rx.recv_timeout(timeout.saturating_sub(started.elapsed())).map_err(|_|"SSH 请求发送超时")?;
     if !status.success() || written.is_err() {return Err("SSH 采集失败：请确认已有主机别名可免交互连接，已信任主机密钥，且 Ubuntu 已安装 Python 3.7 或更新版本".into())}
     if output.len()>MAX_OUTPUT {return Err("SSH 用量响应超过大小上限，未推进采集进度".into())}
     Ok(output)
@@ -129,5 +191,37 @@ pub fn apply(db:&mut Connection,host:&str,home:&str,bytes:&[u8],errors:&mut Vec<
 pub fn collect(db:&mut Connection,host:&str,home:&str,errors:&mut Vec<String>)->Result<usize,String>{
     if host.is_empty(){return Ok(0)}
     validate(host,home)?;
-    let bytes=run(host,request(db,host,home)?)?;apply(db,host,home,&bytes,errors)
+    let bytes=run(host,request(db,host,home)?,TIMEOUT)?;apply(db,host,home,&bytes,errors)
+}
+
+pub fn apply_device(db:&mut Connection,device:&mut Device,bytes:&[u8],errors:&mut Vec<String>)->Result<usize,String>{
+    let (id,name)=identity(bytes)?;
+    if !device.device_id.is_empty() && device.device_id!=id {return Err("设备标识已变化，请重新识别并选择是否纳入统计".into())}
+    device.device_id=id;device.name=name;
+    apply(db,&device.host,&device.home,bytes,errors)
+}
+
+pub fn collect_devices(db:&mut Connection,devices:&mut [Device],errors:&mut Vec<String>)->usize{
+    if let Err(error)=validate_devices(devices){errors.push(error);return 0}
+    let mut count=0;
+    // Prepare SQLite cursors on the owning thread, then bound network concurrency.
+    for batch in devices.chunks_mut(4) {
+        let jobs:Vec<_>=batch.iter().enumerate().filter(|(_,d)|d.included).map(|(index,d)|{
+            let input=validate(&d.host,&d.home).and_then(|_|request(db,&d.host,&d.home));
+            (index,d.host.clone(),input)
+        }).collect();
+        let results=std::thread::scope(|scope|{
+            let jobs:Vec<_>=jobs.into_iter().map(|(index,host,input)|scope.spawn(move||(index,input.and_then(|input|run(&host,input,TIMEOUT))))).collect();
+            jobs.into_iter().map(|job|job.join().unwrap_or_else(|_|(usize::MAX,Err("SSH 采集中断".into())))).collect::<Vec<_>>()
+        });
+        for (index,result) in results {
+            let Some(device)=batch.get_mut(index) else {errors.push("SSH 采集中断".into());continue};
+            let result=result.and_then(|bytes|{
+                let mut issues=Vec::new();let result=apply_device(db,device,&bytes,&mut issues);
+                errors.extend(issues.into_iter().map(|e|format!("SSH {}：{e}",device.host)));result
+            });
+            match result {Ok(n)=>count+=n,Err(e)=>errors.push(format!("SSH {}：{e}",device.host))}
+        }
+    }
+    count
 }

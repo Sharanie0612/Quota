@@ -94,6 +94,8 @@ def collect(request):
     identity = machine + ":" + str(getattr(os, "getuid", lambda: 0)()) + ":" + os.path.realpath(home)
     result = {"format": "quota-codex-ssh-v1", "deviceId": str(uuid.uuid5(uuid.NAMESPACE_URL, "quota:" + identity)),
               "deviceName": text(socket.gethostname()), "files": [], "errors": [], "partial": False}
+    if request.get("mode") == "identity":
+        return result
     paths = []
     def failure(_error=None):
         if "read" not in result["errors"]:

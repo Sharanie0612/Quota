@@ -13,7 +13,7 @@ fn main() {
     for (dir, device) in [(&a, id), (&b, other)] {
         fs::create_dir_all(dir).unwrap(); let mut o = activity::options(dir);
         o.device_id = device.into(); o.sync_dir = shared.to_string_lossy().into();
-        o.codex_home = root.join("no-logs").to_string_lossy().into(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
+        o.codex_home.clear(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
         activity::save_options(dir, &o).unwrap();
     }
     let own = shared.join("quota-activity-v1").join(id); fs::create_dir_all(&own).unwrap();
@@ -127,7 +127,7 @@ fn snapshot(source: &std::path::Path) {
     }
     assert!(copied > 0);
     let mut o = activity::options(&dir); o.sync_dir = shared.to_string_lossy().into();
-    o.codex_home = root.join("no-logs").to_string_lossy().into(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
+    o.codex_home.clear(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
     activity::save_options(&dir,&o).unwrap(); activity::collect(&dir).unwrap();
     let before = activity::report(&dir,None,None,None).unwrap(); assert!(before.errors.is_empty(),"{:?}",before.errors);
     let size = sync_storage::inspect(&dir).unwrap();

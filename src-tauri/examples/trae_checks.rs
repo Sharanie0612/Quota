@@ -6,8 +6,8 @@ fn live() {
         .join(uuid::Uuid::new_v4().to_string());
     fs::create_dir_all(&root).unwrap();
     let mut options = activity::options(&root);
-    options.codex_home = root.join("absent").to_string_lossy().into();
-    options.zcode_home = options.codex_home.clone();
+    options.codex_home.clear();
+    options.zcode_home = root.join("absent").to_string_lossy().into();
     options.trae_enabled = true;
     options.sync_dir.clear();
     activity::save_options(&root, &options).unwrap();
@@ -42,8 +42,8 @@ fn fixture() {
     fs::create_dir_all(&local).unwrap();
     let mut o = activity::options(&local);
     o.auto_collect = false;
-    o.codex_home = root.join("absent").to_string_lossy().into();
-    o.zcode_home = o.codex_home.clone();
+    o.codex_home.clear();
+    o.zcode_home = root.join("absent").to_string_lossy().into();
     o.sync_dir.clear();
     o.trae_home = root.join("fixture").to_string_lossy().into();
     o.trae_enabled = true;

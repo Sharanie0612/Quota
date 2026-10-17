@@ -12,6 +12,8 @@ mod harness;
 pub mod sync_storage;
 #[path = "activity_trae.rs"]
 pub mod trae;
+#[path = "activity_ssh.rs"]
+pub mod ssh;
 
 fn hash(text: &str) -> String { format!("{:x}", Sha256::digest(text.as_bytes())) }
 fn label(text: &str) -> String { text.chars().filter(|c| !c.is_control()).take(160).collect() }
@@ -32,6 +34,10 @@ pub struct Options {
     pub trae_home: String,
     #[serde(default)]
     pub trae_enabled: bool,
+    #[serde(default)]
+    pub codex_ssh_host: String,
+    #[serde(default)]
+    pub codex_ssh_home: String,
 }
 fn default_interval() -> u64 { 30 }
 fn sync_accounts_default() -> bool { true }
@@ -40,7 +46,7 @@ pub fn options(dir: &Path) -> Options {
         let home = std::env::var_os("USERPROFILE").map(PathBuf::from).or_else(dirs::home_dir).unwrap_or_default();
         Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
             codex_home: std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).to_string_lossy().into(),
-            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), trae_home: String::new(), trae_enabled: false }
+            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new() }
     })
 }
 pub fn save_options(dir: &Path, o: &Options) -> Result<(), String> {
@@ -97,7 +103,8 @@ pub fn parse_codex(v: &Value, c: &mut Cursor, device: &str) -> Option<Metric> {
     let timestamp=v.get("timestamp").and_then(Value::as_str).and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())?.timestamp_millis();
     let outer=v.get("type").and_then(Value::as_str).unwrap_or("");
     if outer=="session_meta" {
-        c.session=p.get("session_id").or_else(|| p.get("id")).and_then(Value::as_str).unwrap_or("").to_string();
+        c.session=p.get("session_id").and_then(Value::as_str).filter(|s|!s.trim().is_empty())
+            .or_else(||p.get("id").and_then(Value::as_str)).unwrap_or("").to_string();
         c.inherited_until=p.get("subagent_history_start_ordinal").and_then(Value::as_u64);
         c.agent=if p.get("parent_thread_id").is_some_and(|x| !x.is_null()) { "子 Agent" } else { "主 Agent" }.into();
         return None;
@@ -144,6 +151,9 @@ fn database(dir:&Path) -> Result<Connection,String> {
 }
 pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,String> {
     if !event.valid() { return Err("统计记录格式无效".into()); }
+    // Older sync packets describe the publishing computer only. Preserve a
+    // selectable remote owner when its own descriptor is not present yet.
+    db.execute("INSERT OR IGNORE INTO devices(id,name) VALUES(?1,?2)",params![event.device,"远程采集设备"]).map_err(|_|"保存统计设备失败")?;
     let mut owner = event.device.clone();
     if event.source == "harness" {
         if event.harness_identity == 0 {
@@ -193,27 +203,59 @@ fn cursor(db:&Connection,key:&str) -> Result<Cursor,String> {
 fn save_cursor(db:&Connection,key:&str,c:&Cursor) -> Result<(),String> {
     db.execute("INSERT INTO cursors(path,body) VALUES(?1,?2) ON CONFLICT(path) DO UPDATE SET body=excluded.body",params![key,serde_json::to_string(c).map_err(|_| "保存采集进度失败")?]).map_err(|_| "保存采集进度失败")?; Ok(())
 }
-fn files(dir:&Path, out:&mut Vec<PathBuf>,depth:u8) {
-    if depth>12{return} if let Ok(items)=fs::read_dir(dir){for i in items.flatten(){if let Ok(t)=i.file_type(){if t.is_symlink(){continue}if t.is_dir(){files(&i.path(),out,depth+1)}else if i.path().extension().is_some_and(|e|e=="jsonl"){out.push(i.path())}}}}
+fn files(dir:&Path, out:&mut Vec<PathBuf>,depth:u8,errors:&mut Vec<String>) {
+    if depth>12 { errors.push("Codex 日志目录层级超过读取上限，部分会话未采集".into()); return; }
+    let Ok(items)=fs::read_dir(dir) else { errors.push("Codex 日志目录无法读取，请检查目录权限或挂载状态".into()); return; };
+    for item in items {
+        let Ok(item)=item else { errors.push("部分 Codex 日志目录项无法读取".into()); continue; };
+        let Ok(kind)=item.file_type() else { errors.push("部分 Codex 日志文件状态无法读取".into()); continue; };
+        if kind.is_symlink(){continue}
+        if kind.is_dir(){files(&item.path(),out,depth+1,errors)}
+        else if item.path().extension().is_some_and(|e|e=="jsonl"){out.push(item.path())}
+    }
 }
-fn collect_codex(db:&mut Connection,home:&Path,device:&str) -> Result<usize,String> {
-    let mut paths=Vec::new(); files(&home.join("sessions"),&mut paths,0);files(&home.join("archived_sessions"),&mut paths,0);paths.sort();
+// Each file commits its cursor with its metrics. A failed/locked old rollout must
+// be retried without blocking newer sessions or losing their committed counts.
+fn collect_codex_file(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
     let mut count=0;
-    for path in paths {
-        let key=path.to_string_lossy().to_string(); let mut c=cursor(db,&key)?;
-        let mut f=fs::File::open(&path).map_err(|_| "部分 Codex 会话暂时无法读取")?;
-        let size=f.metadata().map_err(|_| "无法读取会话大小")?.len();
-        if size<c.offset { c=Cursor::default(); } if size==c.offset {continue}
-        f.seek(SeekFrom::Start(c.offset)).map_err(|_| "读取会话进度失败")?;
-        let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;
-        let mut reader=BufReader::new(f);let mut line=Vec::new();
-        loop { line.clear();let n=reader.read_until(b'\n',&mut line).map_err(|_| "读取 Codex 会话失败")?;if n==0||line.last()!=Some(&b'\n'){break}
-            c.offset+=n as u64;
-            if line.len()>32*1024*1024 {continue}
-            if let Ok(v)=serde_json::from_slice::<Value>(&line){if let Some(e)=parse_codex(&v,&mut c,device){if merge_metric(&tx,&e,true)?{count+=1}}}
+    let key=path.to_string_lossy().to_string(); let mut c=cursor(db,&key)?;
+    let mut f=fs::File::open(path).map_err(|_| "部分 Codex 会话暂时无法读取")?;
+    let size=f.metadata().map_err(|_| "无法读取会话大小")?.len();
+    if size<c.offset { c=Cursor::default(); } if size==c.offset {return Ok(0)}
+    f.seek(SeekFrom::Start(c.offset)).map_err(|_| "读取会话进度失败")?;
+    let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;
+    let mut reader=BufReader::new(f);let mut line=Vec::new();
+    loop { line.clear();let n=reader.read_until(b'\n',&mut line).map_err(|_| "读取 Codex 会话失败")?;if n==0||line.last()!=Some(&b'\n'){break}
+        c.offset+=n as u64;
+        if line.len()>32*1024*1024 {continue}
+        if let Ok(v)=serde_json::from_slice::<Value>(&line){if let Some(e)=parse_codex(&v,&mut c,device){if merge_metric(&tx,&e,true)?{count+=1}}}
+    }
+    save_cursor(&tx,&key,&c)?;tx.commit().map_err(|_| "保存采集进度失败")?;
+    Ok(count)
+}
+fn collect_codex(db:&mut Connection,home:&Path,device:&str,errors:&mut Vec<String>) -> usize {
+    // Empty paths intentionally disable a source (including isolated checks).
+    if home.as_os_str().is_empty(){return 0}
+    let mut paths=Vec::new();let mut found=false;
+    for name in ["sessions","archived_sessions"] {
+        let dir=home.join(name);
+        match fs::metadata(&dir) {
+            Ok(_) => { found=true; files(&dir,&mut paths,0,errors); }
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound => {}
+            Err(_) => { found=true;errors.push("Codex 日志目录无法读取，请检查目录权限或挂载状态".into()); }
         }
-        save_cursor(&tx,&key,&c)?;tx.commit().map_err(|_| "保存采集进度失败")?;
-    } Ok(count)
+    }
+    if !found { errors.push("未找到 Codex 会话目录，请在采集设置中选择 Codex 实际使用的数据目录（包含 sessions 或 archived_sessions）".into()); }
+    else if paths.is_empty() && errors.is_empty() { errors.push("Codex 目录内暂无 JSONL 会话日志，请确认采集位置与 Codex 实际使用的数据目录一致".into()); }
+    paths.sort();let mut count=0;let mut failed=0;let mut first_error=None;
+    for path in paths {
+        match collect_codex_file(db,&path,device) {
+            Ok(n)=>count+=n,
+            Err(error) => {failed+=1;first_error.get_or_insert(error);}
+        }
+    }
+    if let Some(error)=first_error {errors.push(format!("{failed} 份 Codex 会话读取或统计失败（{error}），其余会话已继续采集；失败会话保留进度并在下次重试"));}
+    count
 }
 fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
     if !path.exists(){return Ok(0)}
@@ -415,10 +457,11 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     let o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
     let mut errors=Vec::new();let mut count=0;
-    match collect_codex(&mut db,Path::new(&o.codex_home),&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}
+    count+=collect_codex(&mut db,Path::new(&o.codex_home),&o.device_id,&mut errors);
     for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
     if o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
+    match ssh::collect(&mut db,&o.codex_ssh_host,&o.codex_ssh_home,&mut errors){Ok(n)=>count+=n,Err(error)=>errors.push(error)}
     let sync_errors:Vec<String>=if sync_enabled {
         sync(&mut db,&o).err().into_iter().collect()
     } else {
@@ -462,6 +505,8 @@ pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),S
     let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;
     let previous=options(state.store.dir());
     input.device_id=previous.device_id;input.device_name=label(&input.device_name);
+    input.codex_ssh_host=input.codex_ssh_host.trim().to_string();input.codex_ssh_home=input.codex_ssh_home.trim().to_string();
+    ssh::validate(&input.codex_ssh_host,&input.codex_ssh_home)?;
     if !(5..=3600).contains(&input.collect_interval_seconds) { return Err("采集间隔应为 5–3600 秒".into()); }
     for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.trae_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
     if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT OR IGNORE INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}

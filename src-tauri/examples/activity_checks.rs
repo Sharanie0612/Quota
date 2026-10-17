@@ -3,7 +3,46 @@ use std::{fs,io::Write,path::Path};
 use serde_json::json;
 use chrono::TimeZone;
 fn envelope(kind:&str,payload:serde_json::Value,ordinal:u64)->String{json!({"timestamp":"2026-10-04T00:00:00Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
-fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into()}).unwrap()}
+fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into(),codex_ssh_host:String::new(),codex_ssh_home:String::new()}).unwrap()}
+fn check_codex_fault_isolation(root:&Path) {
+ let dir=root.join("codex-faults");let home=root.join("fault-logs");
+ fs::create_dir_all(home.join("sessions")).unwrap();
+ setup(&dir,&home,Path::new(""),"00000000-0000-4000-8000-000000000001");
+ let header=envelope("session_meta",json!({"id":"fault-session"}),0)+&envelope("turn_context",json!({"model":"fault-model"}),1);
+ let token=|input:u64,total:u64|envelope("event_msg",json!({"type":"token_count","info":{"total_token_usage":{"input_tokens":input,"output_tokens":20,"total_tokens":total}}}),2);
+ let broken=home.join("sessions/00-broken.jsonl");let healthy=home.join("sessions/10-healthy.jsonl");
+ fs::write(&broken,header.clone()+&token(100,120)+&token(2_000_000_000_001,2_000_000_000_021)).unwrap();
+ fs::write(&healthy,header.clone()+&token(220,240)).unwrap();
+ // A rejected metric in an older file must not roll back the next file.
+ assert_eq!(activity::collect(&dir).unwrap(),1);
+ let report=||activity::report(&dir,None,None,None).unwrap();
+ let r=report();assert_eq!(r.totals.tokens.total,240);assert_eq!(r.errors.len(),1);assert!(r.errors[0].contains("其余会话已继续采集"));
+ let db=rusqlite::Connection::open(dir.join("activity.sqlite")).unwrap();
+ let cursors:i64=db.query_row("SELECT COUNT(*) FROM cursors WHERE path=?1",[broken.to_string_lossy().as_ref()],|r|r.get(0)).unwrap();assert_eq!(cursors,0);drop(db);
+ fs::OpenOptions::new().append(true).open(&healthy).unwrap().write_all(token(320,340).as_bytes()).unwrap();
+ assert_eq!(activity::collect(&dir).unwrap(),1);assert_eq!(report().totals.tokens.total,340);
+ // Repair retries the failed file, once, without advancing its cursor on failure.
+ fs::write(&broken,header.clone()+&token(100,120)).unwrap();assert_eq!(activity::collect(&dir).unwrap(),1);
+ assert_eq!(report().totals.tokens.total,460);assert!(report().errors.is_empty());
+ assert_eq!(activity::collect(&dir).unwrap(),0);assert_eq!(report().daily.iter().map(|g|g.tokens.total).sum::<u64>(),460);
+ #[cfg(windows)] {
+  use std::os::windows::fs::OpenOptionsExt;
+  let locked=fs::OpenOptions::new().read(true).share_mode(0).open(&broken).unwrap();
+  fs::OpenOptions::new().append(true).open(&healthy).unwrap().write_all(token(420,440).as_bytes()).unwrap();
+  assert_eq!(activity::collect(&dir).unwrap(),1);assert_eq!(report().totals.tokens.total,560);assert!(!report().errors.is_empty());
+  drop(locked);activity::collect(&dir).unwrap();assert!(report().errors.is_empty());
+ }
+ let mut o=activity::options(&dir);o.codex_home=root.join("missing-codex").to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ activity::collect(&dir).unwrap();assert!(report().errors.iter().any(|e|e.contains("未找到 Codex 会话目录")));
+ let empty=root.join("empty-codex");fs::create_dir_all(empty.join("sessions")).unwrap();o.codex_home=empty.to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ activity::collect(&dir).unwrap();assert!(report().errors.iter().any(|e|e.contains("暂无 JSONL")));
+ // An unreadable sessions directory must not suppress valid archived sessions.
+ let malformed=root.join("malformed-codex");fs::create_dir_all(malformed.join("archived_sessions")).unwrap();fs::write(malformed.join("sessions"),b"not a directory").unwrap();
+ fs::write(malformed.join("archived_sessions/archived.jsonl"),header+&token(40,60)).unwrap();o.codex_home=malformed.to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ assert_eq!(activity::collect(&dir).unwrap(),1);assert!(report().errors.iter().any(|e|e.contains("目录无法读取")));
+ o.codex_home.clear();activity::save_options(&dir,&o).unwrap();activity::collect(&dir).unwrap();assert!(report().errors.is_empty());
+ println!("PASS: missing/empty Codex roots, directory failures, invalid/locked file isolation, append during failure, atomic cursor retry, recovered daily totals, blank source disabled");
+}
 fn check_trae_vendor(root:&Path) {
  let dir=root.join("trae-vendor");fs::create_dir_all(&dir).unwrap();activity::report(&dir,None,None,None).unwrap();
  let db=rusqlite::Connection::open(dir.join("activity.sqlite")).unwrap();
@@ -104,6 +143,6 @@ fn main(){
  assert_eq!(quota_lib::parse_macos_proxy("HTTPEnable : 1\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897"),Some("http://127.0.0.1:7897".into()));
  assert!(quota_lib::parse_macos_proxy("HTTPEnable : 0\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897").is_none());
  println!("PASS: task-index detection, macOS proxy, legacy updates, repeated counters, append, partial tail, truncation, inherited fork, cross-device dedup, filters, private-field exclusion, duplicate ZCode databases");
- check_model_calendar_reports(&root);check_trae_vendor(&root);
+ check_model_calendar_reports(&root);check_trae_vendor(&root);check_codex_fault_isolation(&root);
  if std::env::args().any(|a|a=="--live"){let dir=root.join("live");fs::create_dir_all(&dir).unwrap();let mut o=activity::options(&dir);o.sync_dir.clear();activity::save_options(&dir,&o).unwrap();activity::collect(&dir).unwrap();let r=report(&dir);println!("Live read-only sources: {} token records/models, {} tools, {} sessions, errors={:?}",r.models.len(),r.tools.len(),r.totals.sessions,r.errors);activity::collect(&dir).unwrap();let after=report(&dir);assert!(after.errors.is_empty());assert!(after.totals.tokens.total>=r.totals.tokens.total);println!("PASS: live repeat scan, {} new Token while sources remain active",after.totals.tokens.total-r.totals.tokens.total);}
 }

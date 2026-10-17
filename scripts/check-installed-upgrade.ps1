@@ -34,7 +34,7 @@ $resume = @(Get-Process quota -ErrorAction SilentlyContinue | Where-Object { $_.
 $personalHashes = @{}
 try {
   foreach ($instance in $resume) { Stop-Process -Id $instance.Id }
-  foreach ($name in @('config.json','vendor-costs.json','monthly-usage-fx.json','activity-settings.json')) {
+  foreach ($name in @('config.json','vendor-costs.json','monthly-usage-fx.json','activity-settings.json','activity.sqlite','activity.sqlite-wal')) {
     $file = Join-Path (Join-Path $env:APPDATA 'Quota') $name
     if (Test-Path -LiteralPath $file) { $personalHashes[$file] = (Get-FileHash -LiteralPath $file).Hash }
   }

@@ -219,10 +219,18 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     {readError && <Notice tone="warn" actions={<Button size="sm" disabled={loading} onClick={() => void load()}>重试读取</Button>}>
       <b>统计读取未完成</b><div>{readError}</div>{data && <div className="hint">保留当前筛选最近一次读取的结果。</div>}
     </Notice>}
+    {(data?.errors.length || syncError) ? <Notice tone="warn">
+      <b>部分用量尚未采集完整</b><details className="activity-error-details"><summary>查看采集详情</summary><ul>{[...new Set([...(data?.errors ?? []), ...(syncError ? [syncError] : [])])].map(message => <li key={message}>{message}</li>)}</ul></details>
+    </Notice> : null}
     {options && <section className="card activity-settings">
-      <h3>本机采集设置</h3>
+      <h3>用量采集设置</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
-      {(data?.errors.length || syncError) ? <details className="activity-error-details"><summary>最近采集详情</summary><ul>{[...new Set([...(data?.errors ?? []), ...(syncError ? [syncError] : [])])].map(message => <li key={message}>{message}</li>)}</ul></details> : null}
+      <Field label="Codex SSH 远程主机" hint="填写 Codex 中已有的 SSH 主机别名，保存后补采 Ubuntu 的历史用量，并随自动采集持续更新。留空关闭。">
+        <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy} onChange={e=>setOptions({...options,codexSshHost:e.target.value})} />
+      </Field>
+      <details><summary>远程日志位置（可选）</summary><Field label="Ubuntu Codex 数据目录" hint="默认使用远程 CODEX_HOME 或 ~/.codex。只传回用量指标；SSH 连接复用本机已有配置，不保存密码或私钥。">
+        <input className="input" aria-label="远程 Codex 数据目录" value={options.codexSshHome ?? ""} placeholder="自动识别远程数据目录" disabled={!!busy} onChange={e=>setOptions({...options,codexSshHome:e.target.value})} />
+      </Field></details>
       <Field label="Trae 本机用量" hint="首次连接需打开 Trae 或 Trae SOLO，之后可离线读取历史。只保存用量指标。">
         <Button disabled={!!busy || connectingTrae} onClick={() => void connectTrae()}>{options.traeEnabled ? "断开 Trae" : "连接本机 Trae"}</Button>
         {options.traeEnabled && <span className="hint"> 保存后开始采集</span>}

@@ -83,6 +83,14 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const data = report?.query === query ? report.value : null;
   useEffect(() => { setSelection(null); }, [query]);
   const [options, setOptions] = useState<ActivityOptions | null>(null);
+  const [sshHosts, setSshHosts] = useState<string[]>([]);
+  const [sshDetecting, setSshDetecting] = useState(false);
+  const [sshNotice, setSshNotice] = useState("");
+  const [sshWarning, setSshWarning] = useState("");
+  const [sshManual, setSshManual] = useState(false);
+  const sshRequest = useRef(0);
+  const sshTouched = useRef(false);
+  useEffect(() => () => { sshRequest.current++; }, []);
   const [detail, setDetail] = useState("models");
   useEffect(()=>{setDetail(model==="vendor:trae"||model.startsWith("channel:")||source==="trae"?"channels":"models");},[model,source]);
   const [connectingTrae, setConnectingTrae] = useState(false);
@@ -155,9 +163,33 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     } catch (e) { toast(errText(e), "error"); }
   };
 
+  const detectSsh = async () => {
+    const id = ++sshRequest.current;
+    setSshDetecting(true); setSshWarning(""); setSshNotice("");
+    try {
+      const result = await api.discoverSshHosts();
+      if (id !== sshRequest.current) return;
+      setSshHosts(result.hosts);
+      setSshWarning(result.warnings.join("；"));
+      setSshNotice(result.hosts.length === 1 ? "识别到 1 个主机，空白时自动填入；保存后开始采集。"
+        : result.hosts.length ? `识别到 ${result.hosts.length} 个主机，选择需要采集的设备。`
+        : "未在 SSH 配置中找到主机别名，可手动填写 Codex 使用的别名。");
+      if (result.hosts.length === 1) setOptions(current => current && !current.codexSshHost && !sshTouched.current
+        ? { ...current, codexSshHost: result.hosts[0] } : current);
+    } catch (e) {
+      if (id === sshRequest.current) setSshWarning(`自动识别未完成：${errText(e)}。仍可手动填写。`);
+    } finally { if (id === sshRequest.current) setSshDetecting(false); }
+  };
+  const closeOptions = () => { sshRequest.current++; setSshDetecting(false); setOptions(null); };
   const toggleOptions = async () => {
-    if (options) { setOptions(null); return; }
-    try { setOptions(await api.getActivityOptions()); }
+    if (options) { closeOptions(); return; }
+    try {
+      const current = await api.getActivityOptions();
+      sshTouched.current = false;
+      try { sshTouched.current = localStorage.getItem(`quota.ssh-autofill-off:${current.deviceId}`) === "1"; } catch { /* Optional UI preference. */ }
+      setSshManual(false); setSshHosts([]);
+      setOptions(current); void detectSsh();
+    }
     catch (e) { toast(errText(e), "error"); }
   };
 
@@ -177,7 +209,11 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     try {
       const current=await api.getActivityOptions();
       await api.saveActivityOptions({...options,syncDir:current.syncDir,autoCollect:current.autoCollect,collectIntervalSeconds:current.collectIntervalSeconds,syncAccounts:current.syncAccounts});
-      setOptions(null);
+      try {
+        const key = `quota.ssh-autofill-off:${options.deviceId}`;
+        if (options.codexSshHost?.trim()) localStorage.removeItem(key); else localStorage.setItem(key, "1");
+      } catch { /* Optional UI preference. */ }
+      closeOptions();
       // A collection failure must not be reported as a failed settings save.
       try {
         await api.refreshActivity();
@@ -225,8 +261,19 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     {options && <section className="card activity-settings">
       <h3>用量采集设置</h3>
       <Field label="设备名称"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
-      <Field label="Codex SSH 远程主机" hint="填写 Codex 中已有的 SSH 主机别名，保存后补采 Ubuntu 的历史用量，并随自动采集持续更新。留空关闭。">
-        <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy} onChange={e=>setOptions({...options,codexSshHost:e.target.value})} />
+      <Field label="Codex SSH 远程主机" hint={sshDetecting ? "正在读取本机 SSH 配置…" : sshNotice || "保存后补采 Ubuntu 历史用量，并随自动采集持续更新。留空关闭。"}>
+        <div className="activity-path">
+          {sshHosts.length > 0 ? <select className="input" aria-label="识别到的 SSH 主机" disabled={!!busy}
+            value={sshManual || !!options.codexSshHost && !sshHosts.includes(options.codexSshHost) ? "__manual__" : options.codexSshHost ?? ""}
+            onChange={e => { sshTouched.current = true; setSshManual(e.target.value === "__manual__"); if (e.target.value !== "__manual__") setOptions({ ...options, codexSshHost: e.target.value }); }}>
+            <option value="">关闭 SSH 采集</option>{sshHosts.map(host => <option key={host} value={host}>{host}</option>)}<option value="__manual__">手动填写…</option>
+          </select> : <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy}
+            onChange={e => { sshTouched.current = true; setOptions({ ...options, codexSshHost: e.target.value }); }} />}
+          <Button disabled={!!busy || sshDetecting} onClick={() => void detectSsh()}>{sshDetecting ? "识别中…" : "重新识别"}</Button>
+        </div>
+        {sshHosts.length > 0 && (sshManual || !!options.codexSshHost && !sshHosts.includes(options.codexSshHost)) && <input className="input" aria-label="Codex SSH 主机别名" value={options.codexSshHost ?? ""} placeholder="例如 devbox" disabled={!!busy}
+          onChange={e => { sshTouched.current = true; setOptions({ ...options, codexSshHost: e.target.value }); }} />}
+        {sshWarning && <p className="hint" role="status">{sshWarning}</p>}
       </Field>
       <details><summary>远程日志位置（可选）</summary><Field label="Ubuntu Codex 数据目录" hint="默认使用远程 CODEX_HOME 或 ~/.codex。只传回用量指标；SSH 连接复用本机已有配置，不保存密码或私钥。">
         <input className="input" aria-label="远程 Codex 数据目录" value={options.codexSshHome ?? ""} placeholder="自动识别远程数据目录" disabled={!!busy} onChange={e=>setOptions({...options,codexSshHome:e.target.value})} />
@@ -242,7 +289,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
           <Button disabled={!!busy} onClick={() => void choose(key)}>选择</Button>
         </div></Field>;
       })}</details>
-      <div className="activity-settings-actions"><Button disabled={!!busy} onClick={() => setOptions(null)}>取消</Button><Button variant="primary" disabled={!!busy} onClick={() => void save()}>{busy === "save" ? "保存并同步中…" : "保存并同步"}</Button></div>
+      <div className="activity-settings-actions"><Button disabled={!!busy} onClick={closeOptions}>取消</Button><Button variant="primary" disabled={!!busy || sshDetecting} onClick={() => void save()}>{busy === "save" ? "保存并同步中…" : "保存并同步"}</Button></div>
     </section>}
 
     <div className="ladder-filters">

@@ -807,6 +807,12 @@
         case "refresh_activity":
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
           return 0;
+        case "discover_codex_ssh_hosts": {
+          const test = new URLSearchParams(location.search).get("sshCase");
+          if (test === "slow") await new Promise(resolve => setTimeout(resolve, 1200));
+          if (test === "error") throw new Error("示例：SSH 配置暂时无法读取");
+          return {hosts: test === "empty" ? [] : test === "multi" ? ["ubuntu-vm", "devbox"] : ["ubuntu-vm"], warnings:[]};
+        }
         case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""};
         case "get_account_sync_candidates": return structuredClone(syncCandidates);
         case "resolve_account_sync": {
@@ -936,7 +942,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2000",
+            version: "1.0.2200",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

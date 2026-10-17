@@ -10,6 +10,8 @@ use std::{collections::{BTreeMap, BTreeSet}, io::{Read, Write}, process::{Comman
 pub const PROJECTION_SCRIPT: &str = include_str!("../scripts/codex-ssh-metrics.py");
 const MAX_OUTPUT: usize = 16 * 1024 * 1024;
 const TIMEOUT: Duration = Duration::from_secs(25);
+#[path = "activity_ssh_discovery.rs"]
+pub mod discovery;
 
 pub fn validate(host: &str, home: &str) -> Result<(), String> {
     if !host.is_empty() && (host.len()>128 || !host.as_bytes()[0].is_ascii_alphanumeric()

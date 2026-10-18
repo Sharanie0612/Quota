@@ -95,7 +95,7 @@ async function main() {
     if (version !== versionInfo().display) throw Error('Requested version differs from the checked-out main');
     const releases = await api('/releases?per_page=100');
     const candidates = releases.filter(release => release.draft && (release.tag_name === version || release.name === `Quota ${version}`));
-    if (candidates.length !== 1) throw Error('Expected exactly one matching release draft');
+    if (candidates.length !== 1) throw Error(`Expected one matching release draft, found ${candidates.length}; check its name/version and the prepare job contents:write permission`);
     const release = candidates[0];
     const sourceCommit = release.target_commitish;
     validateSource(sourceCommit);

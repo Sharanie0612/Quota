@@ -1,8 +1,6 @@
 name: macOS package
 
 on:
-  push:
-    branches: [codex/feat/token-activity-ui-1.0.2400]
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,122 @@
+name: Publish installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 完整展示版本，例如 1.0.2500（必须与 main 一致）
+        required: true
+        type: string
+      channel:
+        description: draft 仅整理草稿；preview 公开测试版；release 公开并设为最新版
+        type: choice
+        options: [draft, preview, release]
+        default: draft
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - scripts/release.cjs
+      - scripts/verify-release.cjs
+      - scripts/check-release-upgrade.ps1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.version || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/verify-release.cjs
+  prepare:
+    if: github.event_name == 'workflow_dispatch'
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate main, paired installers, source and SHA-256
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          node scripts/release.cjs prepare target/release-assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: target/release-assets/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-baseline
+          path: target/release-baseline/
+          if-no-files-found: error
+  windows-upgrade:
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-baseline
+          path: baseline
+      - name: Install previous version, upgrade and check startup
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        shell: pwsh
+        run: |
+          & scripts/check-release-upgrade.ps1 -BaselineInstaller baseline/baseline-setup.exe -Installer candidate/Quota-Windows-x64-setup.exe -ExpectedVersion $env:RELEASE_VERSION -TestRoot (Join-Path $env:RUNNER_TEMP 'quota-release-upgrade')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-upgrade-evidence
+          path: ${{ runner.temp }}/quota-release-upgrade/evidence.json
+          if-no-files-found: warn
+  publish:
+    needs: [prepare, windows-upgrade]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: target/release-assets
+      - name: Upload verified aliases and publish requested channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+        run: node scripts/release.cjs publish target/release-assets

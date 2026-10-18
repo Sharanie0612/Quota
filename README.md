@@ -8,12 +8,16 @@
 
 ## 下载安装
 
-当前源码版本：**1.0.2500**。安装包、校验值和发布状态以 [GitHub Releases](https://github.com/Sharanie0612/Quota/releases) 为准。
+当前版本：**1.0.2500**。直接选择你的平台下载，固定链接会跟随最新正式发布版本更新。
 
-| 平台 | 安装方式 |
-| --- | --- |
-| Windows x64 | 下载 `Quota_版本号_x64-setup.exe`，退出旧版后运行安装器 |
-| macOS Apple Silicon | 下载 `Quota_版本号_aarch64.dmg`，将 Quota 拖入「应用程序」 |
+| 平台 | 下载最新版 | 安装方式 |
+| --- | --- | --- |
+| Windows x64 | [下载安装包](https://github.com/Sharanie0612/Quota/releases/latest/download/Quota-Windows-x64-setup.exe) | 退出旧版后运行安装器 |
+| macOS Apple Silicon | [下载 DMG](https://github.com/Sharanie0612/Quota/releases/latest/download/Quota-macOS-AppleSilicon.dmg) | 将 Quota 拖入「应用程序」 |
+
+[最新版本说明](https://github.com/Sharanie0612/Quota/releases/latest) · [历史版本 / 测试版](https://github.com/Sharanie0612/Quota/releases) · [SHA-256 校验](https://github.com/Sharanie0612/Quota/releases/latest/download/SHA256SUMS.txt)
+
+每个版本集中提供两个平台的安装包和校验文件。GitHub 自动显示的 **Source code** 是源码压缩包，安装请选择上表中的文件。版本规则和发布步骤见 [发布管理](docs/releases.md)。
 
 macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；首次打开可能需要在「系统设置 → 隐私与安全性」中允许。Intel / Universal 包暂无验收记录。iPhone / iPad 暂不支持。
 

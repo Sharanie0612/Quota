@@ -501,10 +501,12 @@ fn covered_models(
         .query_map([], |r| r.get::<_, String>(0))
         .map_err(|_| "读取实际用量失败")?;
     type Entry = (crate::activity::Tokens, std::collections::BTreeSet<String>);
+    let excluded=crate::activity::options(dir).excluded_devices();
     let mut groups: BTreeMap<(String, String), Entry> = BTreeMap::new();
     for row in rows {
         let event: Metric = serde_json::from_str(&row.map_err(|_| "读取用量记录失败")?)
             .map_err(|_| "用量记录损坏")?;
+        if excluded.contains(&event.device) {continue;}
         let Some(time) = chrono::DateTime::from_timestamp_millis(event.timestamp) else {
             continue;
         };

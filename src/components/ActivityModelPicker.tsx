@@ -11,5 +11,18 @@ export function ActivityModelPicker({rows,value,onChange,loading}: {rows:Activit
   const vendors=[...new Map(rows.filter(row=>!activityModelChannel(row.key)).map(row=>{const info=activityModelIdentity(row.key);return [info.provider,info];})).values()];
   const channels=activityChannels(rows);
   const known=value.startsWith("vendor:")||value.startsWith("channel:")||models.some(row=>row.key===value);
-  return <div className="activity-scope-picker"><input className="input" aria-label="搜索模型或厂商" placeholder="搜索模型或厂商" value={search} onChange={e=>setSearch(e.target.value)}/><select className="select" aria-label="模型或供应商筛选" value={value} onChange={e=>onChange(e.target.value)} disabled={loading&&!rows.length}><option value="">全部用量</option>{channels.length>0&&<optgroup label="Trae">{channels.map(channel=><option key={channel} value={`channel:${channel}`}>{channelHints[channel] ?? activityChannelName(channel)}</option>)}</optgroup>}<optgroup label="供应商汇总">{channels.length>0&&<option value="vendor:trae">Trae · 全部用量</option>}{vendors.map(v=><option key={v.provider} value={`vendor:${v.provider}`}>{v.vendor} · 全部模型</option>)}</optgroup>{vendors.map(v=><optgroup key={v.provider} label={v.vendor}>{models.filter(row=>activityModelIdentity(row.key).provider===v.provider).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}</optgroup>)}{value&&!known&&<option value={value} hidden={!!activityModelChannel(value)}>{label(value)}</option>}</select>{value&&!value.startsWith("vendor:")&&!value.startsWith("channel:")&&<ModelLogo name={activityModelName(value)} size={22}/>}</div>;
+  return <div className="activity-scope-picker">
+    <input className="input" aria-label="搜索模型或厂商" placeholder="搜索模型、厂商或 Trae 通道" value={search} onChange={e=>setSearch(e.target.value)}/>
+    <select className="select" aria-label="模型或供应商筛选" value={value} onChange={e=>onChange(e.target.value)} disabled={loading&&!rows.length}>
+      <option value="">全部用量</option>
+      <optgroup label="供应商汇总">{channels.length>0&&<option value="vendor:trae">Trae · 全部用量</option>}{vendors.map(v=><option key={v.provider} value={`vendor:${v.provider}`}>{v.vendor} · 全部模型</option>)}</optgroup>
+      {vendors.map(v=><optgroup key={v.provider} label={v.vendor}>{models.filter(row=>!activityModelChannel(row.key)&&activityModelIdentity(row.key).provider===v.provider).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}</optgroup>)}
+      {channels.map(channel=><optgroup key={channel} label={channelHints[channel] ?? activityChannelName(channel)}>
+        <option value={`channel:${channel}`}>{activityChannelName(channel)} · 全部模型</option>
+        {models.filter(row=>activityModelChannel(row.key)===channel).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}
+      </optgroup>)}
+      {value&&!known&&<option value={value}>{label(value)}</option>}
+    </select>
+    {value&&!value.startsWith("vendor:")&&!value.startsWith("channel:")&&<ModelLogo name={activityModelName(value)} size={22}/>}
+  </div>;
 }

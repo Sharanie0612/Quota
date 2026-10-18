@@ -3311,12 +3311,13 @@ dependencies = [
 
 [[package]]
 name = "quota"
-version = "1.0.2000"
+version = "1.0.2500"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
  "chrono",
  "dirs",
+ "glob",
  "hmac",
  "keyring",
  "pbkdf2",

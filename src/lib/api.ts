@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type {
-  ActivityReport, ActivityOptions, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
+  ActivityReport, ActivityOptions, SshHostDiscovery, SshIdentity, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
   AccountInput,
   AccountTrend,
   AccountView,
@@ -48,6 +48,8 @@ export const api = {
   exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
   importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
   getActivityOptions: () => invoke<ActivityOptions>("get_activity_options"),
+  discoverSshHosts: () => invoke<SshHostDiscovery>("discover_codex_ssh_hosts"),
+  identifySshDevices: (targets:{host:string;home:string}[]) => invoke<SshIdentity[]>("identify_codex_ssh_devices",{targets}),
   exportData: (path: string) => invoke<string>("export_data", { path }),
   getExchangeRate: () => invoke<{ cnyPerUsd: number; date: string; checkedAt: string; source: string; error: string | null }>("get_exchange_rate"),
   getActivity: (device = "", source = "", days = 0, model = "", from = "", to = "") => invoke<ActivityReport>("get_activity", { device, source, days, model, from, to }),

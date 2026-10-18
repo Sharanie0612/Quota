@@ -7,7 +7,7 @@ const B: &str = "00000000-0000-4000-8000-000000000002";
 fn setup(dir: &Path, shared: &Path, device: &str) {
     fs::create_dir_all(dir).unwrap();
     let mut o = activity::options(dir); o.device_id=device.into();o.auto_collect=false;o.sync_dir=shared.to_string_lossy().into();
-    o.codex_home=dir.join("none").to_string_lossy().into();o.zcode_home=o.codex_home.clone();
+    o.codex_home.clear();o.zcode_home=dir.join("none").to_string_lossy().into();
     activity::save_options(dir,&o).unwrap();
 }
 fn bill(from: &str, to: &str, amount: f64) -> Expense {

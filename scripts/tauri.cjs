@@ -26,6 +26,18 @@ async function main() {
     for (const name of old) fs.renameSync(path.join(bundle, name), path.join(archive, name));
   }
   await run(args, "tauri");
+  // Cargo may reuse an absolute/manifest-relative target directory. Stage only
+  // this version's installer locally; do not move other checkouts' artifacts.
+  if (standard && process.env.CARGO_TARGET_DIR) {
+    const actual = path.resolve(root, "src-tauri", process.env.CARGO_TARGET_DIR, "release/bundle/nsis");
+    if (actual.toLowerCase() !== bundle.toLowerCase()) {
+      const prefix = `Quota_${pkg.version}_`;
+      const files = fs.existsSync(actual) ? fs.readdirSync(actual).filter(n => n.startsWith(prefix) && n.endsWith("-setup.exe")) : [];
+      if (files.length !== 1) throw Error(`构建目录中的本版本安装包数量异常：${files.length}`);
+      fs.mkdirSync(bundle, { recursive: true });
+      fs.copyFileSync(path.join(actual, files[0]), path.join(bundle, files[0]));
+    }
+  }
   if (standard && fs.existsSync(bundle)) {
     const installers = fs.readdirSync(bundle).filter(n => /^Quota_.*-setup\.exe$/.test(n));
     if (installers.length !== 1) throw Error(`预期一个安装包，实际 ${installers.length}`);

@@ -1,6 +1,8 @@
 # macOS 构建与本地交付
 
-当前展示版本与包版本均为 `1.0.1000`。Apple Silicon 使用 arm64 原生构建；尚未公开发布，Intel / Universal 构建未验证。此前 1.0.0900 验证记录保留在下方。
+当前源码展示版本与包版本均为 `1.0.2500`。Apple Silicon 使用 arm64 原生构建，Intel / Universal 构建未验证。安装包是否公开发布以 [Releases](https://github.com/Sharanie0612/Quota/releases) 为准；下方 1.0.1000 / 1.0.0900 记录仅代表对应历史版本。
+
+仓库的 [macOS 构建工作流](../.github/workflows/macos-package.yml) 使用 GitHub 托管的 Apple Silicon runner，执行前端检查、App / DMG 构建、整包临时签名校验、版本与架构检查、DMG 校验及隔离配置启动检查。产物保留为 Actions artifact；不会自动发布 Release，也不读取个人账户、日志或凭据。该检查不替代真实登录、Keychain、覆盖升级和完整 UI 的实机验收。
 
 ## 环境与构建
 
@@ -24,7 +26,7 @@ npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"ma
 产物：
 
 - `src-tauri/target/release/bundle/macos/Quota.app`
-- `src-tauri/target/release/bundle/dmg/Quota_1.0.1000_aarch64.dmg`
+- `src-tauri/target/release/bundle/dmg/Quota_1.0.2500_aarch64.dmg`
 
 当前展示号与包版本相同，无需重命名。将来二者不同时，交付需使用完整展示号命名；例如旧版包版本 `1.0.900` 对应展示号 `1.0.0900`，不要覆盖已有交付文件。
 

@@ -20,4 +20,21 @@ schema-1 同步包新增可选 `devices` 描述，仅传递事件所属设备的
 
 安装包：`src-tauri/target/release/bundle/nsis/Quota_1.0.2500_x64-setup.exe`，3,525,199 字节；SHA-256 `a8151b234640d8f6bc98eb12f7fc37a0eb67630d66123f7479ff8a5e0d043d73`。产物目录通过 Junction 复用仓库根目录 `src-tauri/target`。
 
-未执行实际安装或覆盖升级；为避开单实例限制，隔离检查期间短暂退出并恢复了原安装的 1.0.2400，测试不读取个人用量日志和凭据。真实 SSH 连接和云盘传输仍需各设备环境验证。
+上述本地交付检查当时未执行实际安装或覆盖升级；为避开单实例限制，隔离检查期间短暂退出并恢复了原安装的 1.0.2400，测试不读取个人用量日志和凭据。随后公开发布的升级验证见下节。真实 SSH 连接和云盘传输仍需各设备环境验证。
+
+## 2026-10-18 GitHub 双平台公开发布
+
+[Quota 1.0.2500](https://github.com/Sharanie0612/Quota/releases/tag/1.0.2500) 已公开，并设为 GitHub 最新版。标签指向 `db898b7585cb96811f686f785f5d6615aff0012b`，该安装包源提交已通过 PR #17 合入 main。后续发布工具和文档提交没有更改产品版本或业务代码。
+
+| 平台 | 带版本号的安装包 | 大小 / SHA-256 |
+| --- | --- | --- |
+| Windows x64 | `Quota_1.0.2500_x64-setup.exe` | 3,525,199 字节；`a8151b234640d8f6bc98eb12f7fc37a0eb67630d66123f7479ff8a5e0d043d73` |
+| macOS Apple Silicon | `Quota_1.0.2500_aarch64.dmg` | 6,373,074 字节；`5a32ab0393e1306ee88a12a81291dae63b05971d73ffce3a25d6483e4bfd0ca4` |
+
+每个安装包另有相同内容的固定名称，README 的最新版入口无需逐次改链接。公开下载的两个固定链接均已在不登录的情况下实际下载，大小与 SHA-256 匹配；`SHA256SUMS.txt` 和 `release-manifest.json` 同页保留。
+
+[发布工作流](https://github.com/Sharanie0612/Quota/actions/runs/39130772462)通过：两平台文件与源提交检查、严格产物白名单、SHA-256，以及 GitHub 临时 Windows runner 的 **1.0.1900 → 1.0.2500** 实际覆盖升级。已安装程序和 WebView2Loader.dll 匹配，两个隔离配置文件保留，升级后启动存活 8 秒；证据 artifact 为 `windows-upgrade-evidence`。维护者本机安装、个人日志与凭据未参与该检查。
+
+[Mac 构建](https://github.com/Sharanie0612/Quota/actions/runs/39112234288)通过 App 整包签名结构、arm64、版本、无 Windows DLL、DMG 完整性及隔离启动 8 秒。包为 ad-hoc 临时签名，未进行 Developer ID 签名或公证；真实 Keychain、账户登录、覆盖升级和完整 UI 仍需实机验收。
+
+历史安装包和标签不覆盖，后续修复使用新版本。渠道、固定链接和维护步骤见 [发布管理](releases.md)。

@@ -57,6 +57,7 @@ use tauri::{Manager, WindowEvent};
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| tray::show_main(app)))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -109,10 +110,14 @@ pub fn run() {
             widget::get_widget_usage,
             widget::widget_ready,
             widget::set_widget_expanded,
+            widget::move_widget,
+            usage_sync::sync_usage_now,
             exchange::get_exchange_rate,
             usage_fx::get_monthly_usage_fx,
             usage_fx::save_monthly_usage_fx,
             activity::get_activity,
+            activity::get_sync_overview,
+            activity::sync_activity_now,
             activity::get_activity_options,
             activity::refresh_activity,
             activity::save_activity_options,

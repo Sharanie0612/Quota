@@ -712,6 +712,10 @@
         }
         case 'widget_ready': widgetState(false);return null;
         case 'set_widget_expanded': widgetState(args.expanded);return null;
+        case 'move_widget': return null;
+        case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],updatedAt:Date.now(),syncErrors:[]};
+        case 'sync_activity_now':
+        case 'sync_usage_now': return null;
         case "plugin:window|is_maximized": return windowMaximized;
         case "plugin:window|toggle_maximize": {
           windowMaximized=!windowMaximized;
@@ -932,7 +936,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.1900",
+            version: "1.0.2000",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

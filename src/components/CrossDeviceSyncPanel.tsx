@@ -1,29 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { api, errText, events } from '../lib/api';
-import type { ActivityOptions, ActivityReport } from '../lib/types';
+import type { ActivityOptions } from '../lib/types';
 import { Button, Notice, Switch } from './ui';
 import { ActivityStoragePanel } from './ActivityStoragePanel';
 import { AccountSyncPanel } from './AccountSyncPanel';
 
 export function CrossDeviceSyncPanel(){
   const [options,setOptions]=useState<ActivityOptions|null>(null);
-  const [report,setReport]=useState<ActivityReport|null>(null);
+  const [report,setReport]=useState<Awaited<ReturnType<typeof api.getSyncOverview>>|null>(null);
   const [account,setAccount]=useState<{lastSynced:string|null;error:string|null}|null>(null);
   const [readers,setReaders]=useState<{device:string;version:string|null;compressed:boolean|null}[]>([]);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
   const reload=useCallback(async()=>{
-    const [o,r,a,p]=await Promise.all([api.getActivityOptions(),api.getActivity(),api.getAccountSyncStatus(),api.getActivityReaders()]);
-    setOptions(o);setReport(r);setAccount(a);setReaders(p);return {o,r,a};
+    const [os,rs,as,ps]=await Promise.allSettled([api.getActivityOptions(),api.getSyncOverview(),api.getAccountSyncStatus(),api.getActivityReaders()]);
+    if(os.status==='rejected')throw os.reason;
+    const o=os.value;
+    const r=rs.status==='fulfilled'?rs.value:{devices:[],updatedAt:null,syncErrors:[errText(rs.reason)]};
+    const a=as.status==='fulfilled'?as.value:{lastSynced:null,error:errText(as.reason)};
+    const p=ps.status==='fulfilled'?ps.value:[];
+    if(ps.status==='rejected')r.syncErrors=[...r.syncErrors,errText(ps.reason)];
+    setOptions(o);setReport(r);setAccount(a);setReaders(p);setError('');return {o,r,a};
   },[]);
   useEffect(()=>{let live=true;void reload().catch(e=>{if(live)setError(errText(e));});const refresh=()=>{if(live)void reload().catch(()=>undefined);};const un=events.onAccountsUpdated(refresh);const activity=events.onActivityUpdated(refresh);return()=>{live=false;void un.then(f=>f());void activity.then(f=>f());};},[reload]);
   const sync=async(o=options)=>{
     if(!o?.syncDir)return;
     setBusy(true);setError('');setMessage('');
     try{
-      const results=await Promise.allSettled([api.refreshActivity(),o.syncAccounts?api.syncAccounts():Promise.resolve()]);
+      const results=await Promise.allSettled([api.syncActivityNow(),api.syncUsageNow(),o.syncAccounts?api.syncAccounts():Promise.resolve()]);
       const next=await reload();
       const errors=results.flatMap(r=>r.status==='rejected'?[errText(r.reason)]:[]).concat(next.r.syncErrors??[],next.o.syncAccounts&&next.a.error?[next.a.error]:[]);
       if(errors.length)setError([...new Set(errors)].join('；'));else setMessage('已同步，等待云盘传输到其他设备。');
@@ -53,10 +59,11 @@ export function CrossDeviceSyncPanel(){
     </>}
     {message&&<Notice>{message}</Notice>}
     {errors.some(Boolean)&&<Notice tone="warn"><b>部分同步未完成，已保存的数据仍保留。</b><details><summary>查看原因</summary><p>{[...new Set(errors.filter(Boolean))].join('；')}</p></details></Notice>}
+    {enabled&&options?.syncAccounts&&<AccountSyncPanel/>}
     {enabled&&<details className="sync-advanced"><summary>高级选项与故障处理</summary>
       <div className="setting-row"><div className="txt"><b>同时同步账户信息</b><span>同步账户名称、余额与额度；不会同步密钥和登录信息。</span></div><Switch checked={options?.syncAccounts??true} label="同时同步账户信息" disabled={busy} onChange={value=>{setBusy(true);void update({syncAccounts:value}).catch(e=>setError(errText(e))).finally(()=>setBusy(false));}}/></div>
       <p className="hint sync-folder">{options?.syncDir}</p><div className="tag-row"><Button size="sm" disabled={busy} onClick={()=>void choose()}>更换文件夹</Button><Button size="sm" disabled={busy} onClick={()=>{setBusy(true);void update({syncDir:''}).then(()=>{setMessage('已停止跨设备同步，本机账户和用量仍保留。');setError('');return reload();}).catch(e=>setError(errText(e))).finally(()=>setBusy(false));}}>停止同步</Button></div>
-      <ActivityStoragePanel syncDir={options?.syncDir??''}/><AccountSyncPanel/>
+      <ActivityStoragePanel syncDir={options?.syncDir??''}/>
       <p className="hint">本页显示本机处理状态。云盘是否上传完成，请查看云盘客户端；不会删除其他设备的数据。</p>
     </details>}
   </section>;

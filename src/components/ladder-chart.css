@@ -123,3 +123,13 @@
 .ability-slot select { width:100%; }
 .ability-slot select:disabled { opacity:.65; }
 @media(max-width:800px) { .ladder-page .ability-picker { flex-direction:column; } }
+.ladder-unpriced { padding:20px; margin-top:16px; }
+.ladder-score-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 24px; }
+.ladder-score-row { display:flex; align-items:center; gap:10px; min-width:0; border:0; border-radius:12px; padding:10px; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
+.ladder-score-row:hover { background:var(--fill); }
+.ladder-score-row>span:first-of-type { width:44%; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+.ladder-score-row small { display:block; color:var(--text-3); font-size:10px; }
+.ladder-score-track { height:5px; flex:1; border-radius:8px; background:var(--fill); overflow:hidden; }
+.ladder-score-track i { display:block; height:100%; background:var(--blue); border-radius:8px; }
+.ladder-score-row b { font-size:12px; font-variant-numeric:tabular-nums; }
+@media(max-width:1100px) { .ladder-score-list { grid-template-columns:1fr; } }

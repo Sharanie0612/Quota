@@ -297,6 +297,8 @@ export interface AppInfo {
 }
 
 export interface LadderEntry {
+  offPeak?: ModelPrice | null;
+  priceOptions?: { id: string; label: string; price: ModelPrice }[];
   releasedAt?: string | null;
   candidate?: LadderPriceCheck | null;
   id: string;

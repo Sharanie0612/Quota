@@ -21,7 +21,7 @@ cd ..
 npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
 ```
 
-命令行覆盖仅用于本次 Mac 构建：选择 App / DMG，排除 Windows 专用 `WebView2Loader.dll`，并对整个 App 做 ad-hoc 临时签名。仓库默认 NSIS 配置、Windows DLL 资源和产品版本保持不变。仅保留链接器的二进制签名不足以通过 App 资源校验，因此需显式整包签名。
+`tauri.macos.conf.json` 由 Tauri 在 macOS 自动合并，选择 App / DMG、排除 Windows 专用 `WebView2Loader.dll`，并启用当前 Tauri 2.11 所需的透明窗口配置；对应 Cargo feature 仅在 macOS 启用。命令行配置对整个 App 做 ad-hoc 临时签名。Windows 默认 NSIS 配置、DLL 资源和产品版本保持不变。仅保留链接器的二进制签名不足以通过 App 资源校验，因此需显式整包签名。
 
 产物：
 

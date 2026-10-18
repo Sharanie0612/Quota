@@ -55,6 +55,7 @@ keyring = { version = "3", features = ["windows-native"] }
 # macOS / Linux 备用（跨平台编译时不至于失败）
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
+tauri = { version = "2", features = ["macos-private-api"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["linux-native"] }

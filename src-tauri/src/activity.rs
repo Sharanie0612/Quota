@@ -303,32 +303,70 @@ fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,Stri
 }
 
 #[derive(Serialize,Deserialize)]
-struct Packet { schema:u32, device:OptionsDevice, events:Vec<Metric> }
+struct Packet {
+    schema:u32, device:OptionsDevice, events:Vec<Metric>,
+    // Optional descriptors preserve the actual SSH owner across older schema-1 packets.
+    // Names and stable IDs only: connection aliases, remote paths and selection stay local.
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    devices:Vec<OptionsDevice>,
+}
+impl Packet {
+    fn valid(&self)->bool {
+        let valid_device=|d:&OptionsDevice|uuid::Uuid::parse_str(&d.id).is_ok() && d.name.len()<=640 && !d.name.chars().any(char::is_control);
+        self.schema==1 && self.events.len()<=1000 && valid_device(&self.device)
+            && self.devices.len()<=1001 && self.devices.iter().all(valid_device) && self.events.iter().all(Metric::valid)
+    }
+}
+fn known_device_names(db:&Connection,o:&Options)->Result<Vec<OptionsDevice>,String>{
+    let mut devices=db.prepare("SELECT id,name FROM devices ORDER BY id").map_err(|_|"读取设备名称失败")?
+        .query_map([],|r|Ok(OptionsDevice{id:r.get(0)?,name:r.get(1)?})).map_err(|_|"读取设备名称失败")?
+        .collect::<Result<Vec<_>,_>>().map_err(|_|"读取设备名称失败")?;
+    let remotes=o.ssh_devices();
+    for device in &mut devices {
+        if device.id==o.device_id {device.name=o.device_name.clone();}
+        else if let Some(remote)=remotes.iter().find(|remote|remote.device_id==device.id && !remote.name.is_empty()) {
+            device.name=format!("SSH · {}",label(&remote.name));
+        }
+    }
+    Ok(devices)
+}
+fn packet_devices(names:&[OptionsDevice],events:&[Metric])->Vec<OptionsDevice>{
+    let owners:std::collections::BTreeSet<_>=events.iter().map(|e|e.device.as_str()).collect();
+    names.iter().filter(|d|owners.contains(d.id.as_str())).cloned().collect()
+}
+fn import_device_names(db:&Connection,devices:&[OptionsDevice])->Result<(),String>{
+    for device in devices {
+        db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name WHERE excluded.name<>'远程采集设备' OR devices.name='远程采集设备'",params![device.id,device.name]).map_err(|_|"保存远程设备名称失败")?;
+    }
+    Ok(())
+}
 
 // 旧指标包格式兼容：每包最多 1000 条，仅包含白名单指标。
 pub fn cloud_packets(dir: &Path) -> Result<Vec<(String,String)>,String> {
     let o=options(dir); save_options(dir,&o)?;
     let db=database(dir)?;
+    let names=known_device_names(&db,&o)?;
     let mut stmt=db.prepare("SELECT body FROM metrics WHERE local=1 ORDER BY id").map_err(|_|"读取同步统计失败")?;
     let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_|"读取同步统计失败")?;
     let mut packets=Vec::new(); let mut events=Vec::new();
     for row in rows {
         events.push(serde_json::from_str::<Metric>(&row.map_err(|_|"读取同步统计失败")?).map_err(|_|"统计格式无效")?);
-        if events.len()==1000 { packets.push(cloud_packet(&o,std::mem::take(&mut events))?); }
+        if events.len()==1000 { packets.push(cloud_packet(&o,&names,std::mem::take(&mut events))?); }
     }
-    if !events.is_empty() { packets.push(cloud_packet(&o,events)?); }
+    if !events.is_empty() { packets.push(cloud_packet(&o,&names,events)?); }
     Ok(packets)
 }
-fn cloud_packet(o:&Options,events:Vec<Metric>)->Result<(String,String),String>{
-    let body=serde_json::to_string(&Packet{schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},events}).map_err(|_|"编码同步统计失败")?;
+fn cloud_packet(o:&Options,names:&[OptionsDevice],events:Vec<Metric>)->Result<(String,String),String>{
+    let body=serde_json::to_string(&Packet{schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(names,&events),events}).map_err(|_|"编码同步统计失败")?;
     Ok((format!("quota-{}-{}.json",o.device_id,hash(&body)),body))
 }
 pub fn import_cloud_packet(dir:&Path,data:&[u8])->Result<usize,String>{
     if data.len()>4*1024*1024 {return Err("同步文件过大".into())}
     let p:Packet=serde_json::from_slice(data).map_err(|_|"同步文件格式无效")?;
-    if p.schema!=1||p.events.len()>1000||uuid::Uuid::parse_str(&p.device.id).is_err()||p.device.name.len()>640||p.events.iter().any(|e|!e.valid()) {return Err("同步文件格式无效".into())}
+    if !p.valid() {return Err("同步文件格式无效".into())}
     let mut db=database(dir)?;let tx=db.transaction().map_err(|_|"统计资料库忙碌")?;
     tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![p.device.id,label(&p.device.name)]).map_err(|_|"保存设备失败")?;
+    import_device_names(&tx,&p.devices)?;
     let mut count=0;for e in p.events {if merge_metric(&tx,&e,false)?{count+=1}}
     tx.commit().map_err(|_|"保存同步统计失败")?;Ok(count)
 }
@@ -344,23 +382,33 @@ pub fn import_activity_data(dir:&Path,data:&Value)->Result<usize,String>{
 }
 #[derive(Clone,Serialize,Deserialize)]
 pub struct OptionsDevice { pub id:String, pub name:String }
-fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
+fn sync(dir:&Path,db:&mut Connection,o:&Options) -> Result<(),String> {
     if o.sync_dir.is_empty(){return Ok(())}
     if uuid::Uuid::parse_str(&o.device_id).is_err(){return Err("本机设备标识无效".into())}
     let root=PathBuf::from(&o.sync_dir).join("quota-activity-v1");let own=root.join(&o.device_id);
     fs::create_dir_all(&own).map_err(|_| "同步目录不可用，统计已保留在本机")?;
     sync_storage::announce(&own,&o.device_id)?;
     let legacy=sync_storage::readers_for(o)?.iter().any(|r|r.compressed!=Some(true));
+    let names=known_device_names(db,o)?;
+    let names_fingerprint=hash(&serde_json::to_string(&names).map_err(|_|"编码设备名称失败")?);
+    let names_state=dir.join("activity-device-names.sha256");
+    let names_changed=fs::read_to_string(&names_state).ok().as_deref()!=Some(names_fingerprint.as_str());
+    if names_changed {
+        // Republish existing immutable packets once when names arrive or change;
+        // event identities are unchanged, so peers update labels without counting again.
+        db.execute("INSERT OR IGNORE INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"同步设备名称失败")?;
+    }
     loop {
         let pending:Vec<(i64,String)>=db.prepare("SELECT seq,event_id FROM outbox ORDER BY seq LIMIT 1000").map_err(|_| "读取同步队列失败")?.query_map([],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|_| "读取同步队列失败")?.collect::<Result<_,_>>().map_err(|_| "读取同步队列失败")?;
         if pending.is_empty(){break}let mut events=Vec::new();
         for (_,id) in &pending {let text:String=db.query_row("SELECT body FROM metrics WHERE id=?1",[id],|r|r.get(0)).map_err(|_| "读取同步统计失败")?;events.push(serde_json::from_str(&text).map_err(|_| "同步统计格式无效")?);}
         let max=pending.last().expect("nonempty").0;
-        let packet=Packet {schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},events};
+        let packet=Packet {schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(&names,&events),events};
         let fingerprint=hash(&serde_json::to_string(&packet).map_err(|_| "编码同步统计失败")?);
         sync_storage::write_packet(&own.join(format!("{max:020}-{fingerprint}.json.zst")), &packet)?;
         db.execute("DELETE FROM outbox WHERE seq<=?1",[max]).map_err(|_| "保存同步进度失败")?;
     }
+    if names_changed {crate::storage::write_atomic(&names_state,&names_fingerprint)?;}
     let dirs=fs::read_dir(&root).map_err(|_| "同步目录暂时无法读取")?;
     let mut errors=if legacy{sync_storage::restore_legacy(&own,&o.device_id)}else{Vec::new()};
     for device in dirs {let device=match device{Ok(d)=>d,Err(_)=>{errors.push("部分同步设备目录暂不可用".to_string());continue}};
@@ -374,6 +422,7 @@ fn sync(db:&mut Connection,o:&Options) -> Result<(),String> {
         if previous.as_deref()==Some(fingerprint.as_str()){continue}
         let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;
         tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![p.device.id,label(&p.device.name)]).map_err(|_| "保存设备信息失败")?;
+        import_device_names(&tx,&p.devices)?;
         for e in p.events {merge_metric(&tx,&e,false)?;}
         tx.execute("INSERT INTO receipts(path,fingerprint) VALUES(?1,?2) ON CONFLICT(path) DO UPDATE SET fingerprint=excluded.fingerprint",params![receipt,fingerprint]).map_err(|_| "保存同步进度失败")?;tx.commit().map_err(|_| "保存同步统计失败")?;
     }}
@@ -450,7 +499,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
         if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
-    let devices=db.prepare("SELECT id,name FROM devices ORDER BY name").map_err(|_| "读取设备失败")?.query_map([],|r|Ok(OptionsDevice{id:r.get(0)?,name:r.get(1)?})).map_err(|_| "读取设备失败")?.collect::<Result<_,_>>().map_err(|_| "读取设备失败")?;
+    let devices=known_device_names(&db,&o)?;
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
     sync_errors.extend(crate::usage_sync::errors(dir));
@@ -476,7 +525,7 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     count+=ssh::collect_devices(&mut db,&mut devices,&mut errors);
     o.codex_ssh_devices=Some(devices);save_options(dir,&o)?;
     let sync_errors:Vec<String>=if sync_enabled {
-        sync(&mut db,&o).err().into_iter().collect()
+        sync(dir,&mut db,&o).err().into_iter().collect()
     } else {
         fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice::<Value>(&b).ok())
             .and_then(|v|v.get("syncErrors").cloned()).and_then(|v|serde_json::from_value(v).ok()).unwrap_or_default()
@@ -500,7 +549,7 @@ pub async fn get_sync_overview(app:AppHandle)->Result<Value,String>{
 pub async fn sync_activity_now(app:AppHandle)->Result<(),String>{
     tauri::async_runtime::spawn_blocking(move||{
         let state=app.state::<AppState>();let _guard=state.activity_lock.lock().map_err(|_|"同步忙碌")?;let dir=state.store.dir();
-        let result=database(dir).and_then(|mut db|sync(&mut db,&options(dir)));
+        let result=database(dir).and_then(|mut db|sync(dir,&mut db,&options(dir)));
         let previous:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
         crate::storage::write_atomic(&dir.join("activity-status.json"),&serde_json::json!({"at":now(),"errors":previous.get("errors").cloned().unwrap_or(serde_json::json!([])),"syncErrors":result.as_ref().err().into_iter().collect::<Vec<_>>()} ).to_string())?;
         let _=app.emit("activity-updated",());result
@@ -557,7 +606,7 @@ pub fn spawn(app:AppHandle){tauri::async_runtime::spawn(async move{
                 let state=handle.state::<AppState>();let Ok(_guard)=state.activity_lock.try_lock() else{return false};
                 if should_collect { let _=collect_cycle(state.store.dir(),should_sync); }
                 else if should_sync {
-                    let result = database(state.store.dir()).and_then(|mut db| sync(&mut db,&options(state.store.dir())));
+                    let result = database(state.store.dir()).and_then(|mut db| sync(state.store.dir(),&mut db,&options(state.store.dir())));
                     let previous:Value=fs::read(state.store.dir().join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
                     let _=crate::storage::write_atomic(&state.store.dir().join("activity-status.json"),&serde_json::json!({"at":now(),"errors":previous.get("errors").cloned().unwrap_or(serde_json::json!([])),"syncErrors":result.err().into_iter().collect::<Vec<_>>()}).to_string());
                 }

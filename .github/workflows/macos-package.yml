@@ -1,0 +1,62 @@
+name: macOS package
+
+on:
+  push:
+    branches: [codex/feat/token-activity-ui-1.0.2400]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Prepare Rust
+        run: rustup update stable --no-self-update && rustup default stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: macos-arm64-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Check frontend and logic
+        run: |
+          npm ci
+          npm run typecheck
+          node scripts/verify-logic.cjs
+          node scripts/verify-ui-render.cjs
+      - name: Build App and DMG with ad-hoc signature
+        run: |
+          test "$(uname -m)" = arm64
+          npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
+      - name: Verify bundle and run isolated startup check
+        shell: bash
+        run: |
+          set -euo pipefail
+          app=src-tauri/target/release/bundle/macos/Quota.app
+          codesign --verify --deep --strict --verbose=2 "$app"
+          file "$app/Contents/MacOS/quota" | tee binary-architecture.txt
+          grep -q arm64 binary-architecture.txt
+          expected=$(node -p 'require("./package.json").version')
+          actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")
+          test "$actual" = "$expected"
+          test -z "$(find "$app" -iname WebView2Loader.dll -print)"
+          for dmg in src-tauri/target/release/bundle/dmg/*.dmg; do hdiutil verify "$dmg"; done
+          python3 scripts/check-macos-startup.py "$app/Contents/MacOS/quota"
+          mkdir release-assets
+          cp src-tauri/target/release/bundle/dmg/*.dmg release-assets/
+          (cd release-assets && shasum -a 256 *.dmg > SHA256SUMS-macos.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quota-macOS-AppleSilicon
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 30

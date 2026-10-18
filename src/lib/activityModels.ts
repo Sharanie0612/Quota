@@ -31,7 +31,7 @@ export function activityModelIdentity(key: string) {
 export function activityModelChoices(rows: ActivityGroup[], search: string) {
   const words = search.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const text = (key: string) => `${activityModelName(key)} ${activityModelIdentity(key).vendor} ${activityChannelName(activityModelChannel(key))}`.toLowerCase();
-  return rows.filter(row => row.key !== "" && !activityModelChannel(row.key) && words.every(word => text(row.key).includes(word)))
+  return rows.filter(row => row.key !== "" && words.every(word => text(row.key).includes(word)))
     .sort((a, b) => activityModelIdentity(a.key).vendor.localeCompare(activityModelIdentity(b.key).vendor, "zh-CN") || b.tokens.total - a.tokens.total || a.key.localeCompare(b.key));
 }
 

@@ -12,6 +12,10 @@
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
   const accountCase = new URLSearchParams(location.search).get("accountCase");
+  const demoSshDevices = new URLSearchParams(location.search).get("sshCase") === "multi" ? [
+    {deviceId:"22222222-2222-5222-8222-222222222222",host:"ubuntu-vm",aliases:["ubuntu-vm","vm-alias"],home:"/home/work/.codex",name:"ubuntu-work",included:true},
+    {deviceId:"11111111-1111-5111-8111-111111111111",host:"devbox",aliases:["devbox"],home:"/home/dev/.codex",name:"ubuntu-dev",included:true}
+  ] : [];
   let activityReads = 0;
   let modelReads = 0;
   // 仅在预览中强制应用现有深色 CSS；不修改系统设置，也不参与产品构建。
@@ -780,13 +784,14 @@
           if (activityCase === "error" && read === 1) throw new Error("演示：统计文件暂时不可读，请重试。");
           const tokens={input:2400000,cached:1700000,cacheWrite:50000,output:320000,reasoning:90000,total:2720000};
           const sourceFactor = ({codex:.5,zcode:.25,harness:.15,trae:.1})[args.source] ?? 1;
-          const deviceFactor = args.device === "demo-a" ? .6 : args.device === "demo-b" ? .4 : 1;
+          const deviceWeights = demoSshDevices.length ? {"demo-a":.35,"demo-b":.25,"22222222-2222-5222-8222-222222222222":.25,"11111111-1111-5111-8111-111111111111":.15} : {"demo-a":.6,"demo-b":.4};
+          const deviceFactor = deviceWeights[args.device] ?? 1;
           const factor = sourceFactor * deviceFactor * (activityCase === "empty" ? 0 : 1);
           const row=(key,f=1)=>({key,tokens:Object.fromEntries(Object.entries(tokens).map(([k,v])=>[k,Math.round(v*f*factor)])),calls:Math.round(326*f*factor),sessions:Math.round(38*f*factor)});
-          const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source && args.source!=="without-trae" ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("kimi-k2.6",.1)];
+          const availableModels = args.source === "trae" ? [row("DeepSeek-V4-Pro-Official\u001ftrae",.5),row("glm-5.3\u001ftrae",.3),row("deepseek-v4-pro\u001fapi",.2)] : args.source && args.source!=="without-trae" ? [row(({codex:"gpt-6.1-sol",zcode:"GLM-5.3",harness:"deepseek-flash"})[args.source])] : [row("gpt-6.1-sol",.5),row("GLM-5.3",.25),row("deepseek-flash",.15),row("DeepSeek-V4-Pro-Official\u001ftrae",.05),row("glm-5.3\u001ftrae",.03),row("deepseek-v4-pro\u001fapi",.02)];
           const vendorOf={"gpt-6.1-sol":"vendor:custom","GLM-5.3":"vendor:zhipu","deepseek-flash":"vendor:deepseek","kimi-k2.6":"vendor:moonshot"};
           const models = args.model ? availableModels.filter(model => (args.model === "vendor:trae" && model.key.includes("\u001f")) || model.key === args.model || vendorOf[model.key] === args.model || (args.model === "channel:api" && model.key.endsWith("\u001fapi")) || (args.model === "channel:trae" && model.key.endsWith("\u001ftrae"))) : availableModels;
-          const selectedFactor = !args.model ? 1 : models.length ? (args.source && args.source!=="without-trae" ? 1 : models.reduce((sum,row)=>sum+({"gpt-6.1-sol":.5,"GLM-5.3":.25,"deepseek-flash":.15,"kimi-k2.6":.1})[row.key],0)) : 0;
+          const selectedFactor = !args.model ? 1 : tokens.total*factor ? models.reduce((sum,row)=>sum+row.tokens.total,0)/(tokens.total*factor) : 0;
           const selectedRow=(key,f=1)=>row(key,f*selectedFactor);
           let totals=selectedRow("全部");
           const count=args.days===7?7:30;
@@ -802,7 +807,7 @@
           const rangeFactor = totals.tokens.total ? selectedDays.reduce((sum,row)=>sum+row.tokens.total,0)/totals.tokens.total : 0;
           if(args.from || args.to) { totals = selectedRow("全部",rangeFactor); for(const key of Object.keys(tokens))totals.tokens[key]=selectedDays.reduce((sum,row)=>sum+row.tokens[key],0); }
           document.documentElement.dataset.activityRead = String(read);
-          return {options:window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,codexHome:"C:\\Users\\demo\\.codex",zcodeHome:"C:\\Users\\demo\\.zcode",harnessHome:"",traeHome:"",traeEnabled:false,collectIntervalSeconds:30,syncAccounts:true,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""},devices:[{id:"demo-a",name:"工作电脑"},{id:"demo-b",name:"笔记本"}],totals,models:(args.from||args.to)?models.map(row=>({...row,tokens:Object.fromEntries(Object.entries(row.tokens).map(([k,v])=>[k,Math.round(v*rangeFactor)]))})):models,availableModels,tools:[selectedRow("exec_command",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("read",.4*((args.from||args.to)?rangeFactor:1))],agents:[selectedRow("主 Agent",.7*((args.from||args.to)?rangeFactor:1)),selectedRow("build",.3*((args.from||args.to)?rangeFactor:1))],byDevice:args.device?[selectedRow(args.device,(args.from||args.to)?rangeFactor:1)]:[selectedRow("demo-a",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("demo-b",.4*((args.from||args.to)?rangeFactor:1))],sources:args.source?[selectedRow(args.source,(args.from||args.to)?rangeFactor:1)]:[selectedRow("codex",.5*((args.from||args.to)?rangeFactor:1)),selectedRow("zcode",.25*((args.from||args.to)?rangeFactor:1)),selectedRow("harness",.15*((args.from||args.to)?rangeFactor:1)),selectedRow("trae",.1*((args.from||args.to)?rangeFactor:1))],channels:(!args.source||args.source==="trae")?[selectedRow("trae",.8*((args.from||args.to)?rangeFactor:1)*(args.source?1:.1)),selectedRow("api",.2*((args.from||args.to)?rangeFactor:1)*(args.source?1:.1))]:[],hourly:selectedDays.flatMap(day=>{const weights=[0,0,0,0,0,0,1,2,4,6,9,7,5,3,4,8,12,11,8,5,3,2,1,1];const sum=weights.reduce((a,b)=>a+b,0);let previous=0;return weights.map((weight,hour)=>{const next=previous+weight;const result={...day,key:day.key+"T"+String(hour).padStart(2,"0"),tokens:Object.fromEntries(Object.entries(day.tokens).map(([k,v])=>[k,Math.floor(v*next/sum)-Math.floor(v*previous/sum)]))};previous=next;return result;});}),daily:selectedDays,updatedAt:Date.now(),syncErrors:new URLSearchParams(location.search).has("usageSyncConflict")?["我的使用：custom USD 的账期 2026-10-01–2026-10-31 与 2026-10-15–2026-11-14 重叠；请在原设备调整或删除其中一条后同步，当前账期已保留"]:[],errors:activityCase==="partial"?["Harness 会话 v5 尚未适配（支持 v0–v4），未回退到旧会话；请更新 Quota"]:[]};
+          return {options:window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,codexHome:"C:\\Users\\demo\\.codex",zcodeHome:"C:\\Users\\demo\\.zcode",harnessHome:"",traeHome:"",traeEnabled:false,collectIntervalSeconds:30,syncAccounts:true,codexSshDevices:demoSshDevices,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""},devices:[{id:"demo-a",name:"工作电脑"},{id:"demo-b",name:"笔记本"},...demoSshDevices.map(d=>({id:d.deviceId,name:"远程采集设备"}))],totals,models:(args.from||args.to)?models.map(row=>({...row,tokens:Object.fromEntries(Object.entries(row.tokens).map(([k,v])=>[k,Math.round(v*rangeFactor)]))})):models,availableModels,tools:[selectedRow("exec_command",.6*((args.from||args.to)?rangeFactor:1)),selectedRow("read",.4*((args.from||args.to)?rangeFactor:1))],agents:[selectedRow("主 Agent",.7*((args.from||args.to)?rangeFactor:1)),selectedRow("build",.3*((args.from||args.to)?rangeFactor:1))],byDevice:args.device?[selectedRow(args.device,(args.from||args.to)?rangeFactor:1)]:Object.entries(deviceWeights).map(([id,weight])=>selectedRow(id,weight*((args.from||args.to)?rangeFactor:1))),sources:args.source?[selectedRow(args.source,(args.from||args.to)?rangeFactor:1)]:[selectedRow("codex",.5*((args.from||args.to)?rangeFactor:1)),selectedRow("zcode",.25*((args.from||args.to)?rangeFactor:1)),selectedRow("harness",.15*((args.from||args.to)?rangeFactor:1)),selectedRow("trae",.1*((args.from||args.to)?rangeFactor:1))],channels:["trae","api"].filter(channel=>models.some(m=>m.key.endsWith("\u001f"+channel))).map(channel=>{const members=models.filter(m=>m.key.endsWith("\u001f"+channel));return {key:channel,tokens:Object.fromEntries(Object.keys(tokens).map(key=>[key,Math.round(members.reduce((sum,m)=>sum+m.tokens[key],0)*((args.from||args.to)?rangeFactor:1))])),sessions:members.reduce((sum,m)=>sum+m.sessions,0),calls:members.reduce((sum,m)=>sum+m.calls,0)};}),hourly:selectedDays.flatMap(day=>{const weights=[0,0,0,0,0,0,1,2,4,6,9,7,5,3,4,8,12,11,8,5,3,2,1,1];const sum=weights.reduce((a,b)=>a+b,0);let previous=0;return weights.map((weight,hour)=>{const next=previous+weight;const result={...day,key:day.key+"T"+String(hour).padStart(2,"0"),tokens:Object.fromEntries(Object.entries(day.tokens).map(([k,v])=>[k,Math.floor(v*next/sum)-Math.floor(v*previous/sum)]))};previous=next;return result;});}),daily:selectedDays,updatedAt:Date.now(),syncErrors:new URLSearchParams(location.search).has("usageSyncConflict")?["我的使用：custom USD 的账期 2026-10-01–2026-10-31 与 2026-10-15–2026-11-14 重叠；请在原设备调整或删除其中一条后同步，当前账期已保留"]:[],errors:activityCase==="partial"?["Harness 会话 v5 尚未适配（支持 v0–v4），未回退到旧会话；请更新 Quota"]:[]};
         }
         case "refresh_activity":
           if (activityCase === "save-error") throw new Error("演示：共享目录暂时离线。");
@@ -818,7 +823,7 @@
           if(test==="slow")await new Promise(resolve=>setTimeout(resolve,1200));
           return args.targets.map(t=>({...t,deviceId:t.host==="offline"?"":t.host==="devbox"?"11111111-1111-5111-8111-111111111111":"22222222-2222-5222-8222-222222222222",name:t.host==="offline"?"":t.host==="devbox"?"ubuntu-dev":"ubuntu-work",error:t.host==="offline"?"SSH 连接失败：设备离线，请检查连接后重新识别。":null}));
         }
-        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""};
+        case "get_activity_options": return window.demoActivityOptions||{deviceId:"demo-a",deviceName:"工作电脑",autoCollect:true,collectIntervalSeconds:30,syncAccounts:true,codexHome:"/demo/.codex",zcodeHome:"/demo/.zcode",harnessHome:"",traeHome:"",traeEnabled:false,codexSshDevices:demoSshDevices,syncDir:new URLSearchParams(location.search).has("storageCase") ? "D:\\demo\\QuotaSync" : ""};
         case "get_account_sync_candidates": return structuredClone(syncCandidates);
         case "resolve_account_sync": {
           const source = syncCandidates.find(row => row.id === args.sourceId);
@@ -947,7 +952,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2300",
+            version: "1.0.2500",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

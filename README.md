@@ -1,49 +1,53 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/readme/hero-dark.svg">
-    <img src="assets/readme/hero-light.svg" alt="Quota — 本地优先的 AI 账户余额、订阅额度与用量看板">
-  </picture>
-</p>
+# Quota
 
-Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅额度、模型价格和 Token 活动放进同一个窗口，减少在多个服务商控制台之间切换。
+把 AI 账户余额、订阅额度、实际支出和 Token 活动放进同一个桌面窗口。
 
-**Windows 10+ · macOS Apple Silicon 构建支持 · Tauri 2 + Rust + React · 浅色 / 深色模式**
+本地优先 · Windows / macOS · 浅色与深色模式 · Tauri 2 + Rust + React
 
-[功能](#功能) · [支持账户](#支持账户) · [开始使用](#开始使用) · [界面预览](#界面预览) · [数据与安全](#数据与安全) · [构建与开发](#构建与开发) · [文档](#文档)
+[下载安装](#下载安装) · [开始使用](#开始使用) · [功能](#功能) · [界面预览](#界面预览) · [开发](#开发)
+
+## 下载安装
+
+当前源码版本：**1.0.2500**。安装包、校验值和发布状态以 [GitHub Releases](https://github.com/Sharanie0612/Quota/releases) 为准。
+
+| 平台 | 安装方式 |
+| --- | --- |
+| Windows x64 | 下载 `Quota_版本号_x64-setup.exe`，退出旧版后运行安装器 |
+| macOS Apple Silicon | 下载 `Quota_版本号_aarch64.dmg`，将 Quota 拖入「应用程序」 |
+
+macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；首次打开可能需要在「系统设置 → 隐私与安全性」中允许。Intel / Universal 包暂无验收记录。iPhone / iPad 暂不支持。
+
+更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
+
+## 开始使用
+
+1. **添加账户**：在「账户总览」选择平台，填入 API Key 或连接官方登录，保存即可。账户名称可选，其他参数收进「高级设置」。
+2. **查看活动**：在「Token 活动」点击「更新用量」，读取本机已有记录。SSH 设备、Trae 和自定义日志目录在「采集设置」中配置。
+3. **按需同步**：在「设置」选择共享目录，各设备使用同一个云盘或 NAS 文件夹；登录信息在每台设备单独配置。
+
+充值入口只打开官方页面。统计基于实际保留的记录，不能替代厂商账单或订阅额度。
 
 ## 功能
 
-| 页面 | 能做什么 |
+| 页面 | 主要用途 |
 | --- | --- |
-| **账户总览** | 查看余额、订阅余量、刷新状态和低余额提醒；累计充值、累计消费分别展示 |
-| **模型库** | 查看模型资料、官方价格与来源，隐藏或恢复型号 |
-| **AI 模型天梯** | 图表、列表、六维能力图；自适应价格与评分区间，筛选模型，点击查看能力、价格及推出日期 |
-| **Token 活动** | 汇总 Codex、智谱 ZCode 和 DeepSeek Harness 用量；按设备、来源、模型或厂商筛选，查看小时曲线与缓存命中情况 |
-| **模型使用价格** | 按实际 Token 构成计算费用与综合单价；精确匹配已核实资料，支持本机费率与按统计范围保存的实付账单，估算与实付分别标注 |
-| **设置** | 调整刷新、采集频率、通知和共享目录同步，导出备份并选择导入内容 |
-
-### 模型天梯
-
-- 价格与性能图按当前模型自动选择坐标区间，搜索、分类、价格类型和币种变化后重新适配；所有当前可比较型号保留。
-- 能力图最多对比三个模型，展示综合、编程、数学、科学、推理、智能体六个维度；缺失评分留空。
-- 点击模型查看能力卡片、标准输入 / 缓存命中 / 输出价格和推出日期。没有可核实资料时显示未知。
-- 账户、模型库和天梯共用本地品牌资源，不加载远程图标。
-
-排名和能力评分来自 AITier；价格仅接受厂商官方标准档，保留来源、单位、条件和核实时间。十家厂商的确定性价格表可自动核实，结构或型号不明确时不猜数字。模型库中的启发式候选仍需人工采用。详见 [模型资料库规则](docs/model-catalog.md)。
+| **账户总览** | 余额、订阅余量、查询状态与低余额提醒；累计充值和消费分别记录 |
+| **我的使用** | 按自然月或自定义日期看用量、订阅支出和实际单价；账期独立管理，美元按固定月度参考汇率折算 |
+| **模型库** | 查看模型资料、官方价格与核实来源，隐藏或恢复型号 |
+| **AI 模型天梯** | 对比价格与能力，按条件筛选，查看标准价、缓存价及价格适用条件 |
+| **Token 活动** | 汇总 Codex、智谱 ZCode、DeepSeek Harness 和可选的 Trae 活动；查看趋势、缓存、模型及设备明细 |
+| **设置** | 管理采集频率、通知、用量悬浮窗、备份、迁移和跨设备同步 |
 
 ### Token 活动
 
-- 默认显示全部历史，可切换 7 天、30 天、90 天、1 年。
-- 概览保持五项等宽，支持完整数字与万 / 亿简写；完整数字不换行，空间不足时自动调整字号。
-- **总览**查看每日汇总；**按日**直接查看所选日期的 24 小时变化；按周、按月展示具体周次和年月。
-- 模型筛选既支持单一型号，也支持同一厂商的全部模型汇总。
-- 输入指标可切换缓存命中与未命中；缓存表按模型颜色区分，展示命中率及对应 Token 数。
+- 时间、更新和采集设置集中在顶部；设备、来源、模型 / 厂商筛选按需展开。筛选只限定当前统计视图，不改变采集配置。
+- Trae 分开显示「Trae 提供」和「API 接入 Trae」，各通道可查看具体模型、输入、缓存命中、输出、总 Token 和会话数。历史记录无法识别时保留未知。
+- SSH 设备逐台显示名称、连接别名和独立用量。同一设备的多个别名按设备身份去重；新设备默认不选，取消勾选保留历史，重新勾选后恢复统计。
+- SSH 使用已有连接配置，在远端只读提取指标，无需在远程设备安装 Quota。连接失败和补采进度可见。
 
-统计只使用保留的本地指标事件。缓存和推理属于输入 / 输出子项，不重复加入总 Token；统计不等于厂商账单或订阅剩余额度。详见 [活动统计与同步](docs/activity-stats.md)。
+缓存和推理是输入 / 输出的子项，不重复加入总量。「我的使用」排除 Trae，Token 活动保留其原始指标。详见 [统计口径与同步](docs/activity-stats.md)、[1.0.2500 更新说明](docs/release-1.0.2500.md)。
 
-## 支持账户
-
-添加账户当前展示以下六种类型，账户适配范围与模型天梯的厂商范围分别维护。
+### 支持的账户
 
 | 账户类型 | 查看内容 | 连接方式 |
 | --- | --- | --- |
@@ -54,145 +58,69 @@ Quota 是一个本地优先的 AI 用量桌面看板。将账户余额、订阅�
 | 小米 MiMo 订阅 / Token Plan | 套餐余量、本月用量 | 官方登录，可复用按量账户连接 |
 | ChatGPT 订阅 | Codex 短期与每周额度 | 显式连接本机 Codex 登录 |
 
-**ChatGPT 展示的是订阅内 Codex 额度，不是网页聊天额度。** Quota 不复制或刷新 Codex token。接口能力取决于服务商与账户权限；查询失败时可重试、打开官网或改用手动余额。
+ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex token。查询失败时可重试、打开官网或改用手动余额；未提供的累计充值 / 消费保持未知，可自行补全。账户支持范围与天梯厂商范围分别维护。
 
-官方未提供的累计充值、累计消费保持未知，可在高级设置补全，不根据余额反算。余额趋势只反映已记录数据，耗尽时间为估算。其他供应商定义部分保留在代码中，当前不展示在添加列表。详见 [供应商能力](docs/providers.md)。
-
-## 开始使用
-
-1. 在「账户总览」添加账户：选择平台 → 填入 API Key 或连接登录 → 保存。账户名称可选，其他参数收进「高级设置」。
-2. 在「Token 活动」点击「立即同步」，读取本机已有的活动记录；DeepSeek Harness 需配置持久化日志目录。
-3. 按需开启自动采集、低余额提醒、备份或共享目录同步。单击系统托盘可打开主窗口。
-
-充值与订阅入口只打开官方页面，Quota 不经手支付。
-
-### 当前版本与安装包
-
-当前源码版本为 **1.0.2300**。在「Token 活动 → 采集设置 → SSH 设备」识别连接，按设备勾选需要纳入统计的对象，也可以全部不选。同一设备的多个别名合并显示，新设备默认不勾选。取消勾选会停止采集并让历史退出各处汇总，记录保留，重新勾选即可恢复。见 [1.0.2300 交付说明](docs/release-1.0.2300.md)。
-
-1.0.2100 中，主机 Quota 可通过已有 SSH 主机别名采集 Ubuntu 上的 Codex Token 历史与新增用量，无需在 Ubuntu 安装 Quota；在「Token 活动 → 采集设置」配置。采集失败或补采进度会持续显示，说明与验收见 [1.0.2100 交付说明](docs/release-1.0.2100.md)。
-
-此前 1.0.1900 中，「我的使用」的订阅账期、支出、累计消费观察和固定月度参考汇率加入现有云盘同步；Token 用量继续复用 Token 活动资料库，支持删除传播、离线编辑和重叠账期提示。关闭自动采集后仍会自动同步。Harness 新增 v0/v1 旧会话兼容，并处理会话格式升级后的重复计数；相关设备需一起更新。验收与限制见 [1.0.1900 交付说明](docs/release-1.0.1900.md)。
-
-同一待发布版本另补充[一体化窗口与小米会话续接](docs/window-session-1.0.1900.md)：取消顶部横条、保留现有风格；通过官网 SSO 恢复过期的短期登录，并保留轮换 Cookie，减少重复扫码。
-
-最新[产品界面优化](docs/product-polish-1.0.1900.md)进一步统一圆角、留白和浅深色层次，精简重复说明，并修复筛选恢复、更新失败及误操作问题。
-
-新增[贴边用量悬浮窗与启动动效](docs/usage-widget-1.0.1900.md)：鼠标移入查看今日 Token，点击切换累计用量；设置可调整左右侧和位置。
-
-安装包不存入 Git 仓库，本地构建不代表公开发布。公开下载以 [Releases](https://github.com/Sharanie0612/Quota/releases) 中实际提供的文件为准，也可按下文从源码构建。较早的 Apple Silicon 本地 DMG 交付记录见 [1.0.1000 说明](docs/release-1.0.1000.md)；未做 Developer ID 签名或公证，不能将旧包验收结果视为当前版本的验证。
+天梯排名和能力评分来自 AITier；价格使用厂商官方标准档，保留来源、条件和核实时间。无法核实则标记未知，不猜数字。详见 [供应商能力](docs/providers.md) 和 [模型资料库规则](docs/model-catalog.md)。
 
 ## 界面预览
 
-以下截图由 1.0.1301 前端在浏览器中渲染，使用合成账户、用量与汇率数据，不代表真实账户查询结果。
+以下为 1.0.2500 前端的浏览器预览，使用演示数据，不代表真实账户、账单或 SSH 查询结果。
 
-### 账户总览
+![Trae 提供与 API 接入按模型分别展示](assets/readme/trae-details-2500.png)
 
-![账户余额与订阅额度](assets/readme/overview-1301.jpg)
+<details>
+<summary>查看 SSH 设备明细</summary>
 
-### Token 小时趋势
+![各 SSH 设备的名称、连接别名和独立用量](assets/readme/ssh-devices-2500.png)
 
-![按日查看每小时 Token 变化](assets/readme/activity-1301.jpg)
+</details>
 
-### 自适应模型天梯
+## 数据与同步
 
-![筛选 GLM 后自动适配价格与评分区间](assets/readme/ladder-1301.jpg)
+配置与统计保存在本机：Windows 为 `%APPDATA%\Quota\`，macOS 为 `~/Library/Application Support/Quota/`。
 
-## 备份与跨设备同步
+- API Key、AccessKey、管理密钥与小米 Cookie 使用系统凭据库。**自定义接口的请求头和请求体会写入 `config.json`，不要在这些字段填写密钥。**
+- 活动采集保存指标，不保存对话正文、工具参数或凭据。SSH 连接信息和设备选择留在本机；同步只携带指标及必要的设备名称。
+- 普通备份省略登录信息；主动选择「包含登录信息」并设置密码后，可导出加密备份。Codex token 不在备份范围内。
+- 共享目录由用户选择，传输依赖已有云盘客户端或 NAS。同步不传登录凭据；Quota 不确认文件是否已上传云端。
 
-在「设置 → 备份与迁移」使用统一导出 / 导入入口。默认导出不含登录信息的 JSON；勾选「包含登录信息」并设置密码后生成加密备份。
+macOS 真实凭据读写和跨设备云端传输仍需实机验收。完整边界见 [安全规则](docs/security.md)、[数据迁移](docs/data-migration.md)、[账户同步](docs/account-sync.md)。
 
-| 格式 | 内容与用途 |
-| --- | --- |
-| **普通 JSON** | 账户资料、设置、模型资料、隐藏列表、余额历史、Token 指标；省略密钥、Cookie、备注、自定义请求、连接 URL 和本机路径 |
-| **加密备份** | 另含完整账户配置和凭据库中的 API Key、AccessKey、管理密钥、小米 Cookie；不包含 Codex token，恢复需要原密码 |
+## 开发
 
-导入前可预览并逐账户、逐类别选择；按账户 ID 合并，未选内容保留，历史和活动去重。新设备可能需要重新连接小米或本机 Codex，并重新设置日志路径与共享目录。加密备份采用 AES-256-GCM 和 PBKDF2-HMAC-SHA256，详细范围与兼容规则见 [数据迁移](docs/data-migration.md)。
+准备 Node.js、Rust stable 和对应平台的 Tauri 构建依赖。
 
-跨设备同步需在各设备选择同一个 iCloud Drive、OneDrive 或 NAS 文件夹。可交换 Token 指标及账户展示资料，不包含登录凭据、连接 URL、自定义请求、备注或原始响应；新设备需独立配置登录信息才能主动查询。目录传输由已有云盘客户端或 NAS 完成，Quota 不猜测路径，也不确认文件已上传云端。详见 [账户共享同步](docs/account-sync.md)。
-
-自动采集间隔可选 5 秒至 15 分钟，默认 30 秒，可关闭；仅在应用运行时执行。共享目录交换最低间隔为 5 分钟。Token 事件按独立设备 UUID 去重，账户快照不累加；删除账户仅影响本机。
-
-## 数据与安全
-
-- 配置和统计保存在本机：Windows 为 `%APPDATA%\Quota\`，macOS 为 `~/Library/Application Support/Quota/`。
-- API Key、AccessKey、管理密钥、小米 Cookie 使用系统凭据库的 `Quota` 服务：Windows 凭据管理器 / macOS Keychain。用户主动导出的加密备份可包含凭据；macOS 真实凭据读写尚未完成实机验收。
-- **自定义接口请求头与请求体会写入 `config.json`，不受凭据管理器保护。不要在这些字段填写密钥。**
-- 活动采集保存指标，不保存对话正文、工具参数或凭据。查询余额、获取排名和核实价格会访问对应服务；共享目录同步需主动开启。
-- 从旧版 AgentPrice 升级时，仅复制新位置缺失的数据及所需凭据，旧数据保留。
-
-详见 [安全规则](docs/security.md)。
-
-## 构建与开发
-
-需 Node.js、Rust stable 及对应平台的 Tauri 构建依赖。
-
-```powershell
+```bash
 git clone https://github.com/Sharanie0612/Quota.git
-Set-Location Quota
+cd Quota
 npm ci
 npm run tauri dev
 ```
 
-未合入默认分支的功能需先切换到相应任务分支。前端使用 Vite，Tauri 开发端口为 1420。
+开发端口为 `1420`。尚未合并的功能请切换到对应 PR 分支。
 
-### Windows
+| 平台 | 构建入口 | 说明 |
+| --- | --- | --- |
+| Windows | `npm run package:windows` 或双击 `build-installer.cmd` | GNU 工具链；产出 NSIS 安装包，需携带 WebView2Loader.dll |
+| macOS | [macOS 构建指南](docs/build-macos.md) | Apple Silicon；产出 App / DMG，排除 Windows DLL |
 
-准备好 Node.js、rustup 的 Windows GNU 工具链及 WebView2 后，双击根目录的 **build-installer.cmd**，或运行一条命令：
-
-```powershell
-npm run package:windows
-```
-
-入口自动同步锁定依赖、配置 GNU 路径、执行检查并保留构建缓存。打包前退出构建产物位置正在运行的 Quota。产物：`src-tauri/target/release/quota.exe`（便携版）和 `src-tauri/target/release/bundle/nsis/`（安装包）。`WebView2Loader.dll` 必须随包携带；NSIS 工具链首次下载可能需要代理。详见 [Windows 构建](docs/build-windows.md)。
-
-### macOS（Apple Silicon）
-
-需 Xcode Command Line Tools。默认配置用于 Windows NSIS，Mac 构建需排除 Windows DLL 并指定 App / DMG：
+Windows 详细环境见 [构建指南](docs/build-windows.md)。macOS 构建工作流的产物通过 GitHub Actions 保存；发布页中的文件才是公开安装包。
 
 ```bash
-npm ci
-npm run tauri -- build --bundles app,dmg --config '{"bundle":{"resources":[],"macOS":{"signingIdentity":"-","hardenedRuntime":false}}}'
-```
-
-上述命令使用 ad-hoc 临时签名，不代表 Developer ID 签名或公证。App 位于 `src-tauri/target/release/bundle/macos/`，DMG 位于 `src-tauri/target/release/bundle/dmg/`；Intel / Universal 包暂无验收记录。详见 [macOS 构建与安装](docs/build-macos.md)。
-
-### 验证
-
-```powershell
 npm run typecheck
 npm run build
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml
 node scripts/verify-logic.cjs
-node scripts/verify-ladder-plot.cjs
-node scripts/verify-activity-charts.cjs
 node scripts/verify-ui-render.cjs
 cargo run --release --manifest-path src-tauri/Cargo.toml --example activity_checks
 ```
 
-本机 Windows GNU 环境的 `cargo test` 有 WinRT DLL 加载限制，使用 Rust example 与纯逻辑脚本验证。浏览器 UI 预览可运行 `node scripts/prepare-preview.cjs` 和 `node scripts/preview-server.cjs 4174`，随后访问 `http://127.0.0.1:4174/`；使用合成数据。
+本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
-纯文档修改不递增产品版本。版本展示号、任务分支与 PR 集成规则见 [AGENTS.md](AGENTS.md) 和 [Git 分支规范](docs/git-workflow.md)。
+## 文档与贡献
 
-## 文档
+[活动统计](docs/activity-stats.md) · [模型资料库](docs/model-catalog.md) · [架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [Git 流程](docs/git-workflow.md)
 
-| 文档 | 内容 |
-| --- | --- |
-| [自适应天梯区间](docs/ui-1301.md) | 最新坐标规则、验证及交付边界 |
-| [小时趋势与天梯布局](docs/ui-1300.md) | 小时入口、日期交互与图表留白 |
-| [Token 活动与同步](docs/activity-stats.md) | 统计口径、历史范围与去重协议 |
-| [模型资料库](docs/model-catalog.md) | 官方价格来源与核实纪律 |
-| [供应商能力](docs/providers.md) | 查询方式与接口限制 |
-| [账户同步](docs/account-sync.md) | 无凭据共享与快照合并规则 |
-| [数据迁移](docs/data-migration.md) | 导出范围、选择导入与迁移边界 |
-| [架构](docs/architecture.md) | 前端调用链、命令与 Rust 模块 |
-| [安全规则](docs/security.md) | 凭据存储、自定义接口与旧版兼容 |
-| [开发指南](docs/development.md) | 开发运行与专项验证 |
+提交请说明用户可见变化、验证结果与限制，不包含凭据、个人配置、真实账单或未经核实的价格。历史交付文档记录当时的验收范围。
 
-历史交付文档记录当时的行为与验收，不代表当前版本已验证或公开发布。
-
-## 贡献与许可
-
-提交前请阅读 [贡献指南](CONTRIBUTING.md)。PR 应说明用户可见变化、验证结果与兼容限制；不要提交凭据、个人配置、真实账单或未经官方核实的价格。
-
-项目尚未选择开源许可证。仓库公开可读不代表已授予修改或再分发许可；品牌资源的独立来源与许可见 [图标说明](src/assets/brands/README.md)。
+项目尚未选择开源许可证，公开可读不代表已授予修改或再分发许可。品牌资源见 [图标说明](src/assets/brands/README.md)。

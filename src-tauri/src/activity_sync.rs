@@ -42,12 +42,7 @@ pub(super) fn read_packet(path: &Path) -> Result<Packet, String> {
 pub(super) fn read_packet_with_hash(path: &Path) -> Result<(Packet, String), String> {
     let bytes = read_bytes(path)?;
     let packet: Packet = serde_json::from_slice(&bytes).map_err(|_| "同步文件格式无效")?;
-    if packet.schema != 1
-        || packet.events.len() > 1000
-        || uuid::Uuid::parse_str(&packet.device.id).is_err()
-        || packet.device.name.len() > 640
-        || packet.events.iter().any(|e| !e.valid())
-    {
+    if !packet.valid() {
         return Err("同步文件格式无效".into());
     }
     let fingerprint = super::hash(std::str::from_utf8(&bytes).map_err(|_| "同步文件编码无效")?);

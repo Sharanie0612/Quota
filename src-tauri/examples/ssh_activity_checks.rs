@@ -11,13 +11,28 @@ fn token(input:u64)->String {line("event_msg",json!({"type":"token_count","info"
 fn projection(python:&str,logs:&Path,db:&Connection,host:&str)->Vec<u8>{
     projection_mode(python,logs,db,host,"")
 }
+fn snapshot(root:&Path)->BTreeMap<String,Vec<u8>> {
+    fn scan(root:&Path,dir:&Path,files:&mut BTreeMap<String,Vec<u8>>) {
+        if !dir.exists(){return}
+        for entry in fs::read_dir(dir).unwrap() {
+            let entry=entry.unwrap();let path=entry.path();
+            let key=path.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+            if entry.file_type().unwrap().is_dir(){files.insert(format!("{key}/"),vec![]);scan(root,&path,files);}
+            else {files.insert(key,fs::read(path).unwrap());}
+        }
+    }
+    let mut files=BTreeMap::new();scan(root,root,&mut files);files
+}
 fn projection_mode(python:&str,logs:&Path,db:&Connection,host:&str,mode:&str)->Vec<u8>{
+    let before=snapshot(logs);
     let prefix=format!("ssh:{:x}:",Sha256::digest(format!("{host}\n/home/check").as_bytes()));
     let mut offsets=BTreeMap::new();let mut query=db.prepare("SELECT path,body FROM cursors").unwrap();
     for row in query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).unwrap(){let(path,body)=row.unwrap();if let Some(path)=path.strip_prefix(&prefix){offsets.insert(path.to_string(),serde_json::from_str::<Cursor>(&body).unwrap().offset);}}
     let mut child=Command::new(python).arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/codex-ssh-metrics.py")).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     child.stdin.take().unwrap().write_all(json!({"format":"quota-codex-ssh-v1","home":logs,"offsets":offsets,"mode":mode}).to_string().as_bytes()).unwrap();
     let result=child.wait_with_output().unwrap();assert!(result.status.success(),"projection failed");assert!(result.stderr.is_empty());
+    assert_eq!(snapshot(logs),before,"identity/collection must not create or modify files on the source device");
+    assert!(!logs.join("Quota").exists());assert!(!logs.join("quota-activity-v1").exists());
     let text=std::str::from_utf8(&result.stdout).unwrap();for private in ["PRIVATE_MESSAGE","PRIVATE_ARGUMENT","PRIVATE_INSTRUCTION","PRIVATE_COOKIE"]{assert!(!text.contains(private));}
     result.stdout
 }

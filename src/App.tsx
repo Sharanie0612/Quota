@@ -16,6 +16,7 @@ import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
+import { WorkspaceToolbar } from "./components/WorkspaceToolbar";
 import { LaunchAnimation } from './components/LaunchAnimation';
 import appIcon from "../src-tauri/icons/128x128.png";
 
@@ -141,6 +142,7 @@ export default function App() {
       </aside>
 
       <main className="main">
+        <WorkspaceToolbar onUsage={() => setView('costs')} onSync={() => setView('settings')}/>
         <div className="content" ref={contentRef}>
           <div className="view-transition" key={view}>
         <header className="page-heading content-inner">

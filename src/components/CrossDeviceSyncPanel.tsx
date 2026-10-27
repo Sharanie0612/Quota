@@ -5,6 +5,7 @@ import type { ActivityOptions } from '../lib/types';
 import { Button, Notice, Switch } from './ui';
 import { ActivityStoragePanel } from './ActivityStoragePanel';
 import { AccountSyncPanel } from './AccountSyncPanel';
+import { splitSyncDevices } from '../lib/syncDevices';
 
 export function CrossDeviceSyncPanel(){
   const [options,setOptions]=useState<ActivityOptions|null>(null);
@@ -45,18 +46,19 @@ export function CrossDeviceSyncPanel(){
   const enabled=!!options?.syncDir;
   const errors=[error,...(enabled?(report?.syncErrors??[]):[]),...(enabled&&options?.syncAccounts&&account?.error?[account.error]:[])];
   const failed=enabled&&errors.some(Boolean);
-  const other=report?.devices.filter(d=>d.id!==options?.deviceId)??[];
-  const old=readers.filter(r=>r.compressed!==true).length;
+  const {peers:other,ssh}=options?splitSyncDevices(report?.devices??[],readers,options):{peers:[],ssh:[]};
+  const old=readers.filter(r=>other.some(device=>device.id===r.device)&&r.compressed!==true).length;
   const last=report?.updatedAt?new Date(report.updatedAt).toLocaleString('zh-CN'):null;
   return <section className="card section cross-device-sync">
     <div className="sync-heading"><div><h2>跨设备同步</h2><p>账户、用量与账期随你同步。密钥和登录信息留在本机。</p></div><span className={`badge ${failed?'badge-amber':enabled?'badge-green':''}`}>{!options?'正在检查':failed?'需要重试':enabled?'已开启':'未开启'}</span></div>
     {!enabled?<><div className="sync-start"><span className="hint">每台设备选择同一个云盘文件夹</span><Button variant="primary" disabled={busy||!options} onClick={()=>void choose()}>开启同步</Button></div><details className="product-details"><summary>如何设置</summary><ol className="sync-steps"><li><b>选择云盘文件夹</b><span>支持 iCloud Drive、OneDrive 或 NAS。</span></li><li><b>其他设备选择同一文件夹</b><span>在 Quota 设置中开启同步。</span></li><li><b>保持 Quota 与云盘运行</b><span>账户、用量、账期和支出会自动更新。</span></li></ol></details></>:<>
-      <div className="sync-overview"><div><small>同步文件夹</small><b>{options?.syncDir.split(/[\\/]/).filter(Boolean).pop()}</b></div><div><small>其他设备</small><b>{other.length?`${other.length} 台已发现`:'等待另一台电脑连接'}</b></div></div>
+      <div className="sync-overview"><div><small>同步文件夹</small><b>{options?.syncDir.split(/[\\/]/).filter(Boolean).pop()}</b></div><div><small>其他 Quota 客户端</small><b>{other.length?`${other.length} 台已发现`:'等待另一台电脑连接'}</b></div></div>
       <p className="hint">约每 5 分钟自动同步 · 各设备需单独连接登录</p>
       <div className="tag-row"><Button variant="primary" disabled={busy} onClick={()=>void sync()}>{busy?'同步中…':'立即同步'}</Button><span className="hint">{last?`本机上次检查 ${last}`:'尚未同步'}</span></div>
       {old>0&&<p className="hint">{old} 台设备待更新 · 兼容模式已开启</p>}
-      {other.length>0&&<details className="sync-devices"><summary>查看已发现的设备</summary>{other.map(d=><div key={d.id}><b>{d.name||'其他电脑'}</b><span className="hint">{readers.find(r=>r.device===d.id)?.version??'版本待确认'}</span></div>)}</details>}
+      {other.length>0&&<details className="sync-devices"><summary>查看 Quota 同步客户端</summary>{other.map(d=><div key={d.id}><b>{d.name||'其他电脑'}</b><span className="hint">{readers.find(r=>r.device===d.id)?.version??'版本待确认'}</span></div>)}</details>}
     </>}
+    {ssh.length>0&&<details className="sync-devices sync-ssh-sources"><summary>SSH 用量来源 · {ssh.length} 台</summary><p className="hint">由电脑上的 Quota 通过 SSH 只读采集。远端无需安装 Quota，也无需创建同步目录。</p>{ssh.map(device=><div key={device.id}><b>{device.name.replace(/^SSH · /,'')}</b><span className="badge">无需安装 Quota</span></div>)}</details>}
     {message&&<Notice>{message}</Notice>}
     {errors.some(Boolean)&&<Notice tone="warn"><b>部分同步未完成，已保存的数据仍保留。</b><details><summary>查看原因</summary><p>{[...new Set(errors.filter(Boolean))].join('；')}</p></details></Notice>}
     {enabled&&options?.syncAccounts&&<AccountSyncPanel/>}

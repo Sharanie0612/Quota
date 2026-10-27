@@ -30,6 +30,7 @@ mod secrets;
 mod storage;
 mod tray;
 pub mod widget;
+pub mod window_frame;
 
 // 暴露给 examples/：本机跑不了 cargo test，用 example 真正执行解析与网络查询
 pub use catalog::{cards_for_account, comparison_entries, embedded_file, hidden_keys, is_hidden, merge_cards, normalize};
@@ -71,6 +72,7 @@ pub fn run() {
             if let Err(error) = account_sync::repair_connections(&state) { account_sync::remember_connection_error(&state, error); }
             connections::set_app_handle(app.handle().clone());
             app.manage(state);
+            window_frame::setup(app.handle());
             tray::setup(app.handle())?;
             widget::setup(app.handle())?;
             refresh::spawn(app.handle().clone());
@@ -78,9 +80,13 @@ pub fn run() {
             activity::spawn(app.handle().clone());
             account_sync::spawn(app.handle().clone());
             widget::smoke_if_requested(app.handle());
+            window_frame::smoke_if_requested(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::ScaleFactorChanged { .. }) {
+                let _ = window_frame::update(window);
+            }
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
@@ -105,6 +111,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            window_frame::get_main_window_state,
             widget::get_widget_options,
             widget::save_widget_options,
             widget::get_widget_usage,

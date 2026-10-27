@@ -93,21 +93,22 @@
 
 :root {
   color-scheme: light;
-  --bg: #f5f5f7;
-  --bg-sidebar: rgba(250, 250, 252, 0.72);
-  --bg-topbar: rgba(245, 245, 247, 0.72);
+  --bg: #eef1f4;
+  --bg-sidebar: #eef1f4;
+  --bg-topbar: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #fbfbfd;
-  --surface-3: #f2f2f5;
-  --border: rgba(0, 0, 0, 0.07);
-  --border-strong: rgba(0, 0, 0, 0.14);
-  --text: #1d1d1f;
-  --text-2: #6e6e73;
-  --text-3: #98989d;
-  --blue: #0071e3;
-  --blue-hover: #0077ed;
-  --blue-press: #0064cc;
-  --blue-soft: rgba(0, 113, 227, 0.1);
+  --surface-2: #f7f8fa;
+  --surface-3: #f0f2f5;
+  --border: #e2e6ec;
+  --border-strong: #cbd2dc;
+  --text: #242c37;
+  --text-2: #606c7c;
+  --text-3: #6c7787;
+  --blue: #326dcc;
+  --blue-hover: #2863c3;
+  --blue-press: #2257ac;
+  --blue-soft: #e9f0fc;
+  --on-blue: #ffffff;
   --fill: rgba(120, 120, 128, 0.12);
   --fill-strong: rgba(120, 120, 128, 0.18);
   --fill-press: rgba(120, 120, 128, 0.26);
@@ -124,7 +125,7 @@
   --radius-lg: 24px;
   --radius: 18px;
   --radius-sm: 14px;
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 28px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px rgba(26, 40, 61, 0.035), 0 4px 14px rgba(26, 40, 61, 0.025);
   --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.22);
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI",
@@ -135,21 +136,22 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --bg: #1c1c1e;
-    --bg-sidebar: rgba(28, 28, 30, 0.72);
-    --bg-topbar: rgba(28, 28, 30, 0.72);
-    --surface: #2c2c2e;
-    --surface-2: #232325;
-    --surface-3: #38383a;
-    --border: rgba(255, 255, 255, 0.09);
-    --border-strong: rgba(255, 255, 255, 0.18);
-    --text: #f5f5f7;
-    --text-2: #a1a1a6;
-    --text-3: #7c7c81;
-    --blue: #0a84ff;
-    --blue-hover: #3d9bff;
-    --blue-press: #0060c4;
-    --blue-soft: rgba(10, 132, 255, 0.16);
+    --bg: #171c23;
+    --bg-sidebar: #171c23;
+    --bg-topbar: #1d242d;
+    --surface: #262e39;
+    --surface-2: #1d242d;
+    --surface-3: #303a47;
+    --border: #35404e;
+    --border-strong: #4b596c;
+    --text: #edf1f7;
+    --text-2: #b0bbca;
+    --text-3: #9aa7ba;
+    --blue: #83b1ff;
+    --blue-hover: #a1c4ff;
+    --blue-press: #6a9ced;
+    --blue-soft: #283e60;
+    --on-blue: #172334;
     --fill: rgba(255, 255, 255, 0.1);
     --fill-strong: rgba(255, 255, 255, 0.15);
     --fill-press: rgba(255, 255, 255, 0.22);
@@ -162,7 +164,7 @@
     --amber-soft: rgba(255, 214, 10, 0.16);
     --red: #ff453a;
     --red-soft: rgba(255, 69, 58, 0.16);
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.35);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.16), 0 4px 14px rgba(0, 0, 0, 0.1);
     --shadow-pop: 0 18px 50px rgba(0, 0, 0, 0.5);
   }
 }
@@ -233,7 +235,9 @@ textarea {
   padding: 12px;
   gap: 12px;
   background: var(--bg);
+  border-radius: 14px;
 }
+.app[data-window-shape="square"] { border-radius: 0; }
 
 .sidebar {
   width: 204px;
@@ -335,10 +339,30 @@ textarea {
   min-width: 0;
   min-height: 0;
   margin-top: 30px;
-  border-radius: var(--radius-xl);
+  border-radius: 22px;
   background: var(--surface-2);
-  border: 0;
+  border: 1px solid var(--border);
   overflow: hidden;
+}
+
+.workspace-toolbar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 16px; min-height: 54px; padding: 10px 26px; border-bottom: 1px solid var(--border); background: var(--bg-topbar); }
+.workspace-device { min-width: 0; display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px; }
+.workspace-device > svg { flex-shrink: 0; }
+.workspace-device > span { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-device small { color: var(--text-3); font-size: 10px; white-space: nowrap; }
+.workspace-tools { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.workspace-tools button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 9px; border: 0; border-radius: 9px; background: transparent; color: var(--text-2); font-size: 11px; cursor: pointer; white-space: nowrap; }
+.workspace-tools button:hover { color: var(--blue); background: var(--blue-soft); }
+.workspace-tools button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.workspace-usage strong { color: var(--text); font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.workspace-divider { height: 18px; width: 1px; background: var(--border); }
+.workspace-tools .workspace-retry { color: var(--amber); }
+@media (max-width: 1100px) {
+  .workspace-toolbar { padding: 10px 20px; gap: 8px; }
+  .workspace-device small { display: none; }
+  .workspace-device > span { max-width: 110px; }
+  .workspace-tools { gap: 6px; }
+  .workspace-tools button { gap: 6px; padding: 7px; }
 }
 
 .window-drag-region {
@@ -447,7 +471,7 @@ textarea {
 
 .btn-primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--on-blue);
   /* 实心按钮的质感：顶部内高光 + 极轻投影，不要发光 */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2.5px rgba(0, 0, 0, 0.18);
 }

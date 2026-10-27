@@ -717,12 +717,14 @@
         case 'widget_ready': widgetState(false);return null;
         case 'set_widget_expanded': widgetState(args.expanded);return null;
         case 'move_widget': return null;
-        case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],updatedAt:Date.now(),syncErrors:[]};
+        case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'},...demoSshDevices.map(d=>({id:d.deviceId,name:'SSH · '+d.name}))],updatedAt:Date.now(),syncErrors:[]};
+        case 'get_main_window_state': return {maximized:windowMaximized,fullscreen:false,square:windowMaximized||new URLSearchParams(location.search).get('windowCase')==='tiled'};
         case 'sync_activity_now':
         case 'sync_usage_now': return null;
         case "plugin:window|is_maximized": return windowMaximized;
         case "plugin:window|toggle_maximize": {
           windowMaximized=!windowMaximized;
+          for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='main-window-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{maximized:windowMaximized,fullscreen:false,square:windowMaximized}});
           for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='tauri://resize')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{width:1280,height:800}});
           return null;
         }
@@ -952,7 +954,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2500",
+            version: "1.0.2600",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

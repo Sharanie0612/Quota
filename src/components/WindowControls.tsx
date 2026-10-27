@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { errText } from '../lib/api';
 import { toast } from '../lib/store';
 
@@ -8,10 +10,14 @@ export function WindowControls() {
   const [maximized, setMaximized] = useState(false);
   useEffect(() => {
     let live = true;
-    const win = getCurrentWindow();
-    const update = () => { void win.isMaximized().then(value => { if (live) setMaximized(value); }).catch(() => undefined); };
-    update();
-    const unlisten = win.onResized(update);
+    type State = {maximized: boolean; fullscreen: boolean; square: boolean};
+    const apply = (state: State) => {
+      if (!live) return;
+      setMaximized(state.maximized);
+      document.querySelector('.app')?.setAttribute('data-window-shape', state.square ? 'square' : 'rounded');
+    };
+    const unlisten = listen<State>('main-window-state', event => apply(event.payload));
+    void unlisten.then(() => invoke<State>('get_main_window_state')).then(apply).catch(() => undefined);
     return () => { live = false; void unlisten.then(fn => fn()).catch(() => undefined); };
   }, []);
   const run = (action: 'minimize' | 'toggleMaximize' | 'close') => {

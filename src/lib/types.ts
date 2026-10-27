@@ -162,6 +162,16 @@ export interface Settings {
   defaultLowThreshold: number;
 }
 
+export interface AiModel {
+  available: boolean;
+  id:string;apiId:string;name:string;vendor:string;provider:string;summary:string;
+  context:number|null;maxOutput:number|null;abilities:string[];price:ModelPrice|null;
+  source:string;verifiedAt:string|null;firstSeen:string;issue:string|null;
+  priceOptions:{id:string;label:string;price:ModelPrice}[];
+  cacheWrites:{ttlSeconds:number;price:number}[];
+}
+export interface AiModelSnapshot {schema:number;checkedAt:string|null;models:AiModel[];sources:{vendor:string;url:string;checkedAt:string;models:number;error:string|null}[]}
+
 export interface ModelPrice {
   cachedInput?: number | null;
   cacheWrite?: number | null;

@@ -4,6 +4,7 @@ import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Modal, Notice, Seg, Switch } from "../components/ui";
 import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
 import { UsageWidgetSettings } from '../components/UsageWidgetSettings';
+import { AppearanceSettings } from '../components/AppearanceSettings';
 
 import { DataImportPanel } from "../components/DataImportPanel";
 import { api, copyText, errText } from "../lib/api";
@@ -132,6 +133,7 @@ export function SettingsView({
 
   return (
     <div className="content-inner settings-page">
+      <AppearanceSettings />
       <CrossDeviceSyncPanel />
       <UsageWidgetSettings />
       <div className="card section">
@@ -231,9 +233,9 @@ export function SettingsView({
       </div>
 
       <div className="card section">
-        <h2>提醒与天梯</h2>
+        <h2>提醒与模型资料</h2>
         <div className="setting-row"><div className="txt"><b>余额增加提示</b><span>检测到充值时提示</span></div><Switch checked={settings.notifyRecharge} onChange={(v) => set({ notifyRecharge: v })} label="余额增加提示" /></div>
-        <div className="setting-row"><div className="txt"><b>自动更新模型天梯</b><span>每天检查排名与官方价格，失败保留上次核实结果</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="天梯自动更新" /></div>
+        <div className="setting-row"><div className="txt"><b>自动更新 AI 模型价格</b><span>每天读取厂商官网，失败保留上次记录；第三方评测按需更新</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="模型价格自动更新" /></div>
       </div>
       <div className="card section">
         <h2>

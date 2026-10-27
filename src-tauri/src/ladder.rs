@@ -7,7 +7,7 @@ use crate::{commands::AppState, model::ModelPrice};
 
 const SOURCE: &str = "https://aitier.net/zh";
 const TTL: i64 = 86400;
-const PRICE_POLICY_VERSION: u32 = 1;
+const PRICE_POLICY_VERSION: u32 = 2;
 
 fn supported_vendor(vendor: &str) -> bool {
     matches!(vendor, "OpenAI" | "Anthropic" | "Google" | "DeepSeek" | "Kimi" | "Z AI" | "Xiaomi" | "Alibaba" | "SpaceXAI" | "Meta")
@@ -194,6 +194,23 @@ pub fn get_ladder(state: State<'_, AppState>) -> Snapshot {
     let snapshot = state.ladder.lock().expect("ladder mutex").clone();
     with_overrides(snapshot, &state.overrides.lock().expect("catalog mutex"))
 }
+fn apply_quotes(entries:&mut [Entry],checks:&HashMap<String,crate::official_prices::Check>,at:&str){
+    for entry in entries {
+        let Some(check)=checks.get(&entry.vendor)else{continue};
+        let names=[entry.id.clone(),api_model_id(&entry.id),entry.name.split(" (").next().unwrap_or(&entry.name).to_string()];
+        let found=names.iter().map(|name|crate::official_prices::key(name)).find(|key|check.prices.contains_key(key));
+        let issue=if let Some(key)=found{
+            entry.price=check.prices[&key].clone();entry.price_options=check.options.get(&key).cloned().unwrap_or_default();entry.off_peak=check.off_peak.get(&key).cloned();entry.price_source=check.source.clone();entry.verified_at=Some(at.into());None
+        }else{Some(check.error.clone().unwrap_or_else(||"官网未找到该精确型号可确认的标准 Token 价格；保留上次核实记录".into()))};
+        entry.candidate=Some(Candidate{prices:vec![],excerpts:vec![],checked_at:at.into(),error:issue});
+    }
+}
+pub(crate) fn apply_official(state:&AppState,checks:&HashMap<String,crate::official_prices::Check>)->Result<(),String>{
+    let mut current=state.ladder.lock().map_err(|_|"评测资料暂不可用")?;
+    let mut next=current.clone();apply_quotes(&mut next.entries,checks,&chrono::Utc::now().to_rfc3339());next.price_policy_version=PRICE_POLICY_VERSION;
+    crate::storage::write_atomic(&state.store.dir().join("ladder_cache.json"),&serde_json::to_string_pretty(&next).map_err(|_|"编码价格失败")?)?;
+    *current=next;Ok(())
+}
 
 pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
     let now = chrono::Utc::now();
@@ -221,6 +238,7 @@ pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
     }.await;
     // Price verification is independent of AITier availability.
     let official=crate::official_prices::fetch(&state.http).await;
+    let registry_error=crate::ai_models::ingest(state,&official).err();
     let (mut entries,error)=match ranking_result {
         Ok((rankings,mut entries))=>{for e in &mut entries {e.rankings=rankings.get(&e.id).cloned().unwrap_or_default();} (entries,None)},
         Err(e)=>(previous.entries.clone(),Some(e)),
@@ -231,17 +249,10 @@ pub async fn update(state: &AppState, force: bool) -> Result<Snapshot, String> {
         if let Some(old)=previous.entries.iter().find(|e|e.id==entry.id&&e.verified_at.as_deref().unwrap_or("")>entry.verified_at.as_deref().unwrap_or("")){
             entry.price=old.price.clone();entry.off_peak=old.off_peak.clone();entry.price_options=old.price_options.clone();entry.price_source=old.price_source.clone();entry.verified_at=old.verified_at.clone();
         }
-        if let Some(check)=official.get(&entry.vendor){
-            let name=entry.name.split(" (").next().unwrap_or(&entry.name);
-            let model=api_model_id(&entry.id);
-            let found=check.prices.get(&crate::official_prices::key(&model)).or_else(||check.prices.get(&crate::official_prices::key(name)));
-            let issue=if let Some(price)=found {entry.price=price.clone();entry.price_options=check.options.get(&crate::official_prices::key(&model)).or_else(||check.options.get(&crate::official_prices::key(name))).cloned().unwrap_or_default();entry.price_source=check.source.clone();entry.off_peak=check.off_peak.get(&crate::official_prices::key(&model)).or_else(||check.off_peak.get(&crate::official_prices::key(name))).cloned();entry.verified_at=Some(now.to_rfc3339());None}
-                else{Some(check.error.clone().unwrap_or_else(||"官网未找到该精确型号可确认的标准 Token 价格；保留上次核实记录，自动重试".into()))};
-            entry.candidate=Some(Candidate{prices:Vec::new(),excerpts:Vec::new(),checked_at:now.to_rfc3339(),error:issue});
-        }
     }
+    apply_quotes(&mut entries,&official,&now.to_rfc3339());
     let mut snapshot=state.ladder.lock().map_err(|_|"天梯暂不可用")?;
-    snapshot.entries=entries;snapshot.checked_at=Some(now.to_rfc3339());snapshot.error=error;
+    snapshot.entries=entries;snapshot.checked_at=Some(now.to_rfc3339());snapshot.error=error.or(registry_error);
     snapshot.price_policy_version=PRICE_POLICY_VERSION;
     if snapshot.error.is_none(){snapshot.updated_at=now.to_rfc3339();}
     let output = snapshot.clone();
@@ -304,7 +315,7 @@ pub fn spawn(app: AppHandle) {
         tokio::time::sleep(std::time::Duration::from_secs(15)).await;
         loop {
             let enabled = app.state::<AppState>().config.lock().map(|c| c.settings.ladder_auto_update).unwrap_or(false);
-            if enabled { let _ = update(&app.state::<AppState>(), false).await; }
+            if enabled { if crate::ai_models::refresh(&app.state::<AppState>(), false).await.is_ok(){let _=tauri::Emitter::emit(&app,"ai-models-updated",());} }
             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
         }
     });

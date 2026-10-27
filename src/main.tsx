@@ -3,8 +3,12 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { UsageWidget } from './components/UsageWidget';
 import "./styles.css";
+import { initializeAppearance } from './lib/appearance';
+import { SetupView } from './views/SetupView';
+
+initializeAppearance();
 
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>{new URLSearchParams(location.search).get('window')==='usage-widget'?<UsageWidget/>:<App />}</React.StrictMode>,
+  <React.StrictMode>{new URLSearchParams(location.search).get('window')==='setup'?<SetupView/>:new URLSearchParams(location.search).get('window')==='usage-widget'?<UsageWidget/>:<App />}</React.StrictMode>,
 );

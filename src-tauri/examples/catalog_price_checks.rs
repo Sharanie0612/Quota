@@ -107,11 +107,17 @@ fn main() {
     let current = ladder_with_overrides(snapshot, &[local]);
     for id in ["kimi-k2-6", "kimi-k2-6-non-reasoning"] {
         let entry = current.entries.iter().find(|e| e.id == id).unwrap();
-        assert_eq!(entry.price.cached_input, Some(0.0));
+        assert_eq!(entry.price.cached_input, Some(1.1));
         assert_eq!(entry.price_source, "https://platform.kimi.com/docs/pricing/chat");
-        assert_eq!(entry.verified_at.as_deref(), Some("2026-10-04T04:00:00+08:00"));
+        assert!(entry.verified_at.as_deref().unwrap()>"2026-10-04T04:00:00+08:00");
     }
-    println!("PASS ladder evaluation variants share explicit API override; stale source refreshed");
+    println!("PASS stale local override cannot replace newer official quotes; evaluation variants retain canonical source");
+
+    let base:CatalogEntry=serde_json::from_value(serde_json::json!({"match":["gpt-fixture"],"name":"Base fixture","providers":["custom"],"verified":true,"verifiedAt":"2026-10-01T00:00:00Z","source":"https://developers.openai.com/api/docs/pricing","price":{"currency":"USD","unit":"每百万 tokens","input":1,"output":1}})).unwrap();
+    let mut dated=base.clone();dated.r#match=vec!["gpt-fixture-20261020".into()];dated.price.as_mut().unwrap().input=Some(2.);
+    let cards=cards_for_account("custom","synthetic",&[remote("gpt-fixture-20261020")],&[base,dated],&[]);
+    assert_eq!(cards[0].price.as_ref().unwrap().input,Some(2.));
+    println!("PASS exact dated API version wins over a normalized base alias");
 
     let builtin = catalog.iter().find(|e| e.r#match.contains(&"kimi-k3".into())).unwrap().clone();
     let mut old = builtin.clone();

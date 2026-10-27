@@ -31,6 +31,9 @@ mod storage;
 mod tray;
 pub mod widget;
 pub mod window_frame;
+pub mod ai_models;
+mod appearance;
+pub mod setup;
 
 // 暴露给 examples/：本机跑不了 cargo test，用 example 真正执行解析与网络查询
 pub use catalog::{cards_for_account, comparison_entries, embedded_file, hidden_keys, is_hidden, merge_cards, normalize};
@@ -57,8 +60,12 @@ pub use pricing::{build_comparison, PageScan};
 use tauri::{Manager, WindowEvent};
 
 pub fn run() {
+    let args:Vec<_>=std::env::args_os().collect();
+    if args.get(1).is_some_and(|arg|arg=="--quota-setup"){
+        if args.get(2).map(std::path::PathBuf::from).is_none_or(|path|setup::run(path).is_err()){std::process::exit(2)}return
+    }
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| tray::show_main(app)))
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {if args.iter().any(|arg|arg=="--quota-exit-for-update"){app.exit(0)}else{tray::show_main(app)}}))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -111,6 +118,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            appearance::get_appearance,
+            appearance::save_appearance,
+            ai_models::get_ai_models,
+            ai_models::refresh_ai_models,
             window_frame::get_main_window_state,
             widget::get_widget_options,
             widget::save_widget_options,

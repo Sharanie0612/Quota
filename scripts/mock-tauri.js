@@ -5,6 +5,9 @@
   let seq = 1;
   const callbacks = {};
   const eventHandlers = {};
+  const emit = (event,payload) => {for(const [id,handler] of Object.entries(eventHandlers))if(handler.event===event)callbacks[handler.handler]?.cb({event,id:Number(id),payload});};
+  let setupProgress={phase:'idle',message:'',done:false,error:null};
+  let setupAttempts=0;
   let windowMaximized = false;
   let widgetOptions = {enabled:true,side:'right',heightPercent:50};
   function widgetState(expanded){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side}});}
@@ -707,6 +710,30 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case 'get_appearance': return window.demoAppearance ?? null;
+        case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
+        case 'get_ai_models':
+        case 'refresh_ai_models': {
+          const result=await fetch('/ai-models.json').then(r=>r.json());
+          if(new URLSearchParams(location.search).get('registryCase')==='offline'){
+            result.sources[0].error='演示：官网暂不可用，保留上次核实价格';
+            result.models.filter(m=>m.vendor===result.sources[0].vendor).forEach(m=>m.issue=result.sources[0].error);
+          }
+          return result;
+        }
+        case 'setup_info': return {version:'1.0.2700',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2600':null,payloadBytes:16*1024*1024};
+        case 'setup_status': return setupProgress;
+        case 'setup_ready': return null;
+        case 'setup_install': {
+          window.demoSetupRequest=args.request;setupAttempts++;
+          if(new URLSearchParams(location.search).get('setupCase')==='retry'&&setupAttempts===1)throw Error('Quota 正在运行。请从系统托盘退出 Quota，再点击重试安装。');
+          if(!/^[A-Za-z]:[\\/].+/.test(args.request.target))throw Error('请选择本机磁盘中的完整安装文件夹');
+          setupProgress={phase:'preparing',message:'正在检查安装环境',done:false,error:null};emit('setup-progress',setupProgress);
+          setTimeout(()=>{setupProgress={phase:'copying',message:'正在解压并复制 Quota 文件',done:false,error:null};emit('setup-progress',setupProgress);},250);
+          setTimeout(()=>{setupProgress={phase:'done',message:'Quota 已安装完成',done:true,error:null};emit('setup-progress',setupProgress);},1400);
+          return null;
+        }
+        case 'setup_finish': window.demoSetupFinished=args.launch;return null;
         case 'get_widget_options': return {...widgetOptions};
         case 'save_widget_options': widgetOptions={...args.options};return {...widgetOptions};
         case 'get_widget_usage': {
@@ -954,7 +981,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2600",
+            version: "1.0.2700",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

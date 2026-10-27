@@ -29,6 +29,11 @@ fn record(account: &Account, device: &str) -> Value {
 fn load(path: &Path) -> Value { serde_json::from_slice(&fs::read(path).unwrap()).unwrap() }
 fn save(path: &Path, value: &Value) { fs::write(path, serde_json::to_vec(value).unwrap()).unwrap(); }
 fn main() {
+    let args:Vec<_>=std::env::args().collect();
+    if let Some(at)=args.iter().position(|arg|arg=="--inspect-shared"){
+        let count=account_sync::inspect_shared_packets(Path::new(args.get(at+1).expect("shared directory required"))).expect("shared packet validation");
+        println!("PASS read-only cloud validation: {count} valid packets; redundant empty conflict copies ignored without modifying files");return
+    }
     keyring::set_default_credential_builder(Box::new(memory_keyring::MemoryKeyring::default()));
     let root = std::env::current_dir().unwrap().join("target").join(format!("account-sync-migration-{}",uuid::Uuid::new_v4()));
     let old = state(&root.join("old"), &root.join("old-shared"), vec![account("deepseek")]);
@@ -92,6 +97,23 @@ fn main() {
     assert_eq!(restart.config.lock().unwrap().accounts.len(),2);
     assert_eq!(load(&path)["links"],ledger["links"]);
     println!("PASS repeat exchange and restart keep the v1 packet and all local decisions");
+
+    let device=activity::options(first.store.dir()).device_id;
+    let packets=shared.join("quota-accounts-v1");
+    let duplicate=packets.join(format!("{device}(1).json"));
+    fs::write(&duplicate,b"").unwrap();
+    let mac_copy=packets.join(format!("{device} 2.json"));
+    fs::copy(packets.join(format!("{device}.json")),&mac_copy).unwrap();
+    account_sync::sync(&restart).unwrap();
+    assert_eq!(fs::metadata(&duplicate).unwrap().len(),0);
+    assert!(mac_copy.exists());
+    assert_eq!(restart.config.lock().unwrap().accounts.len(),2);
+    let missing=packets.join(format!("{}(1).json",uuid::Uuid::new_v4()));
+    fs::write(&missing,b"").unwrap();
+    assert!(account_sync::sync(&restart).unwrap_err().contains("尚未下载完整"));
+    fs::remove_file(missing).unwrap();
+    account_sync::sync(&restart).unwrap();
+    println!("PASS iCloud empty duplicate cannot block its validated sibling; valid conflict copies retained; unknown empty peers remain pending");
 
     let valid = load(&path);
     for malformed in [json!({"credentials":{"apiKey":"SYNTHETIC-FORBIDDEN"}}),json!({"links":[]})] {

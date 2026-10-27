@@ -60,6 +60,12 @@ async function main(){
       await page.locator('.app[data-window-shape="rounded"]').waitFor();
       assert.equal(await page.locator('.app').evaluate(el=>getComputedStyle(el).borderRadius),'14px');
       await page.setViewportSize({width:1440,height:900});
+      await page.waitForFunction(()=>{
+        const nav=document.querySelector('.sidebar-nav');
+        const active=nav?.querySelector('[data-motion-active="true"]');
+        const highlight=nav?.querySelector('.motion-highlight');
+        return active&&highlight&&Math.abs(active.getBoundingClientRect().width-highlight.getBoundingClientRect().width)<1;
+      });
       await page.screenshot({path:path.join(out,`${theme}-wide.png`)});
       assert.deepEqual(errors,[]);
       await page.close();

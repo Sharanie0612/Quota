@@ -19,7 +19,15 @@ const points=[profile(1,20),profile(2,15),profile(3,25),profile(3,30),profile(nu
 assert.deepEqual(frontier(points).map(p=>[p.cost,p.index]),[[1,20],[3,30]]);assert.equal(points.length,7);
 assert.deepEqual(frontier([]),[]);
 const seed=JSON.parse(fs.readFileSync(path.join(__dirname,'../src-tauri/data/benchmarks.json'),'utf8'));
-assert.equal(seed.schema,2);
+assert.equal(seed.schema,3);
+assert.ok(seed.epoch.models.length>=200);
+assert.ok(seed.epoch.curves.length>=50);
+assert.equal(new Set(seed.epoch.records.map(r=>[r.modelId,r.configuration,r.benchmark].join('|'))).size,seed.epoch.records.length);
+for(const m of seed.epoch.models){assert.ok(m.benchmarkCount>=4);if(m.lower!=null)assert.ok(m.lower<=m.score&&m.upper>=m.score);}
+const curves=new Map(seed.epoch.curves.map(c=>[c.name,c]));
+for(const r of seed.epoch.records){const c=curves.get(r.benchmark);assert.ok(c);assert.ok(Math.abs(r.normalized-Math.max(0,Math.min(1,(r.raw-c.baseline)/(c.ceiling-c.baseline))))<1e-10);}
+const policy=JSON.parse(fs.readFileSync(path.join(__dirname,'../src-tauri/data/benchmark-policy.json'),'utf8'));
+assert.equal(policy.minimumBenchmarks,2);assert.equal(policy.domains.length,4);assert.ok(policy.domains.every(d=>!d.benchmarks.includes('Terminal Bench')));
 assert.equal(new Set(seed.profiles.map(p=>p.id)).size,seed.profiles.length);
 assert.ok(seed.profiles.every(p=>p.id));
 const weights=seed.sources.find(s=>s.id==='livebench').weights;

@@ -28,7 +28,15 @@ pub fn benchmark_smoke_report(
             .map_err(|_| "评测数据暂不可用")?,
     );
     let result = (|| -> Result<(), String> {
-        for id in ["aa", "livebench", "consensus"] {
+        for id in [
+            "general",
+            "coding",
+            "reasoning",
+            "agents",
+            "knowledge",
+            "aa",
+            "livebench",
+        ] {
             let expected = board
                 .rankings
                 .iter()
@@ -55,6 +63,21 @@ pub fn benchmark_smoke_report(
                         entry.model_id
                     ));
                 }
+                if let (Some(lower), Some(upper)) = (entry.lower, entry.upper) {
+                    let range: Vec<_> = actual["range"]
+                        .as_str()
+                        .unwrap_or("")
+                        .split('–')
+                        .filter_map(|v| v.parse::<f64>().ok())
+                        .collect();
+                    if range.len() != 2
+                        || (range[0] - lower).abs() > 0.00501
+                        || (range[1] - upper).abs() > 0.00501
+                        || actual["rangeKind"].as_str() != Some(entry.range_kind.as_str())
+                    {
+                        return Err(format!("{id} {} 的区间显示不符", entry.model_id));
+                    }
+                }
             }
         }
         Ok(())
@@ -71,12 +94,13 @@ pub fn smoke_if_requested(app: tauri::AppHandle) {
     if !enabled(&app.state::<AppState>()) {
         return;
     }
-    let script = r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0;const ids=['aa','livebench','consensus'],boards={};const timer=setInterval(()=>{
-      const select=document.querySelector('select[aria-label="评测榜单"]');
+    let script = r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0;const ids=['general','coding','reasoning','agents','knowledge','aa','livebench'],boards={};const timer=setInterval(()=>{
+      const id=ids[step],select=document.querySelector('button[data-benchmark-source="'+id+'"]');
       if(!select){document.querySelector('nav[aria-label="主导航"] button[aria-label="AI 模型"]')?.click();return;}
-      const id=ids[step];if(select.value!==id){select.value=id;select.dispatchEvent(new Event('change',{bubbles:true}));return;}
+      if(select.getAttribute('aria-pressed')!=='true'){select.click();return;}
       const board=document.querySelector('.tier-board[data-ranking-id="'+id+'"]');if(!board)return;
-      const rows=[...board.querySelectorAll('.tier-model')].map(el=>({id:el.dataset.modelId,rank:Number(el.dataset.rank),profileId:el.dataset.profileId||'',score:el.querySelector('.tier-model-score strong').textContent.trim()}));if(!rows.length)return;
+      const expand=document.querySelector('button[data-expand-ladder]');if(expand){expand.click();return;}
+      const rows=[...board.querySelectorAll('.tier-model')].map(el=>({id:el.dataset.modelId,rank:Number(el.dataset.rank),profileId:el.dataset.profileId||'',score:el.querySelector('.tier-model-score strong').textContent.trim(),range:el.querySelector('.tier-range-values')?.textContent.trim()||'',rangeKind:el.querySelector('.tier-model-range')?.dataset.rangeKind||''}));if(!rows.length)return;
       boards[id]=rows;step++;if(step===ids.length){clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:{boards}}));}
     },250);})()"#;
     tauri::async_runtime::spawn(async move {

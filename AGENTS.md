@@ -202,6 +202,7 @@ node scripts/preview-server.cjs 4174
 | 2026-10-28 自有 AI 模型目录、官方价格识别、云盘冲突兼容、可收起侧栏、可选主题与产品安装向导（Windows 本地功能构建，验收见 docs/ai-model-workspace-1.0.2700.md） | `1.0.2700` | `1.0.2700` |
 | 2026-10-28 独立测评天梯、能力与成本曲线、Token 占比图、暖灰默认配色与标准安装向导（Windows 本地功能构建，验收见 docs/model-benchmarks-1.0.2800.md） | `1.0.2800` | `1.0.2800` |
 | 2026-10-28 修复模型分数失真、完整配置与官方权重，增加源站及真实 WebView 逐条对账（Windows 本地修复构建，验收见 docs/benchmark-validity-1.0.2801.md） | `1.0.2801` | `1.0.2801` |
+| 2026-10-29 通用综合与编程、推理、Agent、知识分榜，新增公开难度校准及置信/敏感性范围（Windows 本地功能构建，验收见 docs/scenario-evaluation-1.0.2900.md） | `1.0.2900` | `1.0.2900` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 
@@ -217,8 +218,8 @@ node scripts/preview-server.cjs 4174
 - 小米通过隔离的官方登录窗口连接，Cookie 仅在后端和 Windows 凭据管理器中流转。
 - 主窗口使用无系统标题栏布局；窗口按钮及拖动权限仅授予 `main`，关闭必须沿用 Tauri close 事件以遵守托盘设置。小米恢复使用固定官方 `genLoginUrl` 入口，不能只加载首页；认证与套餐查询分开，先保存成功续接的会话。Cookie 的相对 Max-Age 写入凭据库前固定为绝对到期时间，不人为延长服务端登录。运行 `mimo_login_checks`、`mimo_session_checks` 及账户关联回归。
 - ChatGPT 显示订阅内 Codex 额度，显式连接本机 Codex 登录；固定官方额度端点，不复制或刷新 Codex token。不可将这些额度称为网页聊天额度。
-- 主榜保留 AA 原始指数及完整配置，LiveBench 按该版本官网分类权重计算。跨榜只提供明确标注的同池平均名次，不伪造通用性能分；官网报告仅独立对照。禁止逐项挑最高分拼配置、把不相同的任务重命名后平均、或用任意官网权重拉动名次。规则见 `docs/model-benchmarks.md`。旧 `ladder.json` / `ladder_cache.json` 保留兼容，不作为新天梯分数。
-- 评分发布须逐条核对源数据、解析结果、API 和真实打包 WebView 的显示值/名次/配置。`benchmark_checks` 使用独立黄金样本及全量 AA 原分核对；`check-benchmark-ui.ps1` 在隔离无账户、无同步目录中检查安装版；升级脚本支持 `-CheckBenchmarks`。普通 UI 可渲染、数学自洽或模拟预览通过，均不能单独证明评分正确。schema 2 使用 `ai-benchmarks-v2.json`，旧缓存保留但不参与新显示。
+- 默认通用综合保留 Epoch 发布的 ECI 与 90% 区间，明确它是来源的模型组聚合值，不称为同预算或单一配置。编程、推理、Agent、知识分榜用来源公开难度/斜率和同一配置原始记录重估；配置按覆盖选择，不逐项挑最高分，不补零或用任意官网权重拉动名次。场景逐项留出范围是敏感性，不冒充统计置信区间。规则见 `docs/model-benchmarks.md`，场景名单见 `benchmark-policy.json`；AA、LiveBench、官网成绩保留原始对照。旧 `ladder.json` / `ladder_cache.json` 保留兼容，不作为新天梯分数。
+- 评分发布须逐条核对源数据、解析结果、API 和真实打包 WebView 的显示值/名次/配置/区间。`reference-scenarios.py` 与 Rust 独立对账；`benchmark_checks` 另用黄金样本及全量 AA 原分核对；`check-benchmark-ui.ps1` 在隔离无账户、无同步目录中检查安装版；升级脚本支持 `-CheckBenchmarks`。普通 UI 可渲染、数学自洽或模拟预览通过，均不能单独证明评分正确。schema 3 使用 `ai-benchmarks-v3.json`，旧缓存保留但不参与新显示。Epoch 数据按 CC BY 4.0 署名并标明派生计算。
 - 改测评解析或算法运行 `cargo run --release --example benchmark_checks -- --fixtures`；实时来源验证加 `--live`，人工更新内置快照加 `--write-seed`。先运行 `scripts/audit-benchmark-sources.py` 获取公开测试夹具。AA 指数或 LiveBench 表结构升级时保留上次记录并等待明确适配，不能把旧版本标成新版本。
 - 天梯按用户授权自动读取十家厂商的确定性官方价格表，成功核实时更新 `ladder_cache.json`，保存来源、条件与时间；启发式候选不能自动采用。厂商失败或精确型号缺失时保留上次记录并显示原因；排名网站失败不阻断官方价格检查。模型库的人工采用仍写入 `catalog_overrides.json`。
 

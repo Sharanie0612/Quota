@@ -12,6 +12,7 @@ SOURCES = {
     "artificial-analysis": "https://artificialanalysis.ai/leaderboards/models",
     "aa-method": "https://artificialanalysis.ai/methodology/intelligence-benchmarking",
     "livebench": "https://livebench.ai/",
+    "epoch-ai": "https://epoch.ai/data/benchmark_data.zip",
 }
 
 def fetch(item):
@@ -22,7 +23,12 @@ def fetch(item):
             data = response.read(16 * 1024 * 1024 + 1)
             if len(data) > 16 * 1024 * 1024:
                 raise ValueError("source size limit")
-        (OUT / (name + ".html")).write_bytes(data)
+        if name == 'epoch-ai':
+            target = OUT.parent / 'epoch-research' / 'benchmark_data.zip'
+            target.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            target = OUT / (name + '.html')
+        target.write_bytes(data)
         return {"id": name, "url": url, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
     except Exception as error:
         return {"id": name, "url": url, "error": str(error)}

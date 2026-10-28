@@ -18,7 +18,13 @@ try{
  if($process.ExitCode -ne 0 -or -not $report.passed){throw ('Packaged benchmark UI mismatch: '+$report.error)}
  $golden=Get-Content -LiteralPath (Join-Path $workspace 'src-tauri\data\benchmark-golden.json') -Raw|ConvertFrom-Json
  foreach($case in $golden.cases){$actual=@($report.boards.($case.board)|Where-Object {$_.id -eq $case.modelId});if($actual.Count -ne 1 -or [Math]::Abs([double]$actual[0].score-[double]$case.score) -gt 0.00501){throw ('Native rendered golden mismatch: '+$case.board+' '+$case.modelId)}}
- Write-Output ('PASS actual packaged WebView: '+$report.boards.aa.Count+' AA, '+$report.boards.livebench.Count+' LiveBench, '+$report.boards.consensus.Count+' consensus rows; displayed values, ranks and complete profile IDs match Rust and source golden cases')
+ $reference=Get-Content -LiteralPath (Join-Path $workspace 'target\epoch-research\reference.json') -Raw|ConvertFrom-Json
+ foreach($id in @('general','coding','reasoning','agents','knowledge')){
+  $rows=if($id -eq 'general'){@($reference.general)}else{@($reference.scenarios.$id)}
+  foreach($case in $rows){$actual=@($report.boards.$id|Where-Object {$_.id -eq $case.modelId});if($actual.Count -ne 1 -or [Math]::Abs([double]$actual[0].score-[double]$case.score) -gt 0.00501){throw ('Native scenario reference mismatch: '+$id+' '+$case.modelId)}}
+ }
+ $total=0;foreach($id in @('general','coding','reasoning','agents','knowledge','aa','livebench')){$total+=@($report.boards.$id).Count}
+ Write-Output ('PASS actual packaged WebView: '+$total+' displayed rows across general, four scenarios, AA and LiveBench; scores, ranks, configuration IDs and uncertainty/sensitivity ranges match Rust and independent references')
 }finally{
  if($process -and -not $process.HasExited){Stop-Process -Id $process.Id -ErrorAction SilentlyContinue}
  $env:QUOTA_DATA_DIR=$previousData;$env:QUOTA_BENCHMARK_SMOKE=$previousSmoke

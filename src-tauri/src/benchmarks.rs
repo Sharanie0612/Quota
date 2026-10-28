@@ -1,6 +1,7 @@
 //! Source-native benchmark scores, complete configurations and rank consensus.
 //! No inference is run and no account credentials are used by this module.
 mod adapters;
+pub mod epoch;
 mod scoring;
 pub(crate) mod smoke;
 use crate::commands::AppState;
@@ -11,7 +12,7 @@ pub use smoke::smoke_if_requested;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 use tauri::{Emitter, Manager, State};
 
-pub const ALGORITHM: &str = "publisher-benchmarks/2.0";
+pub const ALGORITHM: &str = "calibrated-scenarios/3.0";
 pub const AREAS: [&str; 6] = [
     "reasoning",
     "coding",
@@ -78,16 +79,30 @@ pub struct Dataset {
     pub sources: Vec<Source>,
     pub observations: Vec<Observation>,
     pub profiles: Vec<Profile>,
+    #[serde(default)]
+    pub epoch: Option<epoch::Snapshot>,
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Component {
     pub metric: String,
     pub value: f64,
     pub unit: String,
     pub weight: Option<f64>,
+    #[serde(default)]
+    pub normalized: Option<f64>,
+    #[serde(default)]
+    pub configuration: String,
+    #[serde(default)]
+    pub evaluator: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub difficulty: Option<f64>,
+    #[serde(default)]
+    pub slope: Option<f64>,
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceResult {
     pub source_id: String,
@@ -98,8 +113,20 @@ pub struct SourceResult {
     pub coverage: f64,
     pub components: Vec<Component>,
     pub url: String,
+    #[serde(default)]
+    pub lower: Option<f64>,
+    #[serde(default)]
+    pub upper: Option<f64>,
+    #[serde(default)]
+    pub range_kind: String,
+    #[serde(default)]
+    pub benchmark_count: usize,
+    #[serde(default)]
+    pub calibration_error: Option<f64>,
+    #[serde(default)]
+    pub kind: String,
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct RankEntry {
     pub model_id: String,
@@ -110,8 +137,16 @@ pub struct RankEntry {
     pub profile_id: String,
     pub setting: String,
     pub source_ranks: BTreeMap<String, f64>,
+    #[serde(default)]
+    pub lower: Option<f64>,
+    #[serde(default)]
+    pub upper: Option<f64>,
+    #[serde(default)]
+    pub range_kind: String,
+    #[serde(default)]
+    pub benchmark_count: usize,
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Ranking {
     pub id: String,
@@ -119,6 +154,8 @@ pub struct Ranking {
     pub version: String,
     pub unit: String,
     pub entries: Vec<RankEntry>,
+    #[serde(default)]
+    pub tier_labels: BTreeMap<String, String>,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -175,9 +212,9 @@ pub fn identity(name: &str) -> String {
 pub fn load(dir: &Path) -> Dataset {
     let base: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json"))
         .expect("valid benchmark seed");
-    let saved = std::fs::read(dir.join("ai-benchmarks-v2.json"))
+    let saved = std::fs::read(dir.join("ai-benchmarks-v3.json"))
         .ok()
-        .filter(|b| b.len() <= 12 * 1024 * 1024)
+        .filter(|b| b.len() <= 24 * 1024 * 1024)
         .and_then(|b| serde_json::from_slice::<Dataset>(&b).ok())
         .filter(valid);
     let mut result = saved.unwrap_or_else(|| base.clone());
@@ -197,7 +234,8 @@ pub fn load(dir: &Path) -> Dataset {
     result
 }
 pub fn valid(data: &Dataset) -> bool {
-    data.schema == 2
+    data.schema == 3
+        && data.epoch.as_ref().is_none_or(epoch::Snapshot::valid)
         && data.sources.len() <= 8
         && data.observations.len() <= 12000
         && data.profiles.len() <= 1000
@@ -205,7 +243,11 @@ pub fn valid(data: &Dataset) -> bool {
             s.checked_at.len() < 64
                 && matches!(
                     s.id.as_str(),
-                    "artificial-analysis" | "livebench" | "official-openai" | "official-anthropic"
+                    "artificial-analysis"
+                        | "livebench"
+                        | "epoch-ai"
+                        | "official-openai"
+                        | "official-anthropic"
                 )
         })
         && data.observations.iter().all(|o| {
@@ -233,6 +275,9 @@ pub fn valid(data: &Dataset) -> bool {
         })
 }
 fn replace_source(target: &mut Dataset, incoming: &Dataset, id: &str) {
+    if id == "epoch-ai" {
+        target.epoch = incoming.epoch.clone();
+    }
     target.sources.retain(|s| s.id != id);
     target
         .sources
@@ -255,6 +300,9 @@ fn replace_source(target: &mut Dataset, incoming: &Dataset, id: &str) {
     );
 }
 async fn download(client: &reqwest::Client, url: &str) -> Result<String, String> {
+    String::from_utf8(download_bytes(client, url).await?).map_err(|_| "来源编码变化".into())
+}
+async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, String> {
     let mut response = client
         .get(url)
         .header("User-Agent", "Mozilla/5.0 Quota-public-benchmarks")
@@ -272,6 +320,8 @@ async fn download(client: &reqwest::Client, url: &str) -> Result<String, String>
                 | "www.artificialanalysis.ai"
                 | "livebench.ai"
                 | "www.livebench.ai"
+                | "epoch.ai"
+                | "www.epoch.ai"
         )
     ) {
         return Err("来源地址发生变化".into());
@@ -283,7 +333,7 @@ async fn download(client: &reqwest::Client, url: &str) -> Result<String, String>
         }
         bytes.extend_from_slice(&chunk);
     }
-    String::from_utf8(bytes).map_err(|_| "来源编码变化".into())
+    Ok(bytes)
 }
 pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, String>)> {
     let aa = async {
@@ -326,13 +376,37 @@ pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, Str
             &chrono::Utc::now().to_rfc3339(),
         )
     };
-    let (aa, lb) = tokio::join!(aa, lb);
-    vec![("artificial-analysis".into(), aa), ("livebench".into(), lb)]
+    let epoch = async {
+        let bytes = download_bytes(client, epoch::URL).await?;
+        let checked = chrono::Utc::now().to_rfc3339();
+        let snapshot = epoch::parse(&bytes, &checked)?;
+        Ok(Dataset {
+            schema: 3,
+            sources: vec![Source {
+                id: "epoch-ai".into(),
+                name: "Epoch AI".into(),
+                url: epoch::SITE.into(),
+                version: format!("ECI · {} 项校准", snapshot.curves.len()),
+                checked_at: checked,
+                records: snapshot.records.len(),
+                automatic: true,
+                ..Default::default()
+            }],
+            epoch: Some(snapshot),
+            ..Default::default()
+        })
+    };
+    let (aa, lb, epoch) = tokio::join!(aa, lb, epoch);
+    vec![
+        ("artificial-analysis".into(), aa),
+        ("livebench".into(), lb),
+        ("epoch-ai".into(), epoch),
+    ]
 }
 pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String>)>) -> Dataset {
     for (id, result) in updates {
         match result {
-            Ok(next) if valid(&next) && !next.observations.is_empty() => {
+            Ok(next) if valid(&next) && (!next.observations.is_empty() || next.epoch.is_some()) => {
                 replace_source(&mut previous, &next, &id)
             }
             other => {
@@ -345,13 +419,17 @@ pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String
                     previous.sources.push(Source {
                         weights: BTreeMap::new(),
                         id: id.clone(),
-                        name: if id == "livebench" {
+                        name: if id == "epoch-ai" {
+                            "Epoch AI"
+                        } else if id == "livebench" {
                             "LiveBench"
                         } else {
                             "Artificial Analysis"
                         }
                         .into(),
-                        url: if id == "livebench" {
+                        url: if id == "epoch-ai" {
+                            epoch::SITE
+                        } else if id == "livebench" {
                             "https://livebench.ai/"
                         } else {
                             "https://artificialanalysis.ai/leaderboards/models"
@@ -378,7 +456,7 @@ pub async fn refresh(state: &AppState, force: bool) -> Result<Board, String> {
             .map_err(|_| "评测数据暂不可用")?;
         let automatic: Vec<_> = current.sources.iter().filter(|s| s.automatic).collect();
         if !force
-            && automatic.len() == 2
+            && automatic.len() == 3
             && automatic.iter().all(|s| {
                 s.error.is_none()
                     && chrono::DateTime::parse_from_rfc3339(&s.checked_at)
@@ -411,7 +489,7 @@ pub async fn refresh(state: &AppState, force: bool) -> Result<Board, String> {
         return Err("评测数据校验未通过".into());
     }
     crate::storage::write_atomic(
-        &state.store.dir().join("ai-benchmarks-v2.json"),
+        &state.store.dir().join("ai-benchmarks-v3.json"),
         &serde_json::to_string(&next).map_err(|_| "编码评测数据失败")?,
     )?;
     *current = next;

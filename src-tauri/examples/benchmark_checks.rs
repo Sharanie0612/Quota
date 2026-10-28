@@ -14,7 +14,7 @@ fn fixture() -> Dataset {
     .map(|(k, v)| (format!("LiveBench {k}"), v))
     .collect::<BTreeMap<_, _>>();
     let mut data = Dataset {
-        schema: 2,
+        schema: 3,
         sources: vec![
             Source {
                 id: "artificial-analysis".into(),
@@ -28,6 +28,7 @@ fn fixture() -> Dataset {
         ],
         observations: vec![],
         profiles: vec![],
+        epoch: None,
     };
     for i in 0..8 {
         let id = format!("model{i}");
@@ -184,6 +185,7 @@ fn checks() {
 }
 fn main() {
     checks();
+    scenario_math_checks();
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let audit = root.join("../target/benchmark-sources");
     if !std::env::args().any(|a| a == "--fixtures" || a == "--live" || a == "--write-seed") {
@@ -208,7 +210,7 @@ fn main() {
     .is_err());
     let mut dataset = benchmarks::merge(
         Dataset {
-            schema: 2,
+            schema: 3,
             ..Default::default()
         },
         vec![
@@ -219,7 +221,7 @@ fn main() {
     let old: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json")).unwrap();
     for source in old.sources.iter().filter(|s| !s.automatic) {
         let data = Dataset {
-            schema: 2,
+            schema: 3,
             sources: vec![source.clone()],
             observations: old
                 .observations
@@ -228,9 +230,41 @@ fn main() {
                 .cloned()
                 .collect(),
             profiles: vec![],
+            epoch: None,
         };
         dataset = benchmarks::merge(dataset, vec![(source.id.clone(), Ok(data))]);
     }
+    let epoch_zip = fs::read(root.join("../target/epoch-research/benchmark_data.zip"))
+        .expect("download official Epoch fixture");
+    let epoch_checked: chrono::DateTime<chrono::Utc> =
+        fs::metadata(root.join("../target/epoch-research/benchmark_data.zip"))
+            .unwrap()
+            .modified()
+            .unwrap()
+            .into();
+    let epoch = benchmarks::epoch::parse(&epoch_zip, &epoch_checked.to_rfc3339())
+        .expect("valid official Epoch fixture");
+    dataset = benchmarks::merge(
+        dataset,
+        vec![(
+            "epoch-ai".into(),
+            Ok(Dataset {
+                schema: 3,
+                sources: vec![Source {
+                    id: "epoch-ai".into(),
+                    name: "Epoch AI".into(),
+                    url: benchmarks::epoch::SITE.into(),
+                    version: format!("ECI · {} 项校准", epoch.curves.len()),
+                    checked_at: checked.into(),
+                    records: epoch.records.len(),
+                    automatic: true,
+                    ..Default::default()
+                }],
+                epoch: Some(epoch),
+                ..Default::default()
+            }),
+        )],
+    );
     if std::env::args().any(|a| a == "--live") {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let client = reqwest::Client::new();
@@ -241,10 +275,58 @@ fn main() {
         dataset = benchmarks::merge(dataset, updates);
     }
     assert!(benchmarks::valid(&dataset));
+    let started = std::time::Instant::now();
     let board = benchmarks::calculate(&dataset);
+    println!(
+        "Full board calculation: {} ms",
+        started.elapsed().as_millis()
+    );
     let golden: serde_json::Value =
         serde_json::from_str(include_str!("../data/benchmark-golden.json")).unwrap();
     let mut reconciled = Vec::new();
+    let reference: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(root.join("../target/epoch-research/reference.json"))
+            .expect("run reference-scenarios.py first"),
+    )
+    .unwrap();
+    assert_eq!(
+        reference["zipSha256"].as_str().unwrap(),
+        dataset.epoch.as_ref().unwrap().sha256
+    );
+    assert_eq!(
+        reference["conflictingRecordsExcluded"].as_u64().unwrap() as usize,
+        dataset.epoch.as_ref().unwrap().conflicts_excluded
+    );
+    for id in ["general", "coding", "reasoning", "agents", "knowledge"] {
+        let expected = if id == "general" {
+            reference["general"].as_array().unwrap()
+        } else {
+            reference["scenarios"][id].as_array().unwrap()
+        };
+        let entries = &ranking(&board, id).entries;
+        assert_eq!(entries.len(), expected.len(), "{id} reference roster");
+        for row in expected {
+            let model = row["modelId"].as_str().unwrap();
+            let actual = entries
+                .iter()
+                .find(|e| e.model_id == model)
+                .expect("reference model present");
+            let score = row["score"].as_f64().unwrap();
+            assert!(
+                (actual.score - score).abs() < 0.0001,
+                "{id} {model}: {} vs {score}",
+                actual.score
+            );
+            if id != "general" {
+                assert!(actual.setting == row["profile"].as_str().unwrap());
+                assert_eq!(
+                    actual.benchmark_count,
+                    row["benchmarks"].as_u64().unwrap() as usize
+                );
+            }
+            reconciled.push(serde_json::json!({"board":id,"model":model,"expected":score,"actual":actual.score,"profileId":actual.profile_id}));
+        }
+    }
     for row in golden["cases"].as_array().unwrap() {
         let source = row["board"].as_str().unwrap();
         let id = row["modelId"].as_str().unwrap();
@@ -297,7 +379,7 @@ fn main() {
             .weights["LiveBench Long Agentic"],
         2.
     );
-    for r in board.rankings.iter().take(3) {
+    for r in board.rankings.iter().take(7) {
         println!(
             "BOARD {}: {} models; first {:?}",
             r.id,
@@ -332,4 +414,58 @@ fn main() {
     println!(
         "PASS source-native golden reconciliation and every AA displayed score/profile identity"
     );
+}
+
+fn scenario_math_checks() {
+    use benchmarks::epoch::{Curve, Record};
+    let curves: Vec<_> = [
+        ("easy", 100., 0.05),
+        ("middle", 140., 0.08),
+        ("hard", 175., 0.1),
+    ]
+    .into_iter()
+    .map(|(name, difficulty, slope)| Curve {
+        name: name.into(),
+        difficulty,
+        slope,
+        baseline: 0.,
+        ceiling: 1.,
+        superseded_by: String::new(),
+    })
+    .collect();
+    let curve_map: BTreeMap<_, _> = curves.iter().map(|c| (c.name.as_str(), c)).collect();
+    let mut records: Vec<_> = curves
+        .iter()
+        .map(|c| {
+            let p = 1. / (1. + (-c.slope * (153. - c.difficulty)).exp());
+            Record {
+                model_id: "fixture".into(),
+                configuration: "fixture_max".into(),
+                benchmark: c.name.clone(),
+                raw: p,
+                normalized: p,
+                evaluator: "fixture".into(),
+                url: "https://example.org".into(),
+            }
+        })
+        .collect();
+    let rows: Vec<_> = records.iter().collect();
+    let (score, error) = benchmarks::epoch::fit(&rows, &curve_map).unwrap();
+    assert!(
+        (score - 153.).abs() < 1e-5 && error < 1e-7,
+        "known latent capability must be recovered"
+    );
+    for row in &mut records {
+        row.normalized = 1.;
+    }
+    assert!(
+        benchmarks::epoch::fit(&records.iter().collect::<Vec<_>>(), &curve_map).is_none(),
+        "saturated scores cannot imply a finite capability"
+    );
+    for row in &mut records {
+        row.normalized = 0.;
+    }
+    assert!(benchmarks::epoch::fit(&records.iter().collect::<Vec<_>>(), &curve_map).is_none());
+    assert!(benchmarks::epoch::fit(&[], &curve_map).is_none());
+    println!("PASS known difficulty/slope recovery, zero/one saturation, missing evidence and finite-fit boundaries");
 }

@@ -228,10 +228,11 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         automatic: true,
     };
     Ok(Dataset {
-        schema: 2,
+        schema: 3,
         sources: vec![source],
         observations,
         profiles,
+        epoch: None,
     })
 }
 pub fn livebench_releases(js: &str) -> Vec<String> {
@@ -260,7 +261,15 @@ pub fn livebench_releases(js: &str) -> Vec<String> {
     }
     out.into_iter().collect()
 }
-fn csv(text: &str) -> Result<Vec<Vec<String>>, String> {
+pub(super) fn csv(text: &str) -> Result<Vec<Vec<String>>, String> {
+    csv_limited(text, 1000, 50, 4000)
+}
+pub(super) fn csv_limited(
+    text: &str,
+    max_rows: usize,
+    max_columns: usize,
+    max_cell: usize,
+) -> Result<Vec<Vec<String>>, String> {
     let mut rows = Vec::new();
     let mut row = Vec::new();
     let mut cell = String::new();
@@ -281,8 +290,8 @@ fn csv(text: &str) -> Result<Vec<Vec<String>>, String> {
             '\r' if !quoted => {}
             _ => cell.push(c),
         }
-        if rows.len() > 1000 || row.len() > 50 || cell.len() > 4000 {
-            return Err("LiveBench 表格超过上限".into());
+        if rows.len() > max_rows || row.len() > max_columns || cell.len() > max_cell {
+            return Err("公开 CSV 表格超过读取上限".into());
         }
     }
     if quoted {
@@ -412,7 +421,7 @@ pub fn parse_livebench(
         return Err("LiveBench 成绩不完整".into());
     }
     Ok(Dataset {
-        schema: 2,
+        schema: 3,
         sources: vec![Source {
             weights,
             id: "livebench".into(),
@@ -426,5 +435,6 @@ pub fn parse_livebench(
         }],
         observations,
         profiles: vec![],
+        epoch: None,
     })
 }

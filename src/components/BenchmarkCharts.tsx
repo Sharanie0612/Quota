@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { BenchmarkModel, BenchmarkProfile } from '../lib/types';
-import { fixed, frontier, modelResult, SERIES } from '../lib/benchmarkCharts';
+import { fixed, frontier, modelResult, SCENARIOS, SERIES } from '../lib/benchmarkCharts';
 
 export function CapabilityBars({models,source='aa',effort='best'}:{models:BenchmarkModel[];source?:string;effort?:string}) {
+  if(source==='general')return <section className="card capability-chart"><div className="benchmark-chart-heading"><h2>场景能力</h2><span>指数 · 0–200</span></div><div className="benchmark-legend">{models.map((m,i)=><span key={m.id}><i style={{background:SERIES[i]}}/>{m.name}</span>)}</div><div className="capability-groups">{SCENARIOS.map(scene=><div className="capability-group" key={scene.id}><div className="capability-label">{scene.name}</div><div className="capability-bars">{models.map((m,i)=>{const result=modelResult(m,scene.id);return <div className="capability-bar-row" key={m.id}><div className="capability-track"><span style={{width:(result?Math.min(100,result.score/2):0)+'%',background:SERIES[i]}}/></div><b>{result?.score.toFixed(2)??'—'}</b></div>;})}</div></div>)}</div></section>;
   if(source==='consensus')return <section className="card capability-chart"><h2>各榜原始分数</h2><div className="benchmark-native-table"><table><thead><tr><th>模型</th><th>AA 指数</th><th>LiveBench</th></tr></thead><tbody>{models.map(model=><tr key={model.id}><td>{model.name}</td>{['aa','livebench'].map(id=>{const result=modelResult(model,id);return <td key={id}><b>{result?.score.toFixed(2)??'—'}</b><span>{result?.setting??'未测'}</span></td>;})}</tr>)}</tbody></table></div></section>;
   const results=models.map(model=>modelResult(model,source,effort));
   const metrics=[...new Set(results.flatMap(r=>r?.components.map(c=>c.metric)??[]))];

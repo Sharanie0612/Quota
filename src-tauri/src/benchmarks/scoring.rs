@@ -83,6 +83,8 @@ fn publisher_ranking(
                 profile_id: result.profile_id.clone(),
                 setting: result.setting.clone(),
                 source_ranks: BTreeMap::new(),
+                benchmark_count: result.components.len(),
+                ..Default::default()
             });
         }
     }
@@ -102,6 +104,7 @@ fn publisher_ranking(
         }
         .into(),
         entries,
+        ..Default::default()
     }
 }
 
@@ -174,6 +177,7 @@ pub fn calculate(data: &Dataset) -> Board {
                     value: o.value,
                     unit: o.unit.clone(),
                     weight: None,
+                    ..Default::default()
                 });
             }
             results.push(SourceResult {
@@ -185,6 +189,7 @@ pub fn calculate(data: &Dataset) -> Board {
                 coverage: 100.,
                 components: components.into_values().collect(),
                 url: "https://artificialanalysis.ai/leaderboards/models".into(),
+                ..Default::default()
             });
         }
         if let Some(source) = lb_source.filter(|s| s.weights.len() == 7) {
@@ -234,6 +239,7 @@ pub fn calculate(data: &Dataset) -> Board {
                         metric: key,
                         value: o.value,
                         unit: o.unit.clone(),
+                        ..Default::default()
                     })
                     .collect::<Vec<_>>();
                 results.push(SourceResult {
@@ -245,6 +251,7 @@ pub fn calculate(data: &Dataset) -> Board {
                     coverage: components.len() as f64 / source.weights.len() as f64 * 100.,
                     components,
                     url: source.url.clone(),
+                    ..Default::default()
                 });
             }
         }
@@ -260,6 +267,21 @@ pub fn calculate(data: &Dataset) -> Board {
             results,
             observations,
         });
+    }
+    if let Some(snapshot) = &data.epoch {
+        for (id, results) in epoch::results(snapshot) {
+            if let Some(model) = models.iter_mut().find(|m| m.id == id) {
+                model.results.extend(results);
+            } else if let Some(model) = snapshot.models.iter().find(|m| m.id == id) {
+                models.push(RankedModel {
+                    id,
+                    name: model.name.clone(),
+                    vendor: model.vendor.clone(),
+                    results,
+                    observations: vec![],
+                });
+            }
+        }
     }
     let aa = publisher_ranking(&models, "aa", "AA 能力指数", "artificial-analysis", None);
     let lb = publisher_ranking(&models, "livebench", "LiveBench 综合分", "livebench", None);
@@ -294,6 +316,7 @@ pub fn calculate(data: &Dataset) -> Board {
                 profile_id: String::new(),
                 setting: "两榜同池 · 平均名次".into(),
                 source_ranks: ranks,
+                ..Default::default()
             });
         }
     }
@@ -304,8 +327,68 @@ pub fn calculate(data: &Dataset) -> Board {
         version: format!("{} / {}", aa.version, lb.version),
         unit: "平均名次 · 越低越好".into(),
         entries: consensus,
+        ..Default::default()
     };
     let mut rankings = vec![aa, lb, consensus];
+    if let Some(snapshot) = &data.epoch {
+        let policy = epoch::policy();
+        let mut domains = vec![("general".to_string(), "通用综合".to_string())];
+        domains.extend(
+            policy
+                .domains
+                .iter()
+                .map(|d| (d.id.clone(), d.name.clone())),
+        );
+        for (id, name) in domains.into_iter().rev() {
+            let mut entries: Vec<_> = models
+                .iter()
+                .filter_map(|m| {
+                    m.results
+                        .iter()
+                        .find(|r| r.source_id == "epoch-ai" && r.kind == id)
+                        .map(|r| RankEntry {
+                            model_id: m.id.clone(),
+                            score: r.score,
+                            coverage: r.coverage,
+                            profile_id: r.profile_id.clone(),
+                            setting: r.setting.clone(),
+                            lower: r.lower,
+                            upper: r.upper,
+                            range_kind: r.range_kind.clone(),
+                            benchmark_count: r.benchmark_count,
+                            ..Default::default()
+                        })
+                })
+                .collect();
+            assign_ranks(&mut entries, true);
+            // Fixed, labelled ECI-scale bands: roster changes never move an
+            // existing score to another tier. These are display policy only.
+            for e in &mut entries {
+                e.tier = ["S", "A", "B", "C"]
+                    .into_iter()
+                    .find(|tier| e.score >= policy.tier_thresholds[*tier])
+                    .unwrap_or("D")
+                    .into();
+            }
+            rankings.insert(
+                0,
+                Ranking {
+                    id,
+                    name,
+                    version: format!("{} · {}", policy.version, &snapshot.sha256[..12]),
+                    unit: "校准指数 · 非百分比".into(),
+                    entries,
+                    tier_labels: BTreeMap::from([
+                        ("S".into(), "165+".into()),
+                        ("A".into(), "155–165".into()),
+                        ("B".into(), "145–155".into()),
+                        ("C".into(), "130–145".into()),
+                        ("D".into(), "< 130".into()),
+                    ]),
+                },
+            );
+        }
+    }
     for effort in [
         "Low",
         "Medium",

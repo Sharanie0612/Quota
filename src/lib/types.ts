@@ -174,10 +174,10 @@ export interface AiModelSnapshot {schema:number;checkedAt:string|null;models:AiM
 export interface BenchmarkObservation {profileId:string;modelId:string;modelName:string;vendor:string;sourceId:string;metric:string;family:string;version:string;domain:string;setting:string;value:number;unit:string;weight:number;official:boolean;url:string;checkedAt:string}
 export interface BenchmarkProfile {id:string;modelId:string;name:string;vendor:string;setting:string;index:number;cost:number|null;speed:number|null;latency:number|null;sourceId:string;version:string}
 export interface BenchmarkSource {id:string;name:string;url:string;version:string;checkedAt:string;records:number;error:string|null;automatic:boolean;weights:Record<string,number>}
-export interface BenchmarkComponent {metric:string;value:number;unit:string;weight:number|null}
-export interface BenchmarkResult {sourceId:string;version:string;profileId:string;setting:string;score:number;coverage:number;components:BenchmarkComponent[];url:string}
-export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>}
-export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[]}
+export interface BenchmarkComponent {metric:string;value:number;unit:string;weight:number|null;normalized:number|null;configuration:string;evaluator:string;url:string;difficulty:number|null;slope:number|null}
+export interface BenchmarkResult {sourceId:string;version:string;profileId:string;setting:string;score:number;coverage:number;components:BenchmarkComponent[];url:string;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number;calibrationError:number|null;kind:string}
+export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number}
+export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[];tierLabels:Record<string,string>}
 export interface BenchmarkModel {id:string;name:string;vendor:string;results:BenchmarkResult[];observations:BenchmarkObservation[]}
 export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[];rankings:BenchmarkRanking[]}
 

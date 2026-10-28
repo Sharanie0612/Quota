@@ -1,6 +1,9 @@
-import type { BenchmarkProfile } from './types';
+import type { BenchmarkModel, BenchmarkProfile } from './types';
 
-export const DOMAINS = [{id:'reasoning',name:'推理'},{id:'coding',name:'编程'},{id:'knowledge',name:'知识分析'},{id:'research',name:'科学研究'},{id:'agents',name:'智能体'},{id:'visual',name:'视觉与创作'}];
+export function modelResult(model:BenchmarkModel,source:string,effort='best'){
+  return model.results.filter(r=>r.sourceId===(source==='livebench'?'livebench':'artificial-analysis')&&(source!=='aa'||effort==='best'||r.setting.split(',')[0].trim().toLowerCase()===effort)).sort((a,b)=>b.score-a.score||a.profileId.localeCompare(b.profileId))[0];
+}
+export const settingText=(value:string)=>value.replace('Default Fallback','默认回退').replace('平台公开设置','公开配置');
 export const SERIES = ['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-4)'];
 export const fixed = (value:number|undefined|null) => value==null?'—':value.toFixed(1);
 export function frontier(profiles:BenchmarkProfile[]) {

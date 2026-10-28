@@ -1,26 +1,30 @@
-//! Public benchmark evidence and Quota's publisher-balanced capability index.
+//! Source-native benchmark scores, complete configurations and rank consensus.
 //! No inference is run and no account credentials are used by this module.
 mod adapters;
 mod scoring;
+pub(crate) mod smoke;
 use crate::commands::AppState;
 pub use adapters::{parse_aa, parse_livebench};
 pub use scoring::calculate;
 use serde::{Deserialize, Serialize};
+pub use smoke::smoke_if_requested;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 use tauri::{Emitter, Manager, State};
 
-pub const ALGORITHM: &str = "quota-index/1.0";
-pub const DOMAINS: [(&str, &str, f64); 6] = [
-    ("reasoning", "推理", 0.2),
-    ("coding", "编程", 0.2),
-    ("knowledge", "知识分析", 0.2),
-    ("research", "科学研究", 0.2),
-    ("agents", "智能体", 0.2),
-    ("visual", "视觉与创作", 0.),
+pub const ALGORITHM: &str = "publisher-benchmarks/2.0";
+pub const AREAS: [&str; 6] = [
+    "reasoning",
+    "coding",
+    "knowledge",
+    "research",
+    "agents",
+    "visual",
 ];
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Observation {
+    #[serde(default)]
+    pub profile_id: String,
     pub model_id: String,
     pub model_name: String,
     pub vendor: String,
@@ -40,6 +44,8 @@ pub struct Observation {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Profile {
+    #[serde(default)]
+    pub id: String,
     pub model_id: String,
     pub name: String,
     pub vendor: String,
@@ -51,9 +57,11 @@ pub struct Profile {
     pub source_id: String,
     pub version: String,
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Source {
+    #[serde(default)]
+    pub weights: BTreeMap<String, f64>,
     pub id: String,
     pub name: String,
     pub url: String,
@@ -73,12 +81,44 @@ pub struct Dataset {
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Contribution {
+pub struct Component {
+    pub metric: String,
+    pub value: f64,
+    pub unit: String,
+    pub weight: Option<f64>,
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceResult {
     pub source_id: String,
-    pub domain: String,
+    pub version: String,
+    pub profile_id: String,
+    pub setting: String,
     pub score: f64,
-    pub metrics: usize,
-    pub official: bool,
+    pub coverage: f64,
+    pub components: Vec<Component>,
+    pub url: String,
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RankEntry {
+    pub model_id: String,
+    pub score: f64,
+    pub rank: u32,
+    pub tier: String,
+    pub coverage: f64,
+    pub profile_id: String,
+    pub setting: String,
+    pub source_ranks: BTreeMap<String, f64>,
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Ranking {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub unit: String,
+    pub entries: Vec<RankEntry>,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -86,14 +126,7 @@ pub struct RankedModel {
     pub id: String,
     pub name: String,
     pub vendor: String,
-    pub score: Option<f64>,
-    pub rank: Option<u32>,
-    pub tier: String,
-    pub domains: BTreeMap<String, f64>,
-    pub coverage: f64,
-    pub independent_sources: usize,
-    pub provisional: bool,
-    pub contributions: Vec<Contribution>,
+    pub results: Vec<SourceResult>,
     pub observations: Vec<Observation>,
 }
 #[derive(Clone, Serialize, Debug)]
@@ -104,6 +137,7 @@ pub struct Board {
     pub models: Vec<RankedModel>,
     pub profiles: Vec<Profile>,
     pub reference_cohort: Vec<String>,
+    pub rankings: Vec<Ranking>,
 }
 pub struct Cache {
     pub dataset: Mutex<Dataset>,
@@ -141,7 +175,7 @@ pub fn identity(name: &str) -> String {
 pub fn load(dir: &Path) -> Dataset {
     let base: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json"))
         .expect("valid benchmark seed");
-    let saved = std::fs::read(dir.join("ai-benchmarks-v1.json"))
+    let saved = std::fs::read(dir.join("ai-benchmarks-v2.json"))
         .ok()
         .filter(|b| b.len() <= 12 * 1024 * 1024)
         .and_then(|b| serde_json::from_slice::<Dataset>(&b).ok())
@@ -163,7 +197,7 @@ pub fn load(dir: &Path) -> Dataset {
     result
 }
 pub fn valid(data: &Dataset) -> bool {
-    data.schema == 1
+    data.schema == 2
         && data.sources.len() <= 8
         && data.observations.len() <= 12000
         && data.profiles.len() <= 1000
@@ -181,14 +215,16 @@ pub fn valid(data: &Dataset) -> bool {
                 && o.value.is_finite()
                 && o.value >= 0.
                 && o.value <= 5000.
-                && o.weight > 0.
+                && o.weight >= 0.
                 && o.weight <= 10.
-                && DOMAINS.iter().any(|d| d.0 == o.domain)
+                && AREAS.contains(&o.domain.as_str())
                 && o.url.starts_with("https://")
                 && data.sources.iter().any(|s| s.id == o.source_id)
         })
         && data.profiles.iter().all(|p| {
-            p.index.is_finite()
+            !p.id.is_empty()
+                && p.source_id == "artificial-analysis"
+                && p.index.is_finite()
                 && (0. ..=100.).contains(&p.index)
                 && [p.cost, p.speed, p.latency]
                     .into_iter()
@@ -307,6 +343,7 @@ pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String
                     source.error = Some(error);
                 } else {
                     previous.sources.push(Source {
+                        weights: BTreeMap::new(),
                         id: id.clone(),
                         name: if id == "livebench" {
                             "LiveBench"
@@ -374,7 +411,7 @@ pub async fn refresh(state: &AppState, force: bool) -> Result<Board, String> {
         return Err("评测数据校验未通过".into());
     }
     crate::storage::write_atomic(
-        &state.store.dir().join("ai-benchmarks-v1.json"),
+        &state.store.dir().join("ai-benchmarks-v2.json"),
         &serde_json::to_string(&next).map_err(|_| "编码评测数据失败")?,
     )?;
     *current = next;

@@ -23,6 +23,7 @@ import type {
 export const api = {
   getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
   refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
+  reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
   getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),
   refreshAiModels: (force=true) => invoke<AiModelSnapshot>('refresh_ai_models',{force}),
   moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),

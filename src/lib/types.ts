@@ -171,11 +171,15 @@ export interface AiModel {
   cacheWrites:{ttlSeconds:number;price:number}[];
 }
 export interface AiModelSnapshot {schema:number;checkedAt:string|null;models:AiModel[];sources:{vendor:string;url:string;checkedAt:string;models:number;error:string|null}[]}
-export interface BenchmarkObservation {modelId:string;modelName:string;vendor:string;sourceId:string;metric:string;family:string;version:string;domain:string;setting:string;value:number;unit:string;weight:number;official:boolean;url:string;checkedAt:string}
-export interface BenchmarkProfile {modelId:string;name:string;vendor:string;setting:string;index:number;cost:number|null;speed:number|null;latency:number|null;sourceId:string;version:string}
-export interface BenchmarkSource {id:string;name:string;url:string;version:string;checkedAt:string;records:number;error:string|null;automatic:boolean}
-export interface BenchmarkModel {id:string;name:string;vendor:string;score:number|null;rank:number|null;tier:string;domains:Record<string,number>;coverage:number;independentSources:number;provisional:boolean;contributions:{sourceId:string;domain:string;score:number;metrics:number;official:boolean}[];observations:BenchmarkObservation[]}
-export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[]}
+export interface BenchmarkObservation {profileId:string;modelId:string;modelName:string;vendor:string;sourceId:string;metric:string;family:string;version:string;domain:string;setting:string;value:number;unit:string;weight:number;official:boolean;url:string;checkedAt:string}
+export interface BenchmarkProfile {id:string;modelId:string;name:string;vendor:string;setting:string;index:number;cost:number|null;speed:number|null;latency:number|null;sourceId:string;version:string}
+export interface BenchmarkSource {id:string;name:string;url:string;version:string;checkedAt:string;records:number;error:string|null;automatic:boolean;weights:Record<string,number>}
+export interface BenchmarkComponent {metric:string;value:number;unit:string;weight:number|null}
+export interface BenchmarkResult {sourceId:string;version:string;profileId:string;setting:string;score:number;coverage:number;components:BenchmarkComponent[];url:string}
+export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>}
+export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[]}
+export interface BenchmarkModel {id:string;name:string;vendor:string;results:BenchmarkResult[];observations:BenchmarkObservation[]}
+export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[];rankings:BenchmarkRanking[]}
 
 export interface ModelPrice {
   cachedInput?: number | null;

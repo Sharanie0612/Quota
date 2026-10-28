@@ -19,6 +19,11 @@ const points=[profile(1,20),profile(2,15),profile(3,25),profile(3,30),profile(nu
 assert.deepEqual(frontier(points).map(p=>[p.cost,p.index]),[[1,20],[3,30]]);assert.equal(points.length,7);
 assert.deepEqual(frontier([]),[]);
 const seed=JSON.parse(fs.readFileSync(path.join(__dirname,'../src-tauri/data/benchmarks.json'),'utf8'));
+assert.equal(seed.schema,2);
+assert.equal(new Set(seed.profiles.map(p=>p.id)).size,seed.profiles.length);
+assert.ok(seed.profiles.every(p=>p.id));
+const weights=seed.sources.find(s=>s.id==='livebench').weights;
+assert.equal(weights['LiveBench Long Agentic'],2);assert.equal(weights['LiveBench Coding'],1.5);assert.equal(weights['LiveBench Design'],1.5);
 assert.ok(seed.sources.some(s=>s.id==='official-anthropic'&&!s.automatic));
 for(const o of seed.observations){assert.ok(o.url.startsWith('https://'));assert.ok(Number.isFinite(Date.parse(o.checkedAt)));assert.ok(Number.isFinite(o.value));}
 for(const p of seed.profiles){assert.equal(p.version,'Intelligence Index v5');assert.ok(p.cost==null||p.cost>=0);}

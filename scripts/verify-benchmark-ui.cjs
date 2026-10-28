@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require(process.env.QUOTA_PLAYWRIGHT_MODULE||'playwright');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'target/model-benchmarks-ui'),preview=path.join(root,'dist-mock');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'target/benchmark-validity-ui'),preview=path.join(root,'dist-mock');
 const base=process.env.QUOTA_PREVIEW_URL||'http://127.0.0.1:4178/';
 fs.mkdirSync(out,{recursive:true});fs.mkdirSync(preview,{recursive:true});
 fs.cpSync(path.join(root,'dist/assets'),path.join(preview,'assets'),{recursive:true});
@@ -20,11 +20,23 @@ try{
   assert.equal(await page.locator('html').getAttribute('data-color-theme'),'quota');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'AI 模型',exact:true}).click();
   await page.locator('.tier-model').first().waitFor();assert.ok(await page.locator('.tier-s .tier-model').count()>0);
-  await overflow(page,'.content');await page.screenshot({path:path.join(out,mode+'-ladder.png')});
+  const board=JSON.parse(fs.readFileSync(path.join(root,'target/benchmark-sources/board.json'),'utf8'));
+  for(const id of ['aa','livebench','consensus']){
+    await page.getByRole('combobox',{name:'评测榜单',exact:true}).selectOption(id);await page.locator('.tier-board[data-ranking-id="'+id+'"]').waitFor();
+    const actual=await page.locator('.tier-model').evaluateAll(rows=>rows.map(e=>({id:e.dataset.modelId,rank:Number(e.dataset.rank),profileId:e.dataset.profileId,score:Number(e.querySelector('.tier-model-score strong').textContent)})));
+    const expected=board.rankings.find(r=>r.id===id).entries;
+    assert.equal(actual.length,expected.length);
+    actual.forEach((row,i)=>{assert.equal(row.id,expected[i].modelId);assert.equal(row.rank,expected[i].rank);assert.equal(row.profileId,expected[i].profileId);assert.ok(Math.abs(row.score-expected[i].score)<=.00501);});
+    await overflow(page,'.content');await page.screenshot({path:path.join(out,mode+'-'+id+'-ladder.png')});
+  }
+  await page.getByRole('combobox',{name:'评测榜单',exact:true}).selectOption('aa');
+  await page.getByRole('combobox',{name:'推理档位',exact:true}).selectOption('low');await page.locator('.tier-board[data-ranking-id="aa:low"]').waitFor();assert.ok(await page.locator('.tier-model-setting').evaluateAll(rows=>rows.every(e=>e.textContent.toLowerCase().startsWith('low'))));
+  await page.getByRole('combobox',{name:'推理档位',exact:true}).selectOption('best');
+  await page.locator('.tier-board[data-ranking-id="aa"]').waitFor();
   await page.getByRole('textbox',{name:'搜索天梯模型'}).fill('GPT-6.1 Terra');assert.equal(await page.locator('.tier-model').count(),1);await page.getByRole('textbox',{name:'搜索天梯模型'}).fill('');
-  await page.locator('.tier-model-main').first().click();let dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/原始成绩/);await dialog.locator('.benchmark-evidence summary').first().click();assert.match(await dialog.innerText(),/公开配置/);await page.screenshot({path:path.join(out,mode+'-model-detail.png')});await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
-  await page.getByRole('button',{name:'算法与来源',exact:true}).click();dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/各占 20%/);assert.match(await dialog.innerText(),/Anthropic 官方报告/);await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
-  await page.locator('.benchmark-toolbar').getByRole('tab',{name:'能力对比',exact:true}).click();assert.equal(await page.locator('.capability-group').count(),6);await page.screenshot({path:path.join(out,mode+'-capabilities.png')});
+  await page.locator('.tier-model-main').first().click();let dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/分项/);await dialog.locator('.benchmark-evidence summary').first().click();assert.match(await dialog.innerText(),/公开配置/);await page.screenshot({path:path.join(out,mode+'-model-detail.png')});await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
+  await page.getByRole('button',{name:'算法与来源',exact:true}).click();dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/平均名次/);assert.match(await dialog.innerText(),/Anthropic 官方报告/);await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
+  await page.locator('.benchmark-toolbar').getByRole('tab',{name:'能力对比',exact:true}).click();assert.ok(await page.locator('.capability-group').count()>=9);await page.screenshot({path:path.join(out,mode+'-capabilities.png')});
   await page.locator('.benchmark-toolbar').getByRole('tab',{name:'效率曲线',exact:true}).click();await page.locator('.benchmark-point').first().waitFor();assert.ok(await page.locator('.benchmark-point').count()>3);await page.locator('.benchmark-point').first().focus();assert.match(await page.locator('.efficiency-readout').innerText(),/任务/);await overflow(page,'.content');await page.screenshot({path:path.join(out,mode+'-efficiency.png')});
   await page.locator('.benchmark-toolbar').getByRole('tab',{name:'官方价格',exact:true}).click();await page.locator('.registry-model').first().waitFor();await overflow(page,'.content');
   await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'Token 活动',exact:true}).click();await page.locator('.activity-shares').waitFor();assert.equal(await page.locator('.activity-share svg').count(),3);for(const card of await page.locator('.activity-share').all()){const box=await card.evaluate(e=>({client:e.clientWidth,scroll:e.scrollWidth}));assert.ok(box.scroll<=box.client+1,'donut legend overflow');}await page.locator('.activity-shares').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,mode+'-activity-shares.png')});
@@ -40,7 +52,7 @@ try{
   if(test==='retry'){await page.getByRole('button',{name:'重试',exact:true}).waitFor();assert.match(await page.locator('.notice').innerText(),/正在运行/);await page.getByRole('button',{name:'重试',exact:true}).click();}
   await page.getByRole('progressbar').waitFor();assert.equal(await page.getByRole('button',{name:'取消',exact:true}).isDisabled(),true);await page.screenshot({path:path.join(out,'setup-'+test+'-progress.png')});await page.getByRole('heading',{name:'安装完成',exact:true}).waitFor();await page.screenshot({path:path.join(out,'setup-'+test+'-finish.png')});await page.getByRole('button',{name:'完成',exact:true}).click();await page.waitForFunction(()=>window.demoSetupFinished===true);await page.close();evidence.push({setup:test,viewport:[720,540],passed:true});
  }
- for(const test of ['offline','empty']){const page=await browser.newPage({viewport:{width:1024,height:768}});await page.goto(base+'?benchmarkCase='+test);await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'AI 模型',exact:true}).click();await page.getByText(test==='offline'?'部分来源未能更新，已保留上次评测。':'没有匹配的模型',{exact:true}).waitFor();await page.close();}
- fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,evidence},null,2));console.log('PASS ladder, exact-model search, evidence, capabilities, cost/quality profiles, official directory, donuts, default Quota and sidebar; wizard options/progress/retry/finish; offline and empty states');
+ for(const test of ['offline','empty']){const page=await browser.newPage({viewport:{width:1024,height:768}});await page.goto(base+'?benchmarkCase='+test);await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'AI 模型',exact:true}).click();await page.getByText(test==='offline'?'部分来源未能更新，已保留上次评测。':'当前榜单没有匹配型号',{exact:true}).waitFor();await page.close();}
+ fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,evidence},null,2));console.log('PASS all displayed AA/LiveBench/consensus values, ranks and profile identities reconcile; effort selection, raw components, directory, donuts, themes and sidebar; wizard options/progress/retry/finish; offline and empty states');
 }finally{await browser.close();}}
 main().catch(e=>{console.error(e);process.exitCode=1;});

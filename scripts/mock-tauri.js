@@ -717,7 +717,7 @@
           const board=await fetch('/benchmark-board.json').then(r=>r.json());
           const test=new URLSearchParams(location.search).get('benchmarkCase');
           if(test==='offline')board.sources[0].error='演示：来源暂不可用';
-          if(test==='empty'){board.models=[];board.profiles=[];board.referenceCohort=[];}
+          if(test==='empty'){board.models=[];board.profiles=[];board.referenceCohort=[];board.rankings.forEach(r=>r.entries=[]);}
           return board;
         }
         case 'get_ai_models':
@@ -729,7 +729,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.2800',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2700':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.2801',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2800':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -989,7 +989,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2800",
+            version: "1.0.2801",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

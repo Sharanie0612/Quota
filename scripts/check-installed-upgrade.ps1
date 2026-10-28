@@ -5,7 +5,8 @@ param(
   [Parameter(Mandatory=$true)][string]$TestRoot,
   [switch]$CheckWidget,
   [switch]$ModernSetup,
-  [switch]$CheckFrame
+  [switch]$CheckFrame,
+  [switch]$CheckBenchmarks
 )
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -62,6 +63,7 @@ try {
   & (Join-Path $PSScriptRoot 'check-install.ps1') -ExePath $exe -DataDir $data
   if ($CheckWidget) { & (Join-Path $PSScriptRoot 'check-widget.ps1') -ExePath $exe -DataDir $data }
   if ($CheckFrame) { & (Join-Path $PSScriptRoot 'check-window-frame.ps1') -ExePath $exe -DataDir (Join-Path $testPath 'frame-data') }
+  if ($CheckBenchmarks) { & (Join-Path $PSScriptRoot 'check-benchmark-ui.ps1') -ExePath $exe -DataDir (Join-Path $testPath 'benchmark-data') }
   $evidence = @{previousVersion=$previousVersion;version=$version;kind='existing-install-overwrite';actualUpgradeVerified=$true;personalFilesUnchanged=$personalHashes.Count;startupSeconds=8;installerSha256=(Get-FileHash -LiteralPath $Installer).Hash.ToLowerInvariant()}
   if($ModernSetup){$evidence.modernSetup=$modern}
   [IO.File]::WriteAllText((Join-Path $testPath 'evidence.json'),($evidence | ConvertTo-Json -Depth 6),$utf8)

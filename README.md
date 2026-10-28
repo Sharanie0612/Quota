@@ -64,7 +64,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex token。查询失败时可重试、打开官网或改用手动余额；未提供的累计充值 / 消费保持未知，可自行补全。账户支持范围与天梯厂商范围分别维护。
 
-1.0.2800 源码的天梯由 Quota 独立计算，结合 AA、LiveBench 公开测评及受权重上限约束的官网报告。五个主维度各占 20%，缺少可靠证据的型号进入观察名单；完整算法、配置差异与来源见 [模型测评说明](docs/model-benchmarks.md)。此版本的本地 Windows 验收见 [交付记录](docs/model-benchmarks-1.0.2800.md)，不代表两个平台均已公开发布。
+1.0.2801 源码的主榜保留 AA 原始指数和完整推理配置，LiveBench 遵循该版本官网权重；跨榜另列“同池平均名次”，官网报告独立对照。完整计算、原始分对账与配置差异见 [模型测评说明](docs/model-benchmarks.md)，本地 Windows 修复验收见 [交付记录](docs/benchmark-validity-1.0.2801.md)。此说明不代表两个平台均已公开发布。
 
 价格使用厂商官方标准档，保留来源、条件和核实时间。无法核实则标记未知，不猜数字。详见 [供应商能力](docs/providers.md) 和 [模型资料库规则](docs/model-catalog.md)。
 

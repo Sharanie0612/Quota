@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import type { BenchmarkModel, BenchmarkProfile } from '../lib/types';
-import { DOMAINS, fixed, frontier, SERIES } from '../lib/benchmarkCharts';
+import { fixed, frontier, modelResult, SERIES } from '../lib/benchmarkCharts';
 
-export function CapabilityBars({models}:{models:BenchmarkModel[]}) {
-  return <section className="card capability-chart"><div className="benchmark-chart-heading"><h2>各有擅长</h2><span>相对分位 · 0–100</span></div>
+export function CapabilityBars({models,source='aa',effort='best'}:{models:BenchmarkModel[];source?:string;effort?:string}) {
+  if(source==='consensus')return <section className="card capability-chart"><h2>各榜原始分数</h2><div className="benchmark-native-table"><table><thead><tr><th>模型</th><th>AA 指数</th><th>LiveBench</th></tr></thead><tbody>{models.map(model=><tr key={model.id}><td>{model.name}</td>{['aa','livebench'].map(id=>{const result=modelResult(model,id);return <td key={id}><b>{result?.score.toFixed(2)??'—'}</b><span>{result?.setting??'未测'}</span></td>;})}</tr>)}</tbody></table></div></section>;
+  const results=models.map(model=>modelResult(model,source,effort));
+  const metrics=[...new Set(results.flatMap(r=>r?.components.map(c=>c.metric)??[]))];
+  return <section className="card capability-chart"><div className="benchmark-chart-heading"><h2>同一配置 · 分项成绩</h2><span>{source==='aa'?'Artificial Analysis':'LiveBench'}</span></div>
     <div className="benchmark-legend">{models.map((m,i)=><span key={m.id}><i style={{background:SERIES[i]}}/>{m.name}</span>)}</div>
-    <div className="capability-groups">{DOMAINS.map(domain=><div key={domain.id} className="capability-group"><div className="capability-label">{domain.name}{domain.id==='visual'&&<span title="独立展示，不计入综合分">独立项</span>}</div><div className="capability-bars">{models.map((model,i)=>{const value=model.domains[domain.id];return <div key={model.id} className="capability-bar-row" aria-label={`${model.name} · ${domain.name}：${fixed(value)}`}><div className="capability-track"><span style={{width:(value??0)+'%',background:SERIES[i]}}/></div><b>{fixed(value)}</b></div>;})}</div></div>)}</div>
+    {!metrics.length?<div className="benchmark-empty">所选配置没有可比的分项记录。</div>:<div className="capability-groups">{metrics.map(metric=>{
+      const rows=results.map(r=>r?.components.find(c=>c.metric===metric));
+      const elo=rows.some(r=>r?.unit==='Elo');
+      const maximum=elo?Math.max(1000,Math.ceil(Math.max(...rows.map(r=>r?.value??0))/500)*500):100;
+      return <div key={metric} className="capability-group"><div className="capability-label">{metric}<span>{elo?'Elo · 0–'+maximum:'0–100%'}</span></div><div className="capability-bars">{models.map((m,i)=>{const value=rows[i]?.value;return <div key={m.id} className="capability-bar-row" aria-label={`${m.name} · ${metric}：${fixed(value)}`}><div className="capability-track"><span style={{width:(value==null?0:value/maximum*100)+'%',background:SERIES[i]}}/></div><b>{value==null?'—':value.toFixed(1)}</b></div>;})}</div></div>;
+    })}</div>}
   </section>;
 }
 

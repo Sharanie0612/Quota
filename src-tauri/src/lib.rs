@@ -86,6 +86,7 @@ pub fn run() {
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
             benchmarks::spawn(app.handle().clone());
+            benchmarks::smoke_if_requested(app.handle().clone());
             activity::spawn(app.handle().clone());
             account_sync::spawn(app.handle().clone());
             widget::smoke_if_requested(app.handle());
@@ -126,6 +127,7 @@ pub fn run() {
             ai_models::refresh_ai_models,
             benchmarks::get_benchmarks,
             benchmarks::refresh_benchmarks,
+            benchmarks::smoke::benchmark_smoke_report,
             window_frame::get_main_window_state,
             widget::get_widget_options,
             widget::save_widget_options,

@@ -159,6 +159,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
                 (raw * 100., "percent")
             };
             observations.push(Observation {
+                profile_id: slug.into(),
                 model_id: model_id.clone(),
                 model_name: model_name.into(),
                 vendor: vendor.into(),
@@ -192,6 +193,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
                     .all(|key| scores.get(*key).and_then(Value::as_f64).is_some())
                 {
                     profiles.push(Profile {
+                        id: slug.into(),
                         model_id: model_id.clone(),
                         name: name.into(),
                         vendor: vendor.into(),
@@ -215,6 +217,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         return Err("AA v5 分项结构变化，保留上次数据".into());
     }
     let source = Source {
+        weights: BTreeMap::new(),
         id: "artificial-analysis".into(),
         name: "Artificial Analysis".into(),
         url: AA.into(),
@@ -225,7 +228,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         automatic: true,
     };
     Ok(Dataset {
-        schema: 1,
+        schema: 2,
         sources: vec![source],
         observations,
         profiles,
@@ -319,6 +322,29 @@ pub fn parse_livebench(
             return Err("LiveBench 2.0 类别定义变化".into());
         }
     }
+    let declared = categories.get("_overall_weights").filter(|v| !v.is_null());
+    if declared.is_some_and(|v| !v.is_object()) {
+        return Err("LiveBench 权重格式变化".into());
+    }
+    let mut weights = BTreeMap::new();
+    for (_, label, _) in defs {
+        let weight = declared
+            .and_then(|v| v.get(label))
+            .map(|v| {
+                v.as_f64()
+                    .filter(|w| w.is_finite() && *w > 0. && *w <= 100.)
+                    .ok_or("LiveBench 权重无效")
+            })
+            .transpose()?
+            .unwrap_or(1.);
+        weights.insert(format!("LiveBench {label}"), weight);
+    }
+    if declared
+        .and_then(Value::as_object)
+        .is_some_and(|m| m.keys().any(|label| !defs.iter().any(|d| d.1 == label)))
+    {
+        return Err("LiveBench 权重对应未知类别".into());
+    }
     let rows = csv(table)?;
     let header = rows.first().ok_or("LiveBench 表格为空")?;
     if header
@@ -363,6 +389,7 @@ pub fn parse_livebench(
                 .filter(|v| v.is_finite() && (0. ..=100.).contains(v))
                 .ok_or("LiveBench 成绩无效")?;
             observations.push(Observation {
+                profile_id: format!("livebench:{release}:{id}"),
                 model_id: id.clone(),
                 model_name: name.clone(),
                 vendor: String::new(),
@@ -374,7 +401,7 @@ pub fn parse_livebench(
                 setting: "平台公开配置".into(),
                 value,
                 unit: "percent".into(),
-                weight: 1.,
+                weight: weights[&format!("LiveBench {label}")],
                 official: false,
                 url: format!("https://livebench.ai/data/{release}/table.csv"),
                 checked_at: checked.into(),
@@ -385,8 +412,9 @@ pub fn parse_livebench(
         return Err("LiveBench 成绩不完整".into());
     }
     Ok(Dataset {
-        schema: 1,
+        schema: 2,
         sources: vec![Source {
+            weights,
             id: "livebench".into(),
             name: "LiveBench".into(),
             url: "https://livebench.ai/".into(),

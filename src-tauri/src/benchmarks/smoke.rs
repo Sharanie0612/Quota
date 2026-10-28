@@ -21,9 +21,14 @@ pub fn benchmark_smoke_report(app:tauri::AppHandle,window:tauri::WebviewWindow,s
             if row["plotted"]==true && (row["x"].as_f64().is_none_or(|n|!n.is_finite()||!(61. ..=843.).contains(&n))||row["y"].as_f64().is_none_or(|n|!n.is_finite()||!(43. ..=501.).contains(&n))){return Err("价格与能力坐标越界".into())}
         }
         let today=chrono::Local::now().date_naive();let first=today-chrono::Days::new(29);
-        let wanted:std::collections::BTreeSet<String>=expected.values().filter(|p|board.releases.iter().any(|r|r.id==p.model_id&&chrono::NaiveDate::parse_from_str(&r.released_at,"%Y-%m-%d").is_ok_and(|d|d>=first&&d<=today))).map(|p|p.id.clone()).collect();
+        let edition=board.sources.iter().find(|s|s.id=="artificial-analysis").and_then(|s|s.edition.as_ref()).ok_or("缺少测评更新时间来源")?;
+        let fresh=chrono::NaiveDate::parse_from_str(&edition.published_at,"%Y-%m-%d").is_ok_and(|d|d>=first&&d<=today);
+        let wanted:std::collections::BTreeSet<String>=expected.values().filter(|p|fresh&&p.version==edition.version).map(|p|p.id.clone()).collect();
         let recent:std::collections::BTreeSet<String>=report["recent"].as_array().ok_or("缺少近30天筛选记录")?.iter().filter_map(|v|v["id"].as_str().map(str::to_string)).collect();
-        if wanted!=recent{return Err("近30天筛选与实际发布日期不符".into())}
+        if wanted!=recent{return Err("近30天筛选与测评版本更新日不符".into())}
+        let primary:std::collections::BTreeSet<String>=report["primary"].as_array().ok_or("缺少当前主力记录")?.iter().filter_map(|v|v["id"].as_str().map(str::to_string)).collect();
+        let wanted_primary:std::collections::BTreeSet<String>=edition.primary_profiles.iter().filter(|id|wanted.contains(*id)).cloned().collect();
+        if primary!=wanted_primary{return Err("当前主力范围不符".into())}
         if report["radar"].as_u64().unwrap_or(0)==0||report["libraryRemoved"]!=true||report["donutLegendsRemoved"]!=true{return Err("六维图或产品页面结构不符".into())}
         let speed=crate::activity::speed::report(state.store.dir(),"","codex",7,"")?;
         let displayed=report["speed"].as_array().ok_or("缺少输出速度界面值")?;
@@ -41,11 +46,11 @@ pub fn smoke_if_requested(app:tauri::AppHandle){
     let script=r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0,wait=0;const report={};
       const button=name=>[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===name);
       const collect=()=>[...document.querySelectorAll('.scatter-point')].flatMap(e=>(e.dataset.profileIds||'').split('|').filter(Boolean).map(id=>({id,score:Number(e.dataset.score),x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),plotted:true}))).concat([...document.querySelectorAll('.ladder-score-row')].map(e=>({id:e.dataset.profileId,score:Number(e.dataset.score),plotted:false})));
-      const change=value=>{const select=document.querySelector('select[aria-label="模型发布时间"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
+      const change=value=>{const select=document.querySelector('select[aria-label="测评范围"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
       const timer=setInterval(()=>{wait++;if(wait>150){clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:{error:'UI timeout',step}}));return;}
-        if(step===0){document.querySelector('nav button[aria-label="AI 模型"]')?.click();if(!document.querySelector('.visual-model-page'))return;change('0');step=1;return;}
-        if(step===1){if(document.querySelector('.visual-model-page')?.dataset.releaseWindow!=='0'||!collect().length)return;report.all=collect();change('30');step=2;return;}
-        if(step===2){if(document.querySelector('.visual-model-page')?.dataset.releaseWindow!=='30')return;report.recent=collect();button('六维对比')?.click();step=3;return;}
+        if(step===0){document.querySelector('nav button[aria-label="AI 模型"]')?.click();if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='main30'||!collect().length)return;report.primary=collect();change('all');step=1;return;}
+        if(step===1){if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='all'||!collect().length)return;report.all=collect();change('all30');step=2;return;}
+        if(step===2){if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='all30')return;report.recent=collect();button('六维对比')?.click();step=3;return;}
         if(step===3){const radar=document.querySelector('.visual-ability .ability-radar');if(!radar)return;report.radar=radar.querySelectorAll('circle').length;document.querySelector('nav button[aria-label="输出速度"]')?.click();step=4;return;}
         if(step===4){if(!document.querySelector('.speed-summary')||!document.querySelector('.speed-chart > svg'))return;report.speed=[...document.querySelectorAll('.speed-summary strong')].map(e=>Number(e.textContent.replaceAll(',','')));report.libraryRemoved=!document.querySelector('nav button[aria-label="模型库"]');document.querySelector('nav button[aria-label="Token 活动"]')?.click();step=5;return;}
         if(step===5){if(!document.querySelector('.activity-shares'))return;report.donutLegendsRemoved=!document.querySelector('.activity-share-legend')&&!document.getElementById('activity-details');clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:report}));}

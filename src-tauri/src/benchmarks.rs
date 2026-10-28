@@ -4,6 +4,7 @@ mod adapters;
 pub mod epoch;
 mod scoring;
 pub mod releases;
+pub mod edition;
 pub(crate) mod smoke;
 use crate::commands::AppState;
 pub use adapters::{parse_aa, parse_livebench};
@@ -62,6 +63,8 @@ pub struct Profile {
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Source {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edition: Option<edition::Edition>,
     #[serde(default)]
     pub weights: BTreeMap<String, f64>,
     pub id: String,
@@ -230,7 +233,7 @@ pub fn load(dir: &Path) -> Dataset {
             .iter()
             .find(|old| old.id == source.id)
             .is_none_or(|old| {
-                chrono::DateTime::parse_from_rfc3339(&old.checked_at).ok()
+                (old.id == "artificial-analysis" && old.edition.is_none() && source.edition.is_some()) || chrono::DateTime::parse_from_rfc3339(&old.checked_at).ok()
                     < chrono::DateTime::parse_from_rfc3339(&source.checked_at).ok()
             })
         {
@@ -248,6 +251,7 @@ pub fn valid(data: &Dataset) -> bool {
         && data.profiles.len() <= 1000
         && data.sources.iter().all(|s| {
             s.checked_at.len() < 64
+                && s.edition.as_ref().is_none_or(|edition|s.id=="artificial-analysis" && edition.valid(data))
                 && matches!(
                     s.id.as_str(),
                     "artificial-analysis"
@@ -347,8 +351,9 @@ async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, 
 pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, String>)> {
     let releases=async {releases::parse(&download(client,releases::URL).await?,&chrono::Utc::now().to_rfc3339())};
     let aa = async {
-        let body = download(client, "https://artificialanalysis.ai/leaderboards/models").await?;
-        parse_aa(&body, &chrono::Utc::now().to_rfc3339())
+        let (body,index,publication)=tokio::join!(download(client,"https://artificialanalysis.ai/leaderboards/models"),download(client,edition::INDEX),download(client,edition::PUBLICATION));
+        let mut data=parse_aa(&body?,&chrono::Utc::now().to_rfc3339())?;
+        edition::attach(&mut data,&index?,&publication?)?;Ok(data)
     };
     let lb = async {
         let index = download(client, "https://livebench.ai/").await?;
@@ -428,6 +433,7 @@ pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String
                     source.error = Some(error);
                 } else {
                     previous.sources.push(Source {
+                        edition: None,
                         weights: BTreeMap::new(),
                         id: id.clone(),
                         name: if id == "epoch-ai" {

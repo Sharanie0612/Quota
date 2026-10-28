@@ -736,7 +736,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3000',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3001',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -996,7 +996,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3000",
+            version: "1.0.3001",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

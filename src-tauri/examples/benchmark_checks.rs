@@ -200,7 +200,14 @@ fn main() {
     let table = fs::read_to_string(audit.join("livebench-current-table.csv")).unwrap();
     let categories = fs::read_to_string(audit.join("livebench-current-categories.json")).unwrap();
     let release = fs::read_to_string(audit.join("livebench-release.txt")).unwrap();
-    let aa = benchmarks::parse_aa(&aa_html, checked).unwrap();
+    let mut aa = benchmarks::parse_aa(&aa_html, checked).unwrap();
+    let index_html=fs::read_to_string(audit.join("aa-index.html")).expect("download AA evaluation page");
+    let edition_html=fs::read_to_string(audit.join("aa-index-v5.html")).expect("download AA version announcement");
+    benchmarks::edition::attach(&mut aa,&index_html,&edition_html).expect("verified evaluation edition");
+    let edition=aa.sources.iter().find(|s|s.id=="artificial-analysis").unwrap().edition.as_ref().unwrap();
+    assert_eq!(edition.published_at,"2026-10-27");assert!(edition.primary_profiles.contains(&"gpt-6-astra".to_string()));
+    assert!(aa.profiles.iter().all(|p|aa.profiles.iter().any(|other|other.vendor==p.vendor&&edition.primary_profiles.contains(&other.id))));
+    let mut invalid=aa.clone();assert!(benchmarks::edition::attach(&mut invalid,&index_html,&edition_html.replace("datePublished","unconfirmedDate")).is_err());
     let lb = benchmarks::parse_livebench(&table, &categories, release.trim(), checked).unwrap();
     assert!(benchmarks::parse_livebench(
         &table.replace("reasoning", "reasoning_v3"),

@@ -39,8 +39,10 @@ $resume = @(Get-Process quota -ErrorAction SilentlyContinue | Where-Object { $_.
 $personalHashes = @{}
 $previousSetupSmoke=$env:QUOTA_SETUP_SMOKE
 $previousSetupReport=$env:QUOTA_SETUP_SMOKE_REPORT
+$previousWebView=$env:WEBVIEW2_USER_DATA_FOLDER
 try {
   foreach ($instance in $resume) { Stop-Process -Id $instance.Id }
+  $env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $testPath 'WebViewProfile'
   foreach ($name in @('config.json','vendor-costs.json','monthly-usage-fx.json','activity-settings.json','activity.sqlite','activity.sqlite-wal')) {
     $file = Join-Path (Join-Path $env:APPDATA 'Quota') $name
     if (Test-Path -LiteralPath $file) { $personalHashes[$file] = (Get-FileHash -LiteralPath $file).Hash }
@@ -73,5 +75,6 @@ try {
 } finally {
   $env:QUOTA_SETUP_SMOKE=$previousSetupSmoke
   $env:QUOTA_SETUP_SMOKE_REPORT=$previousSetupReport
+  $env:WEBVIEW2_USER_DATA_FOLDER=$previousWebView
   if ($resume.Count -and -not @(Get-Process quota -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }).Count) { Start-Process -FilePath $exe -WindowStyle Hidden | Out-Null }
 }

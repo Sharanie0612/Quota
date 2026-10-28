@@ -23,11 +23,14 @@ async function main(){
    const page=await browser.newPage({viewport:{width,height:900},colorScheme:mode,reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(base);await page.locator('.launch-screen').waitFor({state:'hidden'});const nav=page.getByRole('navigation',{name:'主导航'});
    assert.equal(await nav.getByRole('button',{name:'模型库',exact:true}).count(),0);
-   await nav.getByRole('button',{name:'AI 模型',exact:true}).click();await page.locator('.visual-model-page[data-release-window="30"]').waitFor();
+   await nav.getByRole('button',{name:'AI 模型',exact:true}).click();await page.locator('.visual-model-page[data-evaluation-scope="main30"]').waitFor();
    await page.waitForFunction(()=>document.querySelector('.scatter-point,.ladder-score-row,.visual-model-pending'));
-   assert.equal(await page.getByLabel('模型发布时间',{exact:true}).inputValue(),'30');assert.equal(await page.getByLabel('图表币种',{exact:true}).count(),0);assert.equal(await page.locator('.tier-board').count(),0);
+   assert.equal(await page.getByLabel('测评范围',{exact:true}).inputValue(),'main30');assert.equal(await page.getByLabel('图表币种',{exact:true}).count(),0);assert.equal(await page.locator('.tier-board').count(),0);
    await overflow(page);await capture(page,`${mode}-${width}-ladder`);
-   const recent=await page.locator('.scatter-point,.ladder-score-row').count();await page.getByLabel('模型发布时间',{exact:true}).selectOption('0');await page.locator('.visual-model-page[data-release-window="0"]').waitFor();
+   const primaryIds=await page.locator('.scatter-point,.ladder-score-row').evaluateAll(points=>points.flatMap(e=>e.classList.contains('scatter-point')?e.dataset.profileIds.split('|'):[e.dataset.profileId]));
+   assert.deepEqual(new Set(primaryIds),new Set(board.sources.find(s=>s.id==='artificial-analysis').edition.primaryProfiles),'current source cohort and vendor representatives');
+   assert(primaryIds.some(id=>board.profiles.find(p=>p.id===id)?.name.startsWith('Claude Opus 5.5')),'current Opus must remain regardless of model release month');
+   const recent=await page.locator('.scatter-point,.ladder-score-row').count();await page.getByLabel('测评范围',{exact:true}).selectOption('all');await page.locator('.visual-model-page[data-evaluation-scope="all"]').waitFor();
    await page.waitForFunction(()=>document.querySelectorAll('.scatter-point,.ladder-score-row').length>0);const all=await page.locator('.scatter-point,.ladder-score-row').count();assert(all>=recent);
    const profiles=new Map(board.profiles.filter(p=>p.sourceId==='artificial-analysis').map(p=>[p.id,p]));
    const rows=await page.locator('.scatter-point').evaluateAll(points=>points.flatMap(e=>e.dataset.profileIds.split('|').map(id=>({id,score:Number(e.dataset.score),x:Number(e.dataset.plotX),y:Number(e.dataset.plotY)}))));
@@ -45,7 +48,7 @@ async function main(){
    assert.deepEqual(errors,[]);evidence.push({mode,width,plotted:rows.length,unpriced:unpriced.length,sourceConfigurations:profiles.size,passed:true});await page.close();
   }
   const empty=await browser.newPage({viewport:{width:1024,height:768}});await empty.goto(base+'?speedCase=empty');await empty.getByRole('navigation').getByRole('button',{name:'输出速度',exact:true}).click();await empty.getByText('暂无输出速度记录',{exact:true}).waitFor();assert.equal(await empty.locator('.speed-chart > svg').count(),0);await empty.close();
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,fixture:'public source board; synthetic personal data and speed series',checks:evidence},null,2));console.log('PASS actual production components: complete-configuration prices/scores, 30-day filter, radar, speed filter/empty state, simplified donuts and account form; 1024/1360 light/dark');
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,fixture:'public source board; synthetic personal data and speed series',checks:evidence},null,2));console.log('PASS actual production components: complete-configuration prices/scores, current primary models and 30-day evaluation filter, radar, speed filter/empty state, simplified donuts and account form; 1024/1360 light/dark');
  }finally{await browser?.close();server.kill();}
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

@@ -17,7 +17,7 @@ try{
  if(-not $taskProcess.WaitForExit(60000)){throw 'Packaged product UI did not complete within 60 seconds'}
  $taskReport=Get-Content -LiteralPath (Join-Path $taskData 'benchmark-ui-check.json') -Raw|ConvertFrom-Json
  if($taskProcess.ExitCode -ne 0 -or -not $taskReport.passed){throw ('Packaged product UI mismatch: '+$taskReport.error)}
- Write-Output ('PASS packaged WebView: '+@($taskReport.report.all).Count+' full-configuration scores; '+@($taskReport.report.recent).Count+' recent releases; six-axis radar; output-speed values; model-library and donut-detail removal')
+ Write-Output ('PASS packaged WebView: '+@($taskReport.report.all).Count+' full-configuration scores; '+@($taskReport.report.primary).Count+' current primary configurations; '+@($taskReport.report.recent).Count+' configurations in recent evaluation edition; six-axis radar; output-speed values; model-library and donut-detail removal')
 }finally{
  if($taskProcess -and -not $taskProcess.HasExited){Stop-Process -Id $taskProcess.Id -ErrorAction SilentlyContinue}
  $env:QUOTA_DATA_DIR=$taskPreviousData;$env:QUOTA_BENCHMARK_SMOKE=$taskPreviousSmoke;$env:WEBVIEW2_USER_DATA_FOLDER=$taskPreviousWebView

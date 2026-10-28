@@ -217,6 +217,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         return Err("AA v5 分项结构变化，保留上次数据".into());
     }
     let source = Source {
+        edition: None,
         weights: BTreeMap::new(),
         id: "artificial-analysis".into(),
         name: "Artificial Analysis".into(),
@@ -424,6 +425,7 @@ pub fn parse_livebench(
     Ok(Dataset {
         schema: 3,
         sources: vec![Source {
+            edition: None,
             weights,
             id: "livebench".into(),
             name: "LiveBench".into(),

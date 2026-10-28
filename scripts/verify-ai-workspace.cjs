@@ -36,7 +36,7 @@ async function main(){
     await page.reload();await page.locator('.launch-screen').waitFor({state:'hidden'});await page.locator('.app.sidebar-collapsed').waitFor();
     assert.equal(await page.locator('html').getAttribute('data-color-theme'),'codex');assert.equal(await page.locator('html').getAttribute('data-color-mode'),'light');
     await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();await nav.getByRole('button',{name:'AI 模型',exact:true}).click();
-    await page.locator('.visual-model-page[data-release-window="30"]').waitFor();
+    await page.locator('.visual-model-page[data-evaluation-scope="main30"]').waitFor();
     assert.equal(await page.getByRole('tab',{name:'模型目录',exact:true}).count(),0);
     await page.locator('.visual-model-toolbar button').filter({hasText:/^六维对比$/}).click();
     await page.locator('.visual-ability .ability-radar').waitFor();await noOverflow(page);

@@ -30,7 +30,11 @@ Function QuotaGuiInit
   ${If} $R8 != ""
     InitPluginsDir
     SetOutPath "$PLUGINSDIR"
-    File "/oname=quota-setup.exe" "${__FILEDIR__}\..\target\release\quota.exe"
+    !if "$%QUOTA_SETUP_PAYLOAD%" != ""
+      File "/oname=quota-setup.exe" "$%QUOTA_SETUP_PAYLOAD%"
+    !else
+      File "/oname=quota-setup.exe" "${__FILEDIR__}\..\target\release\quota.exe"
+    !endif
     File "/oname=WebView2Loader.dll" "${__FILEDIR__}\..\WebView2Loader.dll"
     ShowWindow $HWNDPARENT ${SW_HIDE}
     ClearErrors

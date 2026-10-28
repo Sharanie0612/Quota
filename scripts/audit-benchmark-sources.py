@@ -11,6 +11,7 @@ OUT = Path(__file__).resolve().parents[1] / "target/benchmark-sources"
 SOURCES = {
     "artificial-analysis": "https://artificialanalysis.ai/leaderboards/models",
     "aa-method": "https://artificialanalysis.ai/methodology/intelligence-benchmarking",
+    "model-releases": "https://artificialanalysis.ai/models/releases",
     "livebench": "https://livebench.ai/",
     "epoch-ai": "https://epoch.ai/data/benchmark_data.zip",
 }

@@ -29,6 +29,7 @@ fn fixture() -> Dataset {
         observations: vec![],
         profiles: vec![],
         epoch: None,
+        releases: vec![],
     };
     for i in 0..8 {
         let id = format!("model{i}");
@@ -231,6 +232,7 @@ fn main() {
                 .collect(),
             profiles: vec![],
             epoch: None,
+            releases: vec![],
         };
         dataset = benchmarks::merge(dataset, vec![(source.id.clone(), Ok(data))]);
     }
@@ -244,6 +246,9 @@ fn main() {
             .into();
     let epoch = benchmarks::epoch::parse(&epoch_zip, &epoch_checked.to_rfc3339())
         .expect("valid official Epoch fixture");
+    let releases=benchmarks::releases::parse(&fs::read_to_string(audit.join("model-releases.html")).expect("download model releases"),checked).expect("valid release directory");
+    assert!(releases.releases.len()>50);
+    dataset=benchmarks::merge(dataset,vec![("model-releases".into(),Ok(releases))]);
     dataset = benchmarks::merge(
         dataset,
         vec![(
@@ -355,11 +360,11 @@ fn main() {
     assert_eq!(
         top,
         vec![
+            "gemini4carbon",
             "claudeopus55",
             "gpt6astra",
             "gpt61sol",
-            "claudesonnet55",
-            "gpt61terra"
+            "claudesonnet55"
         ]
     );
     for entry in &ranking(&board, "aa").entries {

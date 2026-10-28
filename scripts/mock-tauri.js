@@ -711,6 +711,13 @@
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
         case 'get_appearance': return window.demoAppearance ?? null;
+        case 'get_output_speed': {
+          if(window.demoSpeedReport)return window.demoSpeedReport;
+          const models=['gpt-6.1-sol','gpt-6-astra'];
+          const empty=new URLSearchParams(location.search).get('speedCase')==='empty';
+          const points=empty?[]:Array.from({length:32},(_,i)=>models.map((model,j)=>({timestamp:Date.now()-((31-i)*3600000),model,outputTokens:Math.round((72+j*18+Math.sin(i/3+j)*12)*4000),durationMs:4000000,samples:20+i%7}))).flat().filter(p=>!args.model||p.model===args.model);
+          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points,summary:{average:empty?null:83.2,median:empty?null:80.4,p95:empty?null:112.7,samples:empty?0:824,outputTokens:empty?0:281303},updatedAt:Date.now()};
+        }
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_benchmarks':
         case 'refresh_benchmarks': {
@@ -729,7 +736,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.2900',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3000',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -989,7 +996,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2900",
+            version: "1.0.3000",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

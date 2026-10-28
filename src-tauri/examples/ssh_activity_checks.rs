@@ -96,5 +96,22 @@ fn main(){
     options.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&data,&options).unwrap();
     assert_eq!(report().totals.tokens.total,540);assert_eq!(activity::usage_summary(&data).unwrap().total,540);
     assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
-    println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync and injection validation");
+    speed_projection(&root,&python);
+    println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync, output-speed metadata and injection validation");
+}
+fn speed_projection(root:&Path,python:&str){
+    let logs=root.join("speed-logs");let data=root.join("speed-data");fs::create_dir_all(logs.join("sessions")).unwrap();fs::create_dir_all(&data).unwrap();activity::report(&data,None,None,None).unwrap();let mut db=Connection::open(data.join("activity.sqlite")).unwrap();
+    let t=chrono::Utc::now().timestamp_millis()-5000;
+    let row=|offset,kind,payload|json!({"timestamp":chrono::DateTime::from_timestamp_millis(t+offset).unwrap().to_rfc3339(),"type":kind,"payload":payload}).to_string()+"\n";
+    let log=row(0,"session_meta",json!({"id":"speed-fixture"}))
+        +&row(1,"turn_context",json!({"model":"speed-model"}))
+        +&row(10,"response_item",json!({"type":"message","role":"assistant","content":"PRIVATE_MESSAGE"}))
+        +&row(510,"event_msg",json!({"type":"item_completed","item":{"type":"AgentMessage","content":"PRIVATE_MESSAGE"},"started_at_ms":t+10,"completed_at_ms":t+510}))
+        +&row(511,"token_usage_record",json!({"response_id":"speed-response","usage":{"output_tokens":96,"reasoning_output_tokens":32},"private":"PRIVATE_COOKIE"}))
+        +&row(512,"event_msg",json!({"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":96,"reasoning_output_tokens":32,"total_tokens":196}}}));
+    fs::write(logs.join("sessions/speed.jsonl"),log).unwrap();fs::write(logs.join("sessions/ignored.jsonl"),"{}\n").unwrap();
+    let bytes=projection(python,&logs,&db,"speed-vm");let mut errors=vec![];assert_eq!(ssh::apply(&mut db,"speed-vm","/home/check",&bytes,&mut errors).unwrap(),1);assert!(errors.is_empty());
+    let report=activity::speed::report(&data,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,1);assert_eq!(report.summary.average,Some(128.));
+    let ignored:String=db.query_row("SELECT body FROM cursors WHERE path LIKE '%ignored.jsonl'",[],|r|r.get(0)).unwrap();assert_eq!(serde_json::from_str::<Cursor>(&ignored).unwrap().speed.version,1,"empty projection must finish timing migration");
+    let bytes=projection(python,&logs,&db,"speed-vm");assert_eq!(ssh::apply(&mut db,"speed-vm","/home/check",&bytes,&mut errors).unwrap(),0);assert_eq!(activity::speed::report(&data,"","codex",0,"").unwrap().summary.samples,1);
 }

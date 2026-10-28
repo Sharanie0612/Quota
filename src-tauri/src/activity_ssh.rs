@@ -102,7 +102,7 @@ fn request(db:&Connection,host:&str,home:&str)->Result<Vec<u8>,String>{
         let (path,body)=row.map_err(|_|"读取 SSH 采集进度失败")?;
         let c:Cursor=serde_json::from_str(&body).map_err(|_|"SSH 采集进度损坏")?;
         if offsets.len()>=10000 {return Err("SSH 会话数量超过本轮采集上限".into())}
-        offsets.insert(path[prefix.len()..].to_string(),c.offset);
+        offsets.insert(path[prefix.len()..].to_string(),if c.speed.version<1{0}else{c.offset});
     }
     let bytes=serde_json::to_vec(&serde_json::json!({"format":"quota-codex-ssh-v1","home":home,"offsets":offsets})).map_err(|_|"编码 SSH 采集进度失败")?;
     if bytes.len()>4*1024*1024 {return Err("SSH 采集进度过大".into())} Ok(bytes)
@@ -163,8 +163,10 @@ pub fn apply(db:&mut Connection,host:&str,home:&str,bytes:&[u8],errors:&mut Vec<
             return Err("SSH 会话进度格式无效".into());
         }
         let key=format!("{prefix}{}",file.path);let mut c=cursor(db,&key)?;
+        if c.speed.version<1 {c=Cursor::default();}
         if file.reset {if file.start!=0{return Err("SSH 重读进度无效".into())}c=Cursor::default();}
         else if c.offset!=file.start {return Err("SSH 采集进度发生变化，请重试".into())}
+        c.speed.version=1;
         let result=(||->Result<usize,String>{
             let tx=db.transaction().map_err(|_|"统计资料库忙碌")?;let mut changed=0;
             tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",

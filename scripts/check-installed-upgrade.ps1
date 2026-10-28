@@ -6,9 +6,11 @@ param(
   [switch]$CheckWidget,
   [switch]$ModernSetup,
   [switch]$CheckFrame,
-  [switch]$CheckBenchmarks
+  [switch]$CheckBenchmarks,
+  [string]$BenchmarkActivityDb
 )
 $ErrorActionPreference = 'Stop'
+if ($CheckBenchmarks -and (-not $BenchmarkActivityDb -or -not (Test-Path -LiteralPath $BenchmarkActivityDb))) { throw 'CheckBenchmarks requires the synthetic output_speed_checks activity.sqlite via BenchmarkActivityDb' }
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $testPath = [IO.Path]::GetFullPath($TestRoot)
 if (-not $testPath.StartsWith(($workspace + '\'), [StringComparison]::OrdinalIgnoreCase)) { throw 'TestRoot must be inside this workspace' }
@@ -63,7 +65,7 @@ try {
   & (Join-Path $PSScriptRoot 'check-install.ps1') -ExePath $exe -DataDir $data
   if ($CheckWidget) { & (Join-Path $PSScriptRoot 'check-widget.ps1') -ExePath $exe -DataDir $data }
   if ($CheckFrame) { & (Join-Path $PSScriptRoot 'check-window-frame.ps1') -ExePath $exe -DataDir (Join-Path $testPath 'frame-data') }
-  if ($CheckBenchmarks) { & (Join-Path $PSScriptRoot 'check-benchmark-ui.ps1') -ExePath $exe -DataDir (Join-Path $testPath 'benchmark-data') }
+  if ($CheckBenchmarks) { & (Join-Path $PSScriptRoot 'check-benchmark-ui.ps1') -ExePath $exe -DataDir (Join-Path $testPath 'benchmark-data') -ActivityDb $BenchmarkActivityDb }
   $evidence = @{previousVersion=$previousVersion;version=$version;kind='existing-install-overwrite';actualUpgradeVerified=$true;personalFilesUnchanged=$personalHashes.Count;startupSeconds=8;installerSha256=(Get-FileHash -LiteralPath $Installer).Hash.ToLowerInvariant()}
   if($ModernSetup){$evidence.modernSetup=$modern}
   [IO.File]::WriteAllText((Join-Path $testPath 'evidence.json'),($evidence | ConvertTo-Json -Depth 6),$utf8)

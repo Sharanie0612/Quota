@@ -1,0 +1,1386 @@
+{
+  "schema": 3,
+  "releases": [
+    {
+      "id": "agnes25probeta",
+      "name": "Agnes 2.5 Pro Beta",
+      "vendor": "Sapiens AI",
+      "releasedAt": "2026-08-26",
+      "url": "https://artificialanalysis.ai/models/agnes-2-5-pro-beta"
+    },
+    {
+      "id": "apertus70binstruct",
+      "name": "Apertus 70B Instruct",
+      "vendor": "Swiss AI Initiative",
+      "releasedAt": "2025-09-02",
+      "url": "https://artificialanalysis.ai/models/apertus-70b-instruct"
+    },
+    {
+      "id": "apertus8binstruct",
+      "name": "Apertus 8B Instruct",
+      "vendor": "Swiss AI Initiative",
+      "releasedAt": "2025-09-02",
+      "url": "https://artificialanalysis.ai/models/apertus-8b-instruct"
+    },
+    {
+      "id": "apodex11",
+      "name": "Apodex 1.1",
+      "vendor": "Apodex",
+      "releasedAt": "2026-08-30",
+      "url": "https://artificialanalysis.ai/models/apodex-1-1"
+    },
+    {
+      "id": "aprielv1615bthinker",
+      "name": "Apriel-v1.6-15B-Thinker",
+      "vendor": "ServiceNow",
+      "releasedAt": "2025-11-25",
+      "url": "https://artificialanalysis.ai/models/apriel-v1-6-15b-thinker"
+    },
+    {
+      "id": "axk2",
+      "name": "A.X-K2",
+      "vendor": "SK Telecom",
+      "releasedAt": "2026-08-12",
+      "url": "https://artificialanalysis.ai/models/a-x-k2"
+    },
+    {
+      "id": "beam10",
+      "name": "Beam 1.0",
+      "vendor": "Reflection",
+      "releasedAt": "2026-10-16",
+      "url": "https://artificialanalysis.ai/models/reflection-beam"
+    },
+    {
+      "id": "celeris1",
+      "name": "Celeris-1",
+      "vendor": "Celeris",
+      "releasedAt": "2026-07-24",
+      "url": "https://artificialanalysis.ai/models/celeris-1"
+    },
+    {
+      "id": "claudefable51",
+      "name": "Claude Fable 5.1",
+      "vendor": "Anthropic",
+      "releasedAt": "2026-09-01",
+      "url": "https://artificialanalysis.ai/models/releases/claude-fable-5-1"
+    },
+    {
+      "id": "claudehaiku55",
+      "name": "Claude Haiku 5.5",
+      "vendor": "Anthropic",
+      "releasedAt": "2026-10-07",
+      "url": "https://artificialanalysis.ai/models/releases/claude-haiku-5-5"
+    },
+    {
+      "id": "claudeopus55",
+      "name": "Claude Opus 5.5",
+      "vendor": "Anthropic",
+      "releasedAt": "2026-09-22",
+      "url": "https://artificialanalysis.ai/models/releases/claude-opus-5-5"
+    },
+    {
+      "id": "claudesonnet55",
+      "name": "Claude Sonnet 5.5",
+      "vendor": "Anthropic",
+      "releasedAt": "2026-09-28",
+      "url": "https://artificialanalysis.ai/models/releases/claude-sonnet-5-5"
+    },
+    {
+      "id": "cogitov21",
+      "name": "Cogito v2.1",
+      "vendor": "Deep Cogito",
+      "releasedAt": "2025-11-18",
+      "url": "https://artificialanalysis.ai/models/cogito-v2-1-reasoning"
+    },
+    {
+      "id": "commanda",
+      "name": "Command A+",
+      "vendor": "Cohere",
+      "releasedAt": "2026-05-20",
+      "url": "https://artificialanalysis.ai/models/command-a-plus"
+    },
+    {
+      "id": "deephermes3llama318bpreview",
+      "name": "DeepHermes 3 - Llama-3.1 8B Preview",
+      "vendor": "Nous Research",
+      "releasedAt": "2025-02-13",
+      "url": "https://artificialanalysis.ai/models/deephermes-3-llama-3-1-8b-preview"
+    },
+    {
+      "id": "deephermes3mistral24bpreview",
+      "name": "DeepHermes 3 - Mistral 24B Preview",
+      "vendor": "Nous Research",
+      "releasedAt": "2025-03-13",
+      "url": "https://artificialanalysis.ai/models/deephermes-3-mistral-24b-preview"
+    },
+    {
+      "id": "deepseekv41flash1017",
+      "name": "DeepSeek V4.1 Flash 1017",
+      "vendor": "DeepSeek",
+      "releasedAt": "2026-10-17",
+      "url": "https://artificialanalysis.ai/models/deepseek-v4-1-flash-1017"
+    },
+    {
+      "id": "deepseekv4flashvision",
+      "name": "DeepSeek V4 Flash Vision",
+      "vendor": "DeepSeek",
+      "releasedAt": "2026-08-21",
+      "url": "https://artificialanalysis.ai/models/deepseek-v4-flash-vision"
+    },
+    {
+      "id": "deepseekv4pro0813",
+      "name": "DeepSeek V4 Pro 0813",
+      "vendor": "DeepSeek",
+      "releasedAt": "2026-08-13",
+      "url": "https://artificialanalysis.ai/models/releases/deepseek-v4-pro"
+    },
+    {
+      "id": "diffusiongemma26ba4b",
+      "name": "DiffusionGemma 26B A4B",
+      "vendor": "Google",
+      "releasedAt": "2026-06-10",
+      "url": "https://artificialanalysis.ai/models/diffusiongemma-26b-a4b"
+    },
+    {
+      "id": "doubaoseedcode",
+      "name": "Doubao Seed Code",
+      "vendor": "ByteDance Seed",
+      "releasedAt": "2025-11-11",
+      "url": "https://artificialanalysis.ai/models/doubao-seed-code"
+    },
+    {
+      "id": "ernie45300ba47b",
+      "name": "ERNIE 4.5 300B A47B",
+      "vendor": "Baidu",
+      "releasedAt": "2025-06-30",
+      "url": "https://artificialanalysis.ai/models/ernie-4-5-300b-a47b"
+    },
+    {
+      "id": "ernie50thinkingpreview",
+      "name": "ERNIE 5.0 Thinking Preview",
+      "vendor": "Baidu",
+      "releasedAt": "2025-11-13",
+      "url": "https://artificialanalysis.ai/models/ernie-5-0-thinking-preview"
+    },
+    {
+      "id": "exaone4012b",
+      "name": "Exaone 4.0 1.2B",
+      "vendor": "LG AI Research",
+      "releasedAt": "2025-07-15",
+      "url": "https://artificialanalysis.ai/models/releases/exaone-4-0-1-2b"
+    },
+    {
+      "id": "exaone4032b",
+      "name": "EXAONE 4.0 32B",
+      "vendor": "LG AI Research",
+      "releasedAt": "2025-07-15",
+      "url": "https://artificialanalysis.ai/models/releases/exaone-4-0-32b"
+    },
+    {
+      "id": "exaone4533b",
+      "name": "EXAONE 4.5 33B",
+      "vendor": "LG AI Research",
+      "releasedAt": "2026-04-09",
+      "url": "https://artificialanalysis.ai/models/releases/exaone-4-5-33b"
+    },
+    {
+      "id": "falconh1r7b",
+      "name": "Falcon-H1R-7B",
+      "vendor": "TII UAE",
+      "releasedAt": "2026-01-04",
+      "url": "https://artificialanalysis.ai/models/falcon-h1r-7b"
+    },
+    {
+      "id": "g9v339a5b",
+      "name": "G9v3-39A5B",
+      "vendor": "AI9Stars",
+      "releasedAt": "2026-08-20",
+      "url": "https://artificialanalysis.ai/models/g9v3-39a5b"
+    },
+    {
+      "id": "g9v33b",
+      "name": "G9v3-3B",
+      "vendor": "AI9Stars",
+      "releasedAt": "2026-07-23",
+      "url": "https://artificialanalysis.ai/models/g9v3-3b"
+    },
+    {
+      "id": "gemini31propreview",
+      "name": "Gemini 3.1 Pro Preview",
+      "vendor": "Google",
+      "releasedAt": "2026-02-19",
+      "url": "https://artificialanalysis.ai/models/gemini-3-1-pro-preview"
+    },
+    {
+      "id": "gemini35flashlite",
+      "name": "Gemini 3.5 Flash-Lite",
+      "vendor": "Google",
+      "releasedAt": "2026-07-21",
+      "url": "https://artificialanalysis.ai/models/gemini-3-5-flash-lite"
+    },
+    {
+      "id": "gemini38flash",
+      "name": "Gemini 3.8 Flash",
+      "vendor": "Google",
+      "releasedAt": "2026-09-02",
+      "url": "https://artificialanalysis.ai/models/releases/gemini-3-8-flash"
+    },
+    {
+      "id": "gemini3deepthink",
+      "name": "Gemini 3 Deep Think",
+      "vendor": "Google",
+      "releasedAt": "2026-02-05",
+      "url": "https://artificialanalysis.ai/models/gemini-3-deep-think"
+    },
+    {
+      "id": "gemini4argon",
+      "name": "Gemini 4 Argon",
+      "vendor": "Google",
+      "releasedAt": "2026-09-30",
+      "url": "https://artificialanalysis.ai/models/gemini-4-argon"
+    },
+    {
+      "id": "gemini4carbon",
+      "name": "Gemini 4 Carbon",
+      "vendor": "Google",
+      "releasedAt": "2026-10-28",
+      "url": "https://artificialanalysis.ai/models/gemini-4-carbon"
+    },
+    {
+      "id": "gemma3270m",
+      "name": "Gemma 3 270M",
+      "vendor": "Google",
+      "releasedAt": "2025-08-14",
+      "url": "https://artificialanalysis.ai/models/gemma-3-270m"
+    },
+    {
+      "id": "gemma412b",
+      "name": "Gemma 4 12B",
+      "vendor": "Google",
+      "releasedAt": "2026-06-03",
+      "url": "https://artificialanalysis.ai/models/releases/gemma-4-12b"
+    },
+    {
+      "id": "gemma426ba4b",
+      "name": "Gemma 4 26B A4B",
+      "vendor": "Google",
+      "releasedAt": "2026-04-02",
+      "url": "https://artificialanalysis.ai/models/releases/gemma-4-26b-a4b"
+    },
+    {
+      "id": "gemma431b",
+      "name": "Gemma 4 31B",
+      "vendor": "Google",
+      "releasedAt": "2026-04-02",
+      "url": "https://artificialanalysis.ai/models/releases/gemma-4-31b"
+    },
+    {
+      "id": "gemma4e2b",
+      "name": "Gemma 4 E2B",
+      "vendor": "Google",
+      "releasedAt": "2026-04-02",
+      "url": "https://artificialanalysis.ai/models/releases/gemma-4-e2b"
+    },
+    {
+      "id": "gemma4e4b",
+      "name": "Gemma 4 E4B",
+      "vendor": "Google",
+      "releasedAt": "2026-04-03",
+      "url": "https://artificialanalysis.ai/models/releases/gemma-4-e4b"
+    },
+    {
+      "id": "glm53",
+      "name": "GLM-5.3",
+      "vendor": "Z AI",
+      "releasedAt": "2026-08-18",
+      "url": "https://artificialanalysis.ai/models/releases/glm-5-3"
+    },
+    {
+      "id": "glm53flash",
+      "name": "GLM-5.3-Flash",
+      "vendor": "Z AI",
+      "releasedAt": "2026-08-26",
+      "url": "https://artificialanalysis.ai/models/glm-5-3-flash"
+    },
+    {
+      "id": "gpt53codex",
+      "name": "GPT-5.3 Codex",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-02-05",
+      "url": "https://artificialanalysis.ai/models/gpt-5-3-codex"
+    },
+    {
+      "id": "gpt55instantjune2026",
+      "name": "GPT-5.5 Instant (June 2026)",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-06-25",
+      "url": "https://artificialanalysis.ai/models/gpt-5-5-instant-06-26"
+    },
+    {
+      "id": "gpt55pro",
+      "name": "GPT-5.5 Pro",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-04-23",
+      "url": "https://artificialanalysis.ai/models/gpt-5-5-pro"
+    },
+    {
+      "id": "gpt61sol",
+      "name": "GPT-6.1 Sol",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-09-29",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-6-1-sol"
+    },
+    {
+      "id": "gpt61terra",
+      "name": "GPT-6.1 Terra",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-10-26",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-6-1-terra"
+    },
+    {
+      "id": "gpt6astra",
+      "name": "GPT-6 Astra",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-6-astra"
+    },
+    {
+      "id": "gpt6luna",
+      "name": "GPT-6 Luna",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-09-22",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-6-luna"
+    },
+    {
+      "id": "gpt6sol",
+      "name": "GPT-6 Sol",
+      "vendor": "OpenAI",
+      "releasedAt": "2026-09-22",
+      "url": "https://artificialanalysis.ai/models/gpt-6-sol-daybreak-blue"
+    },
+    {
+      "id": "gptoss120b",
+      "name": "gpt-oss-120b",
+      "vendor": "OpenAI",
+      "releasedAt": "2025-08-05",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-oss-120b"
+    },
+    {
+      "id": "gptoss20b",
+      "name": "gpt-oss-20b",
+      "vendor": "OpenAI",
+      "releasedAt": "2025-08-05",
+      "url": "https://artificialanalysis.ai/models/releases/gpt-oss-20b"
+    },
+    {
+      "id": "granite40350m",
+      "name": "Granite 4.0 350M",
+      "vendor": "IBM",
+      "releasedAt": "2025-10-28",
+      "url": "https://artificialanalysis.ai/models/granite-4-0-350m"
+    },
+    {
+      "id": "granite40h1b",
+      "name": "Granite 4.0 H 1B",
+      "vendor": "IBM",
+      "releasedAt": "2025-10-28",
+      "url": "https://artificialanalysis.ai/models/granite-4-0-h-nano-1b"
+    },
+    {
+      "id": "granite40h350m",
+      "name": "Granite 4.0 H 350M",
+      "vendor": "IBM",
+      "releasedAt": "2025-10-28",
+      "url": "https://artificialanalysis.ai/models/granite-4-0-h-350m"
+    },
+    {
+      "id": "granite40hsmall",
+      "name": "Granite 4.0 H Small",
+      "vendor": "IBM",
+      "releasedAt": "2025-09-22",
+      "url": "https://artificialanalysis.ai/models/granite-4-0-h-small"
+    },
+    {
+      "id": "granite40micro",
+      "name": "Granite 4.0 Micro",
+      "vendor": "IBM",
+      "releasedAt": "2025-09-22",
+      "url": "https://artificialanalysis.ai/models/granite-4-0-micro"
+    },
+    {
+      "id": "granite4230b",
+      "name": "Granite 4.2 30B",
+      "vendor": "IBM",
+      "releasedAt": "2026-08-25",
+      "url": "https://artificialanalysis.ai/models/granite-4-2-30b"
+    },
+    {
+      "id": "granite423b",
+      "name": "Granite 4.2 3B",
+      "vendor": "IBM",
+      "releasedAt": "2026-08-25",
+      "url": "https://artificialanalysis.ai/models/granite-4-2-3b"
+    },
+    {
+      "id": "granite428b",
+      "name": "Granite 4.2 8B",
+      "vendor": "IBM",
+      "releasedAt": "2026-08-25",
+      "url": "https://artificialanalysis.ai/models/granite-4-2-8b"
+    },
+    {
+      "id": "grok47",
+      "name": "Grok 4.7",
+      "vendor": "SpaceXAI",
+      "releasedAt": "2026-09-21",
+      "url": "https://artificialanalysis.ai/models/releases/grok-4-7"
+    },
+    {
+      "id": "hermes4llama31405b",
+      "name": "Hermes 4 - Llama-3.1 405B",
+      "vendor": "Nous Research",
+      "releasedAt": "2025-08-27",
+      "url": "https://artificialanalysis.ai/models/releases/hermes-4-llama-3-1-405b"
+    },
+    {
+      "id": "hermes4llama3170b",
+      "name": "Hermes 4 - Llama-3.1 70B",
+      "vendor": "Nous Research",
+      "releasedAt": "2025-08-27",
+      "url": "https://artificialanalysis.ai/models/releases/hermes-4-llama-3-1-70b"
+    },
+    {
+      "id": "hy3",
+      "name": "Hy3",
+      "vendor": "Tencent",
+      "releasedAt": "2026-07-06",
+      "url": "https://artificialanalysis.ai/models/hy3"
+    },
+    {
+      "id": "hyperclovaxseedthink32b",
+      "name": "HyperCLOVA X SEED Think (32B)",
+      "vendor": "Naver",
+      "releasedAt": "2025-12-26",
+      "url": "https://artificialanalysis.ai/models/hyperclova-x-seed-think-32b"
+    },
+    {
+      "id": "hypernova60b2605",
+      "name": "HyperNova 60B 2605",
+      "vendor": "Multiverse Computing",
+      "releasedAt": "2026-05-26",
+      "url": "https://artificialanalysis.ai/models/hypernova-60b"
+    },
+    {
+      "id": "inkling",
+      "name": "Inkling",
+      "vendor": "Thinking Machines",
+      "releasedAt": "2026-07-15",
+      "url": "https://artificialanalysis.ai/models/inkling"
+    },
+    {
+      "id": "inklingsmall",
+      "name": "Inkling Small",
+      "vendor": "Thinking Machines",
+      "releasedAt": "2026-07-30",
+      "url": "https://artificialanalysis.ai/models/inkling-small"
+    },
+    {
+      "id": "intellect3",
+      "name": "INTELLECT-3",
+      "vendor": "Prime Intellect",
+      "releasedAt": "2025-11-27",
+      "url": "https://artificialanalysis.ai/models/intellect-3"
+    },
+    {
+      "id": "jamba17large",
+      "name": "Jamba 1.7 Large",
+      "vendor": "AI21 Labs",
+      "releasedAt": "2025-07-07",
+      "url": "https://artificialanalysis.ai/models/jamba-1-7-large"
+    },
+    {
+      "id": "jamba17mini",
+      "name": "Jamba 1.7 Mini",
+      "vendor": "AI21 Labs",
+      "releasedAt": "2025-07-07",
+      "url": "https://artificialanalysis.ai/models/jamba-1-7-mini"
+    },
+    {
+      "id": "jambareasoning3b",
+      "name": "Jamba Reasoning 3B",
+      "vendor": "AI21 Labs",
+      "releasedAt": "2025-10-08",
+      "url": "https://artificialanalysis.ai/models/jamba-reasoning-3b"
+    },
+    {
+      "id": "jt35bflash",
+      "name": "JT-35B-Flash",
+      "vendor": "China Mobile",
+      "releasedAt": "2026-05-14",
+      "url": "https://artificialanalysis.ai/models/jt-35b-flash"
+    },
+    {
+      "id": "jt41flash236ba21b",
+      "name": "JT-4.1 Flash 236B A21B",
+      "vendor": "China Mobile",
+      "releasedAt": "2026-07-09",
+      "url": "https://artificialanalysis.ai/models/releases/jt-4-1-flash-236b-a21b"
+    },
+    {
+      "id": "jtmini",
+      "name": "JT-MINI",
+      "vendor": "China Mobile",
+      "releasedAt": "2026-04-15",
+      "url": "https://artificialanalysis.ai/models/jt-mini"
+    },
+    {
+      "id": "k2horizon09b",
+      "name": "K2 Horizon 0.9B",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/k2-horizon-0-9b"
+    },
+    {
+      "id": "k2horizon375ba23b",
+      "name": "K2 Horizon 375B A23B",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/k2-horizon-375b-a23b"
+    },
+    {
+      "id": "k2horizon37b",
+      "name": "K2 Horizon 3.7B",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/k2-horizon-3-7b"
+    },
+    {
+      "id": "k2horizon7b",
+      "name": "K2 Horizon 7B",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/k2-horizon-7b"
+    },
+    {
+      "id": "k2horizonmova36ba4b",
+      "name": "K2 Horizon MoVA 36B A4B",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2026-09-03",
+      "url": "https://artificialanalysis.ai/models/k2-horizon-mova-36b-a4b"
+    },
+    {
+      "id": "k2thinkv2",
+      "name": "K2 Think V2",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2025-12-15",
+      "url": "https://artificialanalysis.ai/models/k2-think-v2"
+    },
+    {
+      "id": "k2v2",
+      "name": "K2-V2",
+      "vendor": "Institute of Foundation Models",
+      "releasedAt": "2025-12-05",
+      "url": "https://artificialanalysis.ai/models/releases/k2-v2"
+    },
+    {
+      "id": "katcoderprov2",
+      "name": "KAT Coder Pro V2",
+      "vendor": "KwaiKAT",
+      "releasedAt": "2026-03-27",
+      "url": "https://artificialanalysis.ai/models/kat-coder-pro-v2"
+    },
+    {
+      "id": "kexaone200803",
+      "name": "K-EXAONE 2.0 0803",
+      "vendor": "LG AI Research",
+      "releasedAt": "2026-08-12",
+      "url": "https://artificialanalysis.ai/models/k-exaone-2-0-0803"
+    },
+    {
+      "id": "kimik27code",
+      "name": "Kimi K2.7 Code",
+      "vendor": "Kimi",
+      "releasedAt": "2026-06-12",
+      "url": "https://artificialanalysis.ai/models/kimi-k2-7-code"
+    },
+    {
+      "id": "kimik31pro",
+      "name": "Kimi K3.1 Pro",
+      "vendor": "Kimi",
+      "releasedAt": "2026-10-23",
+      "url": "https://artificialanalysis.ai/models/kimi-k3-1-pro"
+    },
+    {
+      "id": "kimilinear48ba3binstruct",
+      "name": "Kimi Linear 48B A3B Instruct",
+      "vendor": "Kimi",
+      "releasedAt": "2025-10-30",
+      "url": "https://artificialanalysis.ai/models/kimi-linear-48b-a3b-instruct"
+    },
+    {
+      "id": "lfm224ba2b",
+      "name": "LFM2 24B A2B",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-02-25",
+      "url": "https://artificialanalysis.ai/models/lfm2-24b-a2b"
+    },
+    {
+      "id": "lfm2512binstruct",
+      "name": "LFM2.5-1.2B-Instruct",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-01-05",
+      "url": "https://artificialanalysis.ai/models/lfm2-5-1-2b-instruct"
+    },
+    {
+      "id": "lfm2512bthinking",
+      "name": "LFM2.5-1.2B-Thinking",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-01-20",
+      "url": "https://artificialanalysis.ai/models/lfm2-5-1-2b-thinking"
+    },
+    {
+      "id": "lfm2526b",
+      "name": "LFM2.5-2.6B",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-08-04",
+      "url": "https://artificialanalysis.ai/models/lfm2-5-2-6b"
+    },
+    {
+      "id": "lfm258ba1b",
+      "name": "LFM2.5-8B-A1B",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-05-28",
+      "url": "https://artificialanalysis.ai/models/lfm2-5-8b-a1b"
+    },
+    {
+      "id": "lfm25vl16b",
+      "name": "LFM2.5-VL-1.6B",
+      "vendor": "Liquid AI",
+      "releasedAt": "2026-01-05",
+      "url": "https://artificialanalysis.ai/models/lfm2-5-vl-1-6b"
+    },
+    {
+      "id": "ling30flashfin",
+      "name": "Ling-3.0-flash-Fin",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-09-11",
+      "url": "https://artificialanalysis.ai/models/ling-3-0-flash-fin"
+    },
+    {
+      "id": "ling30flashvl",
+      "name": "Ling-3.0-flash-VL",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-09-10",
+      "url": "https://artificialanalysis.ai/models/ling-3-0-flash-vl"
+    },
+    {
+      "id": "ling30tiny",
+      "name": "Ling 3.0 Tiny",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-08-06",
+      "url": "https://artificialanalysis.ai/models/ling-3-0-tiny"
+    },
+    {
+      "id": "ling31flash",
+      "name": "Ling 3.1 Flash",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-10-01",
+      "url": "https://artificialanalysis.ai/models/ling-3-1-flash"
+    },
+    {
+      "id": "ling31flash1019",
+      "name": "Ling 3.1 Flash 1019",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-10-22",
+      "url": "https://artificialanalysis.ai/models/ling-3-1-flash-1019"
+    },
+    {
+      "id": "llama31instruct405b",
+      "name": "Llama 3.1 Instruct 405B",
+      "vendor": "Meta",
+      "releasedAt": "2024-07-23",
+      "url": "https://artificialanalysis.ai/models/llama-3-1-instruct-405b"
+    },
+    {
+      "id": "llama31nemotronultra253bv1",
+      "name": "Llama 3.1 Nemotron Ultra 253B v1",
+      "vendor": "NVIDIA",
+      "releasedAt": "2025-04-07",
+      "url": "https://artificialanalysis.ai/models/llama-3-1-nemotron-ultra-253b-v1-reasoning"
+    },
+    {
+      "id": "llama32instruct11bvision",
+      "name": "Llama 3.2 Instruct 11B (Vision)",
+      "vendor": "Meta",
+      "releasedAt": "2024-09-25",
+      "url": "https://artificialanalysis.ai/models/llama-3-2-instruct-11b-vision"
+    },
+    {
+      "id": "llama32instruct90bvision",
+      "name": "Llama 3.2 Instruct 90B (Vision)",
+      "vendor": "Meta",
+      "releasedAt": "2024-09-25",
+      "url": "https://artificialanalysis.ai/models/llama-3-2-instruct-90b-vision"
+    },
+    {
+      "id": "llama33instruct70b",
+      "name": "Llama 3.3 Instruct 70B",
+      "vendor": "Meta",
+      "releasedAt": "2024-12-06",
+      "url": "https://artificialanalysis.ai/models/llama-3-3-instruct-70b"
+    },
+    {
+      "id": "llama4maverick",
+      "name": "Llama 4 Maverick",
+      "vendor": "Meta",
+      "releasedAt": "2025-04-05",
+      "url": "https://artificialanalysis.ai/models/llama-4-maverick"
+    },
+    {
+      "id": "llama4scout",
+      "name": "Llama 4 Scout",
+      "vendor": "Meta",
+      "releasedAt": "2025-04-05",
+      "url": "https://artificialanalysis.ai/models/llama-4-scout"
+    },
+    {
+      "id": "longcat20",
+      "name": "LongCat 2.0",
+      "vendor": "LongCat",
+      "releasedAt": "2026-06-29",
+      "url": "https://artificialanalysis.ai/models/longcat-2-0"
+    },
+    {
+      "id": "longcatflashlite",
+      "name": "LongCat Flash Lite",
+      "vendor": "LongCat",
+      "releasedAt": "2026-01-28",
+      "url": "https://artificialanalysis.ai/models/longcat-flash-lite"
+    },
+    {
+      "id": "magistralmedium12",
+      "name": "Magistral Medium 1.2",
+      "vendor": "Mistral",
+      "releasedAt": "2025-09-18",
+      "url": "https://artificialanalysis.ai/models/magistral-medium-2509"
+    },
+    {
+      "id": "magistralsmall12",
+      "name": "Magistral Small 1.2",
+      "vendor": "Mistral",
+      "releasedAt": "2025-09-17",
+      "url": "https://artificialanalysis.ai/models/magistral-small-2509"
+    },
+    {
+      "id": "mercury25",
+      "name": "Mercury 2.5",
+      "vendor": "Inception",
+      "releasedAt": "2026-09-08",
+      "url": "https://artificialanalysis.ai/models/mercury-2-5"
+    },
+    {
+      "id": "midmk25pro",
+      "name": "Mi:dm K 2.5 Pro",
+      "vendor": "Korea Telecom",
+      "releasedAt": "2025-12-11",
+      "url": "https://artificialanalysis.ai/models/mi-dm-k-2-5-pro-dec28"
+    },
+    {
+      "id": "mimov26flash",
+      "name": "MiMo-V2.6-Flash",
+      "vendor": "Xiaomi",
+      "releasedAt": "2026-09-21",
+      "url": "https://artificialanalysis.ai/models/mimo-v2-6-flash"
+    },
+    {
+      "id": "mimov26pro",
+      "name": "MiMo-V2.6-Pro",
+      "vendor": "Xiaomi",
+      "releasedAt": "2026-09-21",
+      "url": "https://artificialanalysis.ai/models/mimo-v2-6-pro"
+    },
+    {
+      "id": "minicpm51b",
+      "name": "MiniCPM5-1B",
+      "vendor": "OpenBMB",
+      "releasedAt": "2026-05-25",
+      "url": "https://artificialanalysis.ai/models/releases/minicpm5-1b"
+    },
+    {
+      "id": "minicpm52b",
+      "name": "MiniCPM5-2B",
+      "vendor": "OpenBMB",
+      "releasedAt": "2026-09-07",
+      "url": "https://artificialanalysis.ai/models/minicpm5-2b"
+    },
+    {
+      "id": "minicpmv4613b",
+      "name": "MiniCPM-V 4.6 1.3B",
+      "vendor": "OpenBMB",
+      "releasedAt": "2026-05-11",
+      "url": "https://artificialanalysis.ai/models/minicpm-v4-6-1-3b"
+    },
+    {
+      "id": "minimaxm3",
+      "name": "MiniMax-M3",
+      "vendor": "MiniMax",
+      "releasedAt": "2026-06-01",
+      "url": "https://artificialanalysis.ai/models/minimax-m3"
+    },
+    {
+      "id": "minimaxm31flash",
+      "name": "MiniMax-M3.1-Flash",
+      "vendor": "MiniMax",
+      "releasedAt": "2026-10-19",
+      "url": "https://artificialanalysis.ai/models/minimax-m3-1-flash"
+    },
+    {
+      "id": "ministral314b",
+      "name": "Ministral 3 14B",
+      "vendor": "Mistral",
+      "releasedAt": "2025-12-02",
+      "url": "https://artificialanalysis.ai/models/ministral-3-14b"
+    },
+    {
+      "id": "ministral33b",
+      "name": "Ministral 3 3B",
+      "vendor": "Mistral",
+      "releasedAt": "2025-12-02",
+      "url": "https://artificialanalysis.ai/models/ministral-3-3b"
+    },
+    {
+      "id": "ministral38b",
+      "name": "Ministral 3 8B",
+      "vendor": "Mistral",
+      "releasedAt": "2025-12-02",
+      "url": "https://artificialanalysis.ai/models/ministral-3-8b"
+    },
+    {
+      "id": "mistrallarge4preview",
+      "name": "Mistral Large 4 Preview",
+      "vendor": "Mistral",
+      "releasedAt": "2026-10-06",
+      "url": "https://artificialanalysis.ai/models/mistral-large-4"
+    },
+    {
+      "id": "mistralmedium35",
+      "name": "Mistral Medium 3.5",
+      "vendor": "Mistral",
+      "releasedAt": "2026-04-29",
+      "url": "https://artificialanalysis.ai/models/mistral-medium-3-5"
+    },
+    {
+      "id": "mistralsmall4",
+      "name": "Mistral Small 4",
+      "vendor": "Mistral",
+      "releasedAt": "2026-03-16",
+      "url": "https://artificialanalysis.ai/models/releases/mistral-small-4"
+    },
+    {
+      "id": "molmo28b",
+      "name": "Molmo2-8B",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2025-12-11",
+      "url": "https://artificialanalysis.ai/models/molmo2-8b"
+    },
+    {
+      "id": "molmo7bd",
+      "name": "Molmo 7B-D",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2024-09-25",
+      "url": "https://artificialanalysis.ai/models/molmo-7b-d"
+    },
+    {
+      "id": "motif2127breasoning",
+      "name": "Motif-2-12.7B-Reasoning",
+      "vendor": "Motif Technologies",
+      "releasedAt": "2025-12-04",
+      "url": "https://artificialanalysis.ai/models/motif-2-12-7b"
+    },
+    {
+      "id": "motif3",
+      "name": "Motif 3",
+      "vendor": "Motif Technologies",
+      "releasedAt": "2026-08-12",
+      "url": "https://artificialanalysis.ai/models/motif-3"
+    },
+    {
+      "id": "museglimmer",
+      "name": "Muse Glimmer",
+      "vendor": "Meta",
+      "releasedAt": "2026-08-10",
+      "url": "https://artificialanalysis.ai/models/muse-glimmer"
+    },
+    {
+      "id": "musesparkopen",
+      "name": "Muse Spark Open",
+      "vendor": "Meta",
+      "releasedAt": "2026-10-15",
+      "url": "https://artificialanalysis.ai/models/muse-spark-open"
+    },
+    {
+      "id": "musewonder",
+      "name": "Muse Wonder",
+      "vendor": "Meta",
+      "releasedAt": "2026-10-12",
+      "url": "https://artificialanalysis.ai/models/muse-wonder"
+    },
+    {
+      "id": "musewonderfull",
+      "name": "Muse Wonder Full",
+      "vendor": "Meta",
+      "releasedAt": "2026-10-12",
+      "url": "https://artificialanalysis.ai/models/muse-wonder-full"
+    },
+    {
+      "id": "nanbeige413b",
+      "name": "Nanbeige4.1-3B",
+      "vendor": "Nanbeige",
+      "releasedAt": "2026-02-11",
+      "url": "https://artificialanalysis.ai/models/nanbeige4-1-3b"
+    },
+    {
+      "id": "nemotron35bolt74ba9b",
+      "name": "Nemotron 3.5 Bolt 74B-A9B",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-10-15",
+      "url": "https://artificialanalysis.ai/models/nemotron-3-5-bolt-74b-a9b"
+    },
+    {
+      "id": "nemotron35bolte4b4gb",
+      "name": "Nemotron 3.5 Bolt E4B 4GB",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-10-23",
+      "url": "https://artificialanalysis.ai/models/nemotron-3-5-bolt-e4b-4gb"
+    },
+    {
+      "id": "nemotron35lightning",
+      "name": "Nemotron 3.5 Lightning",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-08-11",
+      "url": "https://artificialanalysis.ai/models/nemotron-3-5-lightning"
+    },
+    {
+      "id": "nemotron35supervl",
+      "name": "Nemotron 3.5 Super VL",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-10-15",
+      "url": "https://artificialanalysis.ai/models/nemotron-3-5-super-vl"
+    },
+    {
+      "id": "nemotron3nanoomni30ba3breasoning",
+      "name": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-04-29",
+      "url": "https://artificialanalysis.ai/models/nemotron-3-nano-omni-30b-a3b"
+    },
+    {
+      "id": "nemotron3ultra550ba55b",
+      "name": "Nemotron 3 Ultra 550B A55B",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-06-04",
+      "url": "https://artificialanalysis.ai/models/nvidia-nemotron-3-ultra-550b-a55b"
+    },
+    {
+      "id": "nemotroncascade230ba3b",
+      "name": "Nemotron Cascade 2 30B A3B",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-03-19",
+      "url": "https://artificialanalysis.ai/models/nemotron-cascade-2-30b-a3b"
+    },
+    {
+      "id": "nexn2pro",
+      "name": "Nex-N2-Pro",
+      "vendor": "Nex AGI",
+      "releasedAt": "2026-06-02",
+      "url": "https://artificialanalysis.ai/models/nex-n2-pro"
+    },
+    {
+      "id": "northminicode",
+      "name": "North Mini Code",
+      "vendor": "Cohere",
+      "releasedAt": "2026-06-09",
+      "url": "https://artificialanalysis.ai/models/north-mini-code"
+    },
+    {
+      "id": "nova20lite",
+      "name": "Nova 2.0 Lite",
+      "vendor": "Amazon",
+      "releasedAt": "2025-10-29",
+      "url": "https://artificialanalysis.ai/models/releases/nova-2-0-lite"
+    },
+    {
+      "id": "nova20omni",
+      "name": "Nova 2.0 Omni",
+      "vendor": "Amazon",
+      "releasedAt": "2025-11-26",
+      "url": "https://artificialanalysis.ai/models/releases/nova-2-0-omni"
+    },
+    {
+      "id": "nova20propreview",
+      "name": "Nova 2.0 Pro Preview",
+      "vendor": "Amazon",
+      "releasedAt": "2025-11-27",
+      "url": "https://artificialanalysis.ai/models/releases/nova-2-0-pro-preview"
+    },
+    {
+      "id": "novamicro",
+      "name": "Nova Micro",
+      "vendor": "Amazon",
+      "releasedAt": "2024-12-03",
+      "url": "https://artificialanalysis.ai/models/nova-micro"
+    },
+    {
+      "id": "novapremier",
+      "name": "Nova Premier",
+      "vendor": "Amazon",
+      "releasedAt": "2025-04-30",
+      "url": "https://artificialanalysis.ai/models/nova-premier"
+    },
+    {
+      "id": "nvidianemotron3nano30ba3b",
+      "name": "NVIDIA Nemotron 3 Nano 30B A3B",
+      "vendor": "NVIDIA",
+      "releasedAt": "2025-12-15",
+      "url": "https://artificialanalysis.ai/models/releases/nvidia-nemotron-3-nano-30b-a3b"
+    },
+    {
+      "id": "nvidianemotron3nano4b",
+      "name": "NVIDIA Nemotron 3 Nano 4B",
+      "vendor": "NVIDIA",
+      "releasedAt": "2026-03-16",
+      "url": "https://artificialanalysis.ai/models/nvidia-nemotron-3-nano-4b"
+    },
+    {
+      "id": "nvidianemotronnano12bv2vl",
+      "name": "NVIDIA Nemotron Nano 12B v2 VL",
+      "vendor": "NVIDIA",
+      "releasedAt": "2025-10-28",
+      "url": "https://artificialanalysis.ai/models/releases/nvidia-nemotron-nano-12b-v2-vl"
+    },
+    {
+      "id": "nvidianemotronnano9bv2",
+      "name": "NVIDIA Nemotron Nano 9B V2",
+      "vendor": "NVIDIA",
+      "releasedAt": "2025-08-18",
+      "url": "https://artificialanalysis.ai/models/releases/nvidia-nemotron-nano-9b-v2"
+    },
+    {
+      "id": "o3",
+      "name": "o3",
+      "vendor": "OpenAI",
+      "releasedAt": "2025-04-16",
+      "url": "https://artificialanalysis.ai/models/o3"
+    },
+    {
+      "id": "olmo3132binstruct",
+      "name": "Olmo 3.1 32B Instruct",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2026-01-13",
+      "url": "https://artificialanalysis.ai/models/olmo-3-1-32b-instruct"
+    },
+    {
+      "id": "olmo3132bthink",
+      "name": "Olmo 3.1 32B Think",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2025-12-12",
+      "url": "https://artificialanalysis.ai/models/olmo-3-1-32b-think"
+    },
+    {
+      "id": "olmo37binstruct",
+      "name": "Olmo 3 7B Instruct",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2025-11-20",
+      "url": "https://artificialanalysis.ai/models/olmo-3-7b-instruct"
+    },
+    {
+      "id": "olmo37bthink",
+      "name": "Olmo 3 7B Think",
+      "vendor": "Allen Institute for AI",
+      "releasedAt": "2025-11-20",
+      "url": "https://artificialanalysis.ai/models/olmo-3-7b-think"
+    },
+    {
+      "id": "phi4",
+      "name": "Phi-4",
+      "vendor": "Microsoft",
+      "releasedAt": "2024-12-12",
+      "url": "https://artificialanalysis.ai/models/phi-4"
+    },
+    {
+      "id": "phi4miniinstruct",
+      "name": "Phi-4 Mini Instruct",
+      "vendor": "Microsoft",
+      "releasedAt": "2025-02-26",
+      "url": "https://artificialanalysis.ai/models/phi-4-mini"
+    },
+    {
+      "id": "phi4multimodalinstruct",
+      "name": "Phi-4 Multimodal Instruct",
+      "vendor": "Microsoft",
+      "releasedAt": "2025-02-26",
+      "url": "https://artificialanalysis.ai/models/phi-4-multimodal"
+    },
+    {
+      "id": "quasar438b",
+      "name": "Quasar 438B",
+      "vendor": "Multiverse Computing",
+      "releasedAt": "2026-08-10",
+      "url": "https://artificialanalysis.ai/models/quasar-438b"
+    },
+    {
+      "id": "qwen3508b",
+      "name": "Qwen3.5 0.8B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-02",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-0-8b"
+    },
+    {
+      "id": "qwen35122ba10b",
+      "name": "Qwen3.5 122B A10B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-02-24",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-122b-a10b"
+    },
+    {
+      "id": "qwen352b",
+      "name": "Qwen3.5 2B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-02",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-2b"
+    },
+    {
+      "id": "qwen35397ba17b",
+      "name": "Qwen3.5 397B A17B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-02-16",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-397b-a17b"
+    },
+    {
+      "id": "qwen354b",
+      "name": "Qwen3.5 4B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-02",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-4b"
+    },
+    {
+      "id": "qwen359b",
+      "name": "Qwen3.5 9B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-02",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-5-9b"
+    },
+    {
+      "id": "qwen35omniflash",
+      "name": "Qwen3.5 Omni Flash",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-30",
+      "url": "https://artificialanalysis.ai/models/qwen3-5-omni-flash"
+    },
+    {
+      "id": "qwen35omniplus",
+      "name": "Qwen3.5 Omni Plus",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-03-30",
+      "url": "https://artificialanalysis.ai/models/qwen3-5-omni-plus"
+    },
+    {
+      "id": "qwen3635ba3b",
+      "name": "Qwen3.6 35B A3B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-04-16",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-6-35b-a3b"
+    },
+    {
+      "id": "qwen37plus",
+      "name": "Qwen3.7 Plus",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-06-01",
+      "url": "https://artificialanalysis.ai/models/qwen3-7-plus"
+    },
+    {
+      "id": "qwen3824ta95b",
+      "name": "Qwen3.8 2.4T A95B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-08-12",
+      "url": "https://artificialanalysis.ai/models/qwen3-8-2-4t-a95b"
+    },
+    {
+      "id": "qwen3827b",
+      "name": "Qwen3.8 27B",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-08-14",
+      "url": "https://artificialanalysis.ai/models/releases/qwen3-8-27b"
+    },
+    {
+      "id": "qwen38flashnext",
+      "name": "Qwen3.8-Flash-Next",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-08-26",
+      "url": "https://artificialanalysis.ai/models/qwen3-8-flash-next"
+    },
+    {
+      "id": "qwen38max0902",
+      "name": "Qwen3.8 Max (0902)",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-09-02",
+      "url": "https://artificialanalysis.ai/models/qwen3-8-max"
+    },
+    {
+      "id": "qwen3codernext",
+      "name": "Qwen3 Coder Next",
+      "vendor": "Alibaba",
+      "releasedAt": "2026-02-03",
+      "url": "https://artificialanalysis.ai/models/qwen3-coder-next"
+    },
+    {
+      "id": "qwen3next80ba3binstruct",
+      "name": "Qwen3 Next 80B A3B Instruct",
+      "vendor": "Alibaba",
+      "releasedAt": "2025-09-11",
+      "url": "https://artificialanalysis.ai/models/qwen3-next-80b-a3b-instruct"
+    },
+    {
+      "id": "qwen3next80ba3breasoning",
+      "name": "Qwen3 Next 80B A3B (Reasoning)",
+      "vendor": "Alibaba",
+      "releasedAt": "2025-09-11",
+      "url": "https://artificialanalysis.ai/models/qwen3-next-80b-a3b-reasoning"
+    },
+    {
+      "id": "qwen3omni30ba3binstruct",
+      "name": "Qwen3 Omni 30B A3B Instruct",
+      "vendor": "Alibaba",
+      "releasedAt": "2025-09-22",
+      "url": "https://artificialanalysis.ai/models/qwen3-omni-30b-a3b-instruct"
+    },
+    {
+      "id": "qwen3omni30ba3breasoning",
+      "name": "Qwen3 Omni 30B A3B (Reasoning)",
+      "vendor": "Alibaba",
+      "releasedAt": "2025-09-22",
+      "url": "https://artificialanalysis.ai/models/qwen3-omni-30b-a3b-reasoning"
+    },
+    {
+      "id": "r11776",
+      "name": "R1 1776",
+      "vendor": "Perplexity",
+      "releasedAt": "2025-02-18",
+      "url": "https://artificialanalysis.ai/models/r1-1776"
+    },
+    {
+      "id": "rekaflash3",
+      "name": "Reka Flash 3",
+      "vendor": "Reka AI",
+      "releasedAt": "2025-03-10",
+      "url": "https://artificialanalysis.ai/models/reka-flash-3"
+    },
+    {
+      "id": "ring261t",
+      "name": "Ring-2.6-1T",
+      "vendor": "InclusionAI",
+      "releasedAt": "2026-05-08",
+      "url": "https://artificialanalysis.ai/models/ring-2-6-1t"
+    },
+    {
+      "id": "ringflash20",
+      "name": "Ring-flash-2.0",
+      "vendor": "InclusionAI",
+      "releasedAt": "2025-09-19",
+      "url": "https://artificialanalysis.ai/models/ring-flash-2-0"
+    },
+    {
+      "id": "sarvam105b",
+      "name": "Sarvam 105B",
+      "vendor": "Sarvam",
+      "releasedAt": "2026-03-06",
+      "url": "https://artificialanalysis.ai/models/sarvam-105b"
+    },
+    {
+      "id": "sarvam30b",
+      "name": "Sarvam 30B",
+      "vendor": "Sarvam",
+      "releasedAt": "2026-03-06",
+      "url": "https://artificialanalysis.ai/models/sarvam-30b"
+    },
+    {
+      "id": "solarmini4",
+      "name": "Solar Mini 4",
+      "vendor": "Upstage",
+      "releasedAt": "2026-09-22",
+      "url": "https://artificialanalysis.ai/models/solar-mini4"
+    },
+    {
+      "id": "solaropen100b",
+      "name": "Solar Open 100B",
+      "vendor": "Upstage",
+      "releasedAt": "2025-12-17",
+      "url": "https://artificialanalysis.ai/models/solar-open-100b-reasoning"
+    },
+    {
+      "id": "solaropen2250b",
+      "name": "Solar Open2 250B",
+      "vendor": "Upstage",
+      "releasedAt": "2026-08-12",
+      "url": "https://artificialanalysis.ai/models/solar-open2-250b"
+    },
+    {
+      "id": "solarpro4",
+      "name": "Solar Pro 4",
+      "vendor": "Upstage",
+      "releasedAt": "2026-08-06",
+      "url": "https://artificialanalysis.ai/models/solar-pro4"
+    },
+    {
+      "id": "step3vl10b",
+      "name": "Step3 VL 10B",
+      "vendor": "StepFun",
+      "releasedAt": "2026-01-20",
+      "url": "https://artificialanalysis.ai/models/step-3-vl-10b"
+    },
+    {
+      "id": "step5preview",
+      "name": "Step 5 Preview",
+      "vendor": "StepFun",
+      "releasedAt": "2026-09-18",
+      "url": "https://artificialanalysis.ai/models/step-5"
+    },
+    {
+      "id": "tinyayaglobal",
+      "name": "Tiny Aya Global",
+      "vendor": "Cohere",
+      "releasedAt": "2026-02-17",
+      "url": "https://artificialanalysis.ai/models/tiny-aya-global"
+    },
+    {
+      "id": "tri21bthink",
+      "name": "Tri-21B-Think",
+      "vendor": "Trillion Labs",
+      "releasedAt": "2026-02-10",
+      "url": "https://artificialanalysis.ai/models/tri-21b-think-v0-5"
+    },
+    {
+      "id": "trinitylargethinking",
+      "name": "Trinity Large Thinking",
+      "vendor": "Arcee AI",
+      "releasedAt": "2026-04-01",
+      "url": "https://artificialanalysis.ai/models/trinity-large-thinking"
+    }
+  ],
+  "sources": [
+    {
+      "id": "model-releases",
+      "name": "型号发布日期",
+      "url": "https://artificialanalysis.ai/models/releases",
+      "version": "Artificial Analysis release directory",
+      "checkedAt": "2026-10-28T19:00:30.428Z",
+      "records": 195,
+      "automatic": true,
+      "error": null,
+      "weights": {}
+    }
+  ],
+  "observations": [],
+  "profiles": [],
+  "epoch": null
+}

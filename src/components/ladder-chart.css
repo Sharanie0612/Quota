@@ -18,6 +18,7 @@
 .scatter-tick { fill: var(--text-2); font-size: 14px; font-variant-numeric: tabular-nums; }
 .scatter-axis-title { fill: var(--text-2); font-size: 14px; }
 .scatter-point { cursor: pointer; outline: none; }
+.scatter-model-label {font-size:14px;fill:var(--text-2);pointer-events:none;paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round;}
 .scatter-dot { stroke-width: 1; opacity: 1; vector-effect: non-scaling-stroke; }
 .scatter-point:hover .scatter-dot, .scatter-point:focus-visible .scatter-dot { stroke-width: 1.5; }
 .scatter-selection-ring { fill: none; stroke: var(--blue); stroke-width: 1.5; pointer-events: none; vector-effect: non-scaling-stroke; }

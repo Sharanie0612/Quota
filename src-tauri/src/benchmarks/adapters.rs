@@ -233,6 +233,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         observations,
         profiles,
         epoch: None,
+        releases: vec![],
     })
 }
 pub fn livebench_releases(js: &str) -> Vec<String> {
@@ -436,5 +437,6 @@ pub fn parse_livebench(
         observations,
         profiles: vec![],
         epoch: None,
+        releases: vec![],
     })
 }

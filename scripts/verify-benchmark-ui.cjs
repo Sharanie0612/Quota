@@ -1,72 +1,51 @@
-// Browser QA uses the actual production components, synthetic personal data,
-// and the board calculated by Rust's benchmark_checks example.
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const path=require('node:path');
+// Production React/CSS with public benchmark fixtures and synthetic private data.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {spawn}=require('node:child_process');
 const {chromium}=require(process.env.QUOTA_PLAYWRIGHT_MODULE||'playwright');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'target/scenario-evaluation-ui'),preview=path.join(root,'dist-mock');
-const base=process.env.QUOTA_PREVIEW_URL||'http://127.0.0.1:4178/';
+const root=path.resolve(__dirname,'..'),out=path.join(root,'target/model-speed-ui'),preview=path.join(root,'dist-mock');
 fs.mkdirSync(out,{recursive:true});fs.mkdirSync(preview,{recursive:true});
 fs.cpSync(path.join(root,'dist/assets'),path.join(preview,'assets'),{recursive:true});
 for(const name of ['ai-models.json','model_catalog.json','ladder.json'])fs.copyFileSync(path.join(root,'src-tauri/data',name),path.join(preview,name));
-fs.copyFileSync(path.join(root,'target/benchmark-sources/board.json'),path.join(preview,'benchmark-board.json'));
+const board=JSON.parse(fs.readFileSync(path.join(root,'target/benchmark-sources/board.json'),'utf8'));
+if(!board.releases?.length)board.releases=JSON.parse(fs.readFileSync(path.join(root,'src-tauri/data/model-releases.json'),'utf8')).releases;
+fs.writeFileSync(path.join(preview,'benchmark-board.json'),JSON.stringify(board));
 fs.writeFileSync(path.join(preview,'index.html'),fs.readFileSync(path.join(root,'dist/index.html'),'utf8').replace('<head>','<head><script>'+fs.readFileSync(path.join(root,'scripts/mock-tauri.js'),'utf8')+'</script>'));
-async function overflow(page,selector){const box=await page.locator(selector).evaluate(e=>({client:e.clientWidth,scroll:e.scrollWidth}));assert.ok(box.scroll<=box.client+1,selector+' overflow '+JSON.stringify(box));}
-async function main(){const browser=await chromium.launch({channel:'msedge',headless:true});const evidence=[];
-try{
- for(const mode of ['light','dark']){
-  const page=await browser.newPage({viewport:{width:1024,height:768},colorScheme:mode,reducedMotion:'reduce'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.addInitScript(()=>{window.demoAppearance={theme:'codex',mode:'system',collapsed:false,revision:0};});await page.goto(base);await page.locator('.launch-screen').waitFor({state:'hidden'});
-  assert.equal(await page.locator('html').getAttribute('data-color-theme'),'quota');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'AI 模型',exact:true}).click();
-  await page.locator('.tier-model').first().waitFor();assert.ok(await page.locator('.tier-s .tier-model').count()>0);
-  const board=JSON.parse(fs.readFileSync(path.join(root,'target/benchmark-sources/board.json'),'utf8'));
-  assert.equal(await page.locator('[data-benchmark-source=general]').getAttribute('aria-pressed'),'true');
-  assert.equal(await page.locator('.tier-model').count(),24);
-  for(const id of ['general','coding','reasoning','agents','knowledge','aa','livebench']){
-    await page.locator('[data-benchmark-source="'+id+'"]').click();await page.locator('.tier-board[data-ranking-id="'+id+'"]').waitFor();
-    const geometry=await page.locator('.tier-model').evaluateAll(cards=>cards.every(card=>{const main=card.querySelector('.tier-model-main').getBoundingClientRect(),compare=card.querySelector('.tier-compare').getBoundingClientRect();return compare.top>=main.bottom-1&&card.scrollWidth<=card.clientWidth+1;}));assert.ok(geometry,'card comparison control overlaps score/range');
-    await overflow(page,'.content');await page.screenshot({path:path.join(out,mode+'-'+id+'-ladder.png')});
-    const expand=page.locator('button[data-expand-ladder]');if(await expand.count())await expand.click();
-    const actual=await page.locator('.tier-model').evaluateAll(rows=>rows.map(e=>({id:e.dataset.modelId,rank:Number(e.dataset.rank),profileId:e.dataset.profileId,score:Number(e.querySelector('.tier-model-score strong').textContent),range:e.querySelector('.tier-range-values')?.textContent??'',rangeKind:e.querySelector('.tier-model-range')?.dataset.rangeKind??''})));
-    const expected=board.rankings.find(r=>r.id===id).entries;
-    assert.equal(actual.length,expected.length);
-    actual.forEach((row,i)=>{const e=expected[i];assert.equal(row.id,e.modelId);assert.equal(row.rank,e.rank);assert.equal(row.profileId,e.profileId);assert.ok(Math.abs(row.score-e.score)<=.00501);if(e.lower!=null){const range=row.range.split('–').map(Number);assert.equal(range.length,2);assert.ok(Math.abs(range[0]-e.lower)<=.00501&&Math.abs(range[1]-e.upper)<=.00501);assert.equal(row.rangeKind,e.rangeKind);}});
+const port=Number(process.env.QUOTA_PREVIEW_PORT||4198),base=`http://127.0.0.1:${port}/`;
+async function overflow(page){assert(await page.locator('.main').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'main horizontal overflow');assert(await page.locator('.content').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'content horizontal overflow');}
+async function capture(page,name){await page.screenshot({path:path.join(out,name+'.png')});if(name.startsWith('light-1360-')){await page.setViewportSize({width:1360,height:1120});await page.screenshot({path:path.join(out,name+'-full.png')});await page.setViewportSize({width:1360,height:900});}}
+async function main(){
+ const server=spawn(process.execPath,[path.join(root,'scripts/preview-server.cjs'),String(port)],{cwd:root,windowsHide:true,stdio:['ignore','pipe','pipe']});
+ let browser;
+ try{
+  await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('preview startup timeout')),5000);server.once('error',reject);server.stdout.on('data',chunk=>{if(chunk.toString().includes(String(port))){clearTimeout(timer);resolve();}});server.stderr.on('data',chunk=>reject(Error(chunk.toString())));});
+  browser=await chromium.launch({channel:'msedge',headless:true});const evidence=[];
+  for(const mode of ['light','dark'])for(const width of [1024,1360]){
+   const page=await browser.newPage({viewport:{width,height:900},colorScheme:mode,reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+   await page.goto(base);await page.locator('.launch-screen').waitFor({state:'hidden'});const nav=page.getByRole('navigation',{name:'主导航'});
+   assert.equal(await nav.getByRole('button',{name:'模型库',exact:true}).count(),0);
+   await nav.getByRole('button',{name:'AI 模型',exact:true}).click();await page.locator('.visual-model-page[data-release-window="30"]').waitFor();
+   await page.waitForFunction(()=>document.querySelector('.scatter-point,.ladder-score-row,.visual-model-pending'));
+   assert.equal(await page.getByLabel('模型发布时间',{exact:true}).inputValue(),'30');assert.equal(await page.getByLabel('图表币种',{exact:true}).count(),0);assert.equal(await page.locator('.tier-board').count(),0);
+   await overflow(page);await capture(page,`${mode}-${width}-ladder`);
+   const recent=await page.locator('.scatter-point,.ladder-score-row').count();await page.getByLabel('模型发布时间',{exact:true}).selectOption('0');await page.locator('.visual-model-page[data-release-window="0"]').waitFor();
+   await page.waitForFunction(()=>document.querySelectorAll('.scatter-point,.ladder-score-row').length>0);const all=await page.locator('.scatter-point,.ladder-score-row').count();assert(all>=recent);
+   const profiles=new Map(board.profiles.filter(p=>p.sourceId==='artificial-analysis').map(p=>[p.id,p]));
+   const rows=await page.locator('.scatter-point').evaluateAll(points=>points.flatMap(e=>e.dataset.profileIds.split('|').map(id=>({id,score:Number(e.dataset.score),x:Number(e.dataset.plotX),y:Number(e.dataset.plotY)}))));
+   const unpriced=await page.locator('.ladder-score-row').evaluateAll(points=>points.map(e=>({id:e.dataset.profileId,score:Number(e.dataset.score)})));
+   assert.equal(new Set([...rows,...unpriced].map(r=>r.id)).size,profiles.size,'all public configurations retained, priced or unpriced');
+   for(const row of [...rows,...unpriced])assert(Math.abs(row.score-profiles.get(row.id).index)<1e-9,'source-native configuration score');
+   for(const row of rows)assert(row.x>=61&&row.x<=843&&row.y>=43&&row.y<=501,'finite, in-bounds scatter coordinates');
+   await page.locator('.visual-model-toolbar button').filter({hasText:/^六维对比$/}).click();await page.locator('.visual-ability .ability-radar').waitFor();assert(await page.locator('.ability-radar circle').count()>0);assert(!await page.locator('.ability-radar').evaluate(e=>e.innerHTML.includes('NaN')));await overflow(page);await capture(page,`${mode}-${width}-radar`);
+   await page.locator('.visual-compare-selected button').first().click();assert(!await page.getByLabel('添加六维对比模型').isDisabled());
+   await nav.getByRole('button',{name:'输出速度',exact:true}).click();await page.locator('.speed-chart > svg').waitFor();assert.equal(await page.locator('.speed-summary strong').count(),4);await overflow(page);await capture(page,`${mode}-${width}-speed`);
+   await page.getByLabel('输出速度模型').selectOption('gpt-6.1-sol');await page.waitForFunction(()=>document.querySelectorAll('.speed-legend button').length===1);await page.locator('.speed-chart circle[role=button]').first().focus();assert((await page.locator('.speed-inspector').textContent()).includes('gpt-6.1-sol'));
+   await nav.getByRole('button',{name:'Token 活动',exact:true}).click();await page.locator('.activity-shares').waitFor();assert.equal(await page.locator('.activity-share').count(),3);assert.equal(await page.locator('.activity-share-legend,.activity-cache-details,#activity-details').count(),0);await overflow(page);await page.screenshot({path:path.join(out,`${mode}-${width}-shares.png`)});await page.locator('.activity-shares').screenshot({path:path.join(out,`${mode}-${width}-donuts.png`)});
+   await nav.getByRole('button',{name:'设置',exact:true}).click();await page.locator('.appearance-settings').waitFor();await overflow(page);await page.screenshot({path:path.join(out,`${mode}-${width}-appearance.png`)});
+   await nav.getByRole('button',{name:'账户总览',exact:true}).click();await page.getByRole('button',{name:'添加账户',exact:true}).click();const form=page.getByRole('dialog');await form.waitFor();assert(await form.evaluate(e=>e.scrollWidth<=e.clientWidth+1),'account form horizontal overflow');await form.getByRole('button',{name:'取消',exact:true}).click();
+   assert.deepEqual(errors,[]);evidence.push({mode,width,plotted:rows.length,unpriced:unpriced.length,sourceConfigurations:profiles.size,passed:true});await page.close();
   }
-  for(const id of ['general','coding']){
-    await page.locator('[data-benchmark-source="'+id+'"]').click();await page.locator('.tier-board[data-ranking-id="'+id+'"]').waitFor();
-    const first=board.rankings.find(r=>r.id===id).entries[0],model=board.models.find(m=>m.id===first.modelId),result=model.results.find(r=>r.profileId===first.profileId);
-    await page.locator('.tier-model-main').first().click();const detail=page.getByRole('dialog');await detail.waitFor();assert.match(await detail.innerText(),/基线校准值/);
-    const values=await detail.locator('.benchmark-native-table tbody tr').evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('td')].map(cell=>cell.textContent)));
-    assert.equal(values.length,result.components.length);values.forEach((row,i)=>{const c=result.components[i];assert.ok(row[0].includes(c.metric));assert.equal(row[1],c.value.toFixed(2)+'%');assert.equal(row[2],c.normalized.toFixed(2));assert.ok(row[3].includes(c.configuration));});
-    if(id==='general')assert.match(await detail.innerText(),/不用于重算来源发布的综合值/);
-    await page.screenshot({path:path.join(out,mode+'-'+id+'-detail.png')});await detail.getByRole('button',{name:'关闭',exact:true}).first().click();
-  }
-  await page.locator('[data-benchmark-source=aa]').click();
-  await page.getByRole('combobox',{name:'推理档位',exact:true}).selectOption('low');await page.locator('.tier-board[data-ranking-id="aa:low"]').waitFor();assert.ok(await page.locator('.tier-model-setting').evaluateAll(rows=>rows.every(e=>e.textContent.toLowerCase().startsWith('low'))));
-  await page.getByRole('combobox',{name:'推理档位',exact:true}).selectOption('best');
-  await page.locator('.tier-board[data-ranking-id="aa"]').waitFor();
-  await page.getByRole('textbox',{name:'搜索天梯模型'}).fill('GPT-6.1 Terra');assert.equal(await page.locator('.tier-model').count(),1);await page.getByRole('textbox',{name:'搜索天梯模型'}).fill('');
-  await page.locator('.tier-model-main').first().click();let dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/分项/);await dialog.locator('.benchmark-evidence summary').first().click();assert.match(await dialog.innerText(),/公开配置/);await page.screenshot({path:path.join(out,mode+'-model-detail.png')});await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
-  await page.getByRole('button',{name:'算法与来源',exact:true}).click();dialog=page.getByRole('dialog');await dialog.waitFor();assert.match(await dialog.innerText(),/测评难度/);assert.match(await dialog.innerText(),/Anthropic 官方报告/);assert.match(await dialog.innerText(),/不是统计置信区间/);await dialog.getByRole('button',{name:'关闭',exact:true}).first().click();
-  await page.locator('.benchmark-toolbar').getByRole('tab',{name:'能力对比',exact:true}).click();assert.ok(await page.locator('.capability-group').count()>=9);await page.screenshot({path:path.join(out,mode+'-capabilities.png')});
-  await page.locator('[data-benchmark-source=general]').click();assert.equal(await page.locator('.capability-group').count(),5);await page.screenshot({path:path.join(out,mode+'-scenario-comparison.png')});
-  await page.locator('.benchmark-toolbar').getByRole('tab',{name:'效率曲线',exact:true}).click();await page.locator('.benchmark-point').first().waitFor();assert.ok(await page.locator('.benchmark-point').count()>3);await page.locator('.benchmark-point').first().focus();assert.match(await page.locator('.efficiency-readout').innerText(),/任务/);await overflow(page,'.content');await page.screenshot({path:path.join(out,mode+'-efficiency.png')});
-  await page.locator('.benchmark-toolbar').getByRole('tab',{name:'官方价格',exact:true}).click();await page.locator('.registry-model').first().waitFor();await overflow(page,'.content');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'Token 活动',exact:true}).click();await page.locator('.activity-shares').waitFor();assert.equal(await page.locator('.activity-share svg').count(),3);for(const card of await page.locator('.activity-share').all()){const box=await card.evaluate(e=>({client:e.clientWidth,scroll:e.scrollWidth}));assert.ok(box.scroll<=box.client+1,'donut legend overflow');}await page.locator('.activity-shares').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,mode+'-activity-shares.png')});
-  await page.locator('.activity-share').nth(1).locator('.activity-share-legend button').first().click();await page.waitForFunction(()=>document.querySelector('.activity-model-picker')||document.querySelector('.activity-overview'));await overflow(page,'.content');
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'设置',exact:true}).click();await page.locator('.theme-option').first().waitFor();assert.match(await page.locator('.theme-option[aria-pressed="true"]').innerText(),/Quota/);await page.screenshot({path:path.join(out,mode+'-settings.png')});
-  await page.getByRole('button',{name:'收起侧边栏',exact:true}).click();await page.locator('.sidebar-collapsed').waitFor();await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();
-  await page.getByRole('group',{name:'配色方案'}).getByRole('button',{name:'GitHub',exact:true}).click();assert.equal(await page.locator('html').getAttribute('data-color-theme'),'github');await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.colorTheme==='github');assert.deepEqual(errors,[]);evidence.push({mode,viewport:[1024,768],passed:true});await page.close();
- }
- for(const test of ['upgrade','retry']){
-  const page=await browser.newPage({viewport:{width:720,height:540},reducedMotion:'reduce'});await page.goto(base+'?window=setup&setupCase='+test);await page.locator('.setup-version').waitFor();await overflow(page,'.setup-app');await page.screenshot({path:path.join(out,'setup-'+test+'-welcome.png')});
-  await page.getByRole('combobox',{name:'安装语言'}).selectOption('en');assert.match(await page.getByRole('heading',{level:1}).innerText(),/Setup Wizard/);await page.getByRole('combobox',{name:'安装语言'}).selectOption('zh');
-  await page.getByRole('button',{name:'下一步 >',exact:true}).click();assert.equal(await page.getByRole('textbox',{name:'目标文件夹'}).getAttribute('readonly')!==null,test==='upgrade');await page.screenshot({path:path.join(out,'setup-'+test+'-location.png')});await page.getByRole('button',{name:'下一步 >',exact:true}).click();await page.screenshot({path:path.join(out,'setup-'+test+'-review.png')});await page.getByRole('button',{name:'安装',exact:true}).click();
-  if(test==='retry'){await page.getByRole('button',{name:'重试',exact:true}).waitFor();assert.match(await page.locator('.notice').innerText(),/正在运行/);await page.getByRole('button',{name:'重试',exact:true}).click();}
-  await page.getByRole('progressbar').waitFor();assert.equal(await page.getByRole('button',{name:'取消',exact:true}).isDisabled(),true);await page.screenshot({path:path.join(out,'setup-'+test+'-progress.png')});await page.getByRole('heading',{name:'安装完成',exact:true}).waitFor();await page.screenshot({path:path.join(out,'setup-'+test+'-finish.png')});await page.getByRole('button',{name:'完成',exact:true}).click();await page.waitForFunction(()=>window.demoSetupFinished===true);await page.close();evidence.push({setup:test,viewport:[720,540],passed:true});
- }
- for(const test of ['offline','empty']){const page=await browser.newPage({viewport:{width:1024,height:768}});await page.goto(base+'?benchmarkCase='+test);await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'AI 模型',exact:true}).click();await page.getByText(test==='offline'?'部分来源未能更新，已保留上次评测。':'当前榜单没有匹配型号',{exact:true}).waitFor();await page.close();}
- fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,evidence},null,2));console.log('PASS all seven boards: scores, ranks, complete configurations, confidence/sensitivity ranges, pagination, scene comparison, source components, themes and installer flow');
-}finally{await browser.close();}}
-main().catch(e=>{console.error(e);process.exitCode=1;});
+  const empty=await browser.newPage({viewport:{width:1024,height:768}});await empty.goto(base+'?speedCase=empty');await empty.getByRole('navigation').getByRole('button',{name:'输出速度',exact:true}).click();await empty.getByText('暂无输出速度记录',{exact:true}).waitFor();assert.equal(await empty.locator('.speed-chart > svg').count(),0);await empty.close();
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,fixture:'public source board; synthetic personal data and speed series',checks:evidence},null,2));console.log('PASS actual production components: complete-configuration prices/scores, 30-day filter, radar, speed filter/empty state, simplified donuts and account form; 1024/1360 light/dark');
+ }finally{await browser?.close();server.kill();}
+}
+main().catch(e=>{console.error(e);process.exitCode=1});

@@ -11,7 +11,6 @@ import { ProviderLogo } from "./logos";
 import {
   IconAlert,
   IconArrowUpRight,
-  IconGrid,
   IconPencil,
   IconPlus,
   IconRefresh,
@@ -67,7 +66,6 @@ export function AccountCard({
   onRefresh,
   onEdit,
   onUseManual,
-  onShowModels,
 }: {
   account: AccountView;
   busy: boolean;
@@ -75,7 +73,6 @@ export function AccountCard({
   onRefresh: () => void;
   onEdit: () => void;
   onUseManual: () => void;
-  onShowModels: () => void;
 }) {
   const balance = account.status.balance;
   const subscription = account.status.subscription;
@@ -245,16 +242,10 @@ export function AccountCard({
         </Notice>
       ) : null}
 
-      {account.status.modelsError && !account.provider.startsWith("mimo") && account.provider !== "custom" ? (
-        <Notice tone="info" actions={<Button size="sm" variant="quiet" onClick={onShowModels}>查看模型说明</Button>}>
-          模型列表暂未同步
-        </Notice>
-      ) : null}
 
       <div className="card-foot">
         <span className="meta">更新于 {timeAgo(account.status.lastChecked)}{balance?.source === "manual" ? isPlan ? " · 手动额度" : " · 手动余额" : ""}</span>
         <div className="account-actions">
-          {!isPlan && account.provider !== "mimo" && <Button size="sm" onClick={onShowModels}><IconGrid size={16}/>模型</Button>}
           <Button size="sm" disabled={busy} onClick={onRefresh}><IconRefresh size={16} className={busy ? "spin" : ""}/>{busy ? "刷新中" : "刷新"}</Button>
           <Button size="sm" onClick={onEdit}><IconPencil size={16}/>编辑</Button>
           <Button size="sm" variant="primary" disabled={!account.effectiveRechargeUrl} onClick={() => void openUrl(account.effectiveRechargeUrl,isPlan ? "订阅" : "充值")}><IconArrowUpRight size={16}/>{isPlan ? "管理订阅" : "充值"}</Button>

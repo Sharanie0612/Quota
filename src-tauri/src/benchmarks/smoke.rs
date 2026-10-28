@@ -1,132 +1,54 @@
-//! Isolated packaged-WebView verification: compare rendered scores to Rust output.
+//! Opt-in verification against the actual packaged WebView, in an empty isolated profile.
 use super::*;
-use serde_json::{json, Value};
-
-fn enabled(state: &AppState) -> bool {
-    std::env::var("QUOTA_BENCHMARK_SMOKE").ok().as_deref() == Some("1")
-        && std::env::var_os("QUOTA_DATA_DIR")
-            .is_some_and(|p| std::path::PathBuf::from(p).is_absolute())
-        && state.config.lock().is_ok_and(|c| {
-            c.accounts.is_empty() && !c.settings.auto_refresh && !c.settings.ladder_auto_update
-        })
+use serde_json::{json,Value};
+fn enabled(state:&AppState)->bool{
+    std::env::var("QUOTA_BENCHMARK_SMOKE").ok().as_deref()==Some("1")
+        && std::env::var_os("QUOTA_DATA_DIR").is_some_and(|p|std::path::PathBuf::from(p).is_absolute())
+        && state.config.lock().is_ok_and(|c|c.accounts.is_empty()&&!c.settings.auto_refresh&&!c.settings.ladder_auto_update)
 }
 #[tauri::command]
-pub fn benchmark_smoke_report(
-    app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
-    state: State<'_, AppState>,
-    report: Value,
-) -> Result<(), String> {
-    if window.label() != "main" || !enabled(&state) {
-        return Err("仅隔离界面验收可用".into());
-    }
-    let board = calculate(
-        &*state
-            .benchmarks
-            .dataset
-            .lock()
-            .map_err(|_| "评测数据暂不可用")?,
-    );
-    let result = (|| -> Result<(), String> {
-        for id in [
-            "general",
-            "coding",
-            "reasoning",
-            "agents",
-            "knowledge",
-            "aa",
-            "livebench",
-        ] {
-            let expected = board
-                .rankings
-                .iter()
-                .find(|r| r.id == id)
-                .ok_or("缺少榜单")?;
-            let rows = report["boards"][id]
-                .as_array()
-                .ok_or("界面未提供原始榜单")?;
-            if rows.len() != expected.entries.len() {
-                return Err(format!("{id} 界面型号数不符"));
-            }
-            for (actual, entry) in rows.iter().zip(&expected.entries) {
-                let displayed = actual["score"]
-                    .as_str()
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .ok_or("界面分数格式错误")?;
-                if actual["id"].as_str() != Some(&entry.model_id)
-                    || actual["rank"].as_u64() != Some(entry.rank as u64)
-                    || actual["profileId"].as_str() != Some(&entry.profile_id)
-                    || (displayed - entry.score).abs() > 0.00501
-                {
-                    return Err(format!(
-                        "{id} 的 {} 界面分数、名次或配置不符",
-                        entry.model_id
-                    ));
-                }
-                if let (Some(lower), Some(upper)) = (entry.lower, entry.upper) {
-                    let range: Vec<_> = actual["range"]
-                        .as_str()
-                        .unwrap_or("")
-                        .split('–')
-                        .filter_map(|v| v.parse::<f64>().ok())
-                        .collect();
-                    if range.len() != 2
-                        || (range[0] - lower).abs() > 0.00501
-                        || (range[1] - upper).abs() > 0.00501
-                        || actual["rangeKind"].as_str() != Some(entry.range_kind.as_str())
-                    {
-                        return Err(format!("{id} {} 的区间显示不符", entry.model_id));
-                    }
-                }
-            }
+pub fn benchmark_smoke_report(app:tauri::AppHandle,window:tauri::WebviewWindow,state:State<'_,AppState>,report:Value)->Result<(),String>{
+    if window.label()!="main"||!enabled(&state){return Err("仅隔离界面验收可用".into())}
+    let board=calculate(&*state.benchmarks.dataset.lock().map_err(|_|"测评暂不可用")?);
+    let expected:std::collections::BTreeMap<_,_>=board.profiles.iter().filter(|p|p.source_id=="artificial-analysis").map(|p|(p.id.clone(),p)).collect();
+    let result=(||->Result<(),String>{
+        let all=report["all"].as_array().ok_or("未提供天梯坐标记录")?;
+        if all.len()!=expected.len(){return Err(format!("天梯型号数不符：{} / {}",all.len(),expected.len()))}
+        let mut seen=std::collections::BTreeSet::new();
+        for row in all{
+            let id=row["id"].as_str().ok_or("缺少配置标识")?;let profile=expected.get(id).ok_or("未知测评配置")?;
+            if !seen.insert(id)||row["score"].as_f64().is_none_or(|score|(score-profile.index).abs()>0.000001){return Err(format!("{id} 分数或配置重复"))}
+            if row["plotted"]==true && (row["x"].as_f64().is_none_or(|n|!n.is_finite()||!(61. ..=843.).contains(&n))||row["y"].as_f64().is_none_or(|n|!n.is_finite()||!(43. ..=501.).contains(&n))){return Err("价格与能力坐标越界".into())}
+        }
+        let today=chrono::Local::now().date_naive();let first=today-chrono::Days::new(29);
+        let wanted:std::collections::BTreeSet<String>=expected.values().filter(|p|board.releases.iter().any(|r|r.id==p.model_id&&chrono::NaiveDate::parse_from_str(&r.released_at,"%Y-%m-%d").is_ok_and(|d|d>=first&&d<=today))).map(|p|p.id.clone()).collect();
+        let recent:std::collections::BTreeSet<String>=report["recent"].as_array().ok_or("缺少近30天筛选记录")?.iter().filter_map(|v|v["id"].as_str().map(str::to_string)).collect();
+        if wanted!=recent{return Err("近30天筛选与实际发布日期不符".into())}
+        if report["radar"].as_u64().unwrap_or(0)==0||report["libraryRemoved"]!=true||report["donutLegendsRemoved"]!=true{return Err("六维图或产品页面结构不符".into())}
+        let speed=crate::activity::speed::report(state.store.dir(),"","codex",7,"")?;
+        let displayed=report["speed"].as_array().ok_or("缺少输出速度界面值")?;
+        for (i,value) in [speed.summary.average,speed.summary.median,speed.summary.p95,Some(speed.summary.samples as f64)].into_iter().enumerate(){
+            if let Some(value)=value{if displayed.get(i).and_then(Value::as_f64).is_none_or(|n|(n-value).abs()>0.051){return Err("输出速度界面与本机记录不符".into())}}
         }
         Ok(())
     })();
-    let payload = json!({"passed":result.is_ok(),"error":result.as_ref().err(),"version":crate::version::display_version(),"algorithm":board.algorithm,"boards":report["boards"],"kind":"packaged-webview-rendered-values"});
-    crate::storage::write_atomic(
-        &state.store.dir().join("benchmark-ui-check.json"),
-        &payload.to_string(),
-    )?;
-    app.exit(if result.is_ok() { 0 } else { 1 });
-    result
+    let payload=json!({"passed":result.is_ok(),"error":result.as_ref().err(),"version":crate::version::display_version(),"algorithm":board.algorithm,"report":report,"kind":"packaged-webview-rendered-values"});
+    crate::storage::write_atomic(&state.store.dir().join("benchmark-ui-check.json"),&payload.to_string())?;
+    app.exit(if result.is_ok(){0}else{1});result
 }
-pub fn smoke_if_requested(app: tauri::AppHandle) {
-    if !enabled(&app.state::<AppState>()) {
-        return;
-    }
-    let script = r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0;const ids=['general','coding','reasoning','agents','knowledge','aa','livebench'],boards={};const timer=setInterval(()=>{
-      const id=ids[step],select=document.querySelector('button[data-benchmark-source="'+id+'"]');
-      if(!select){document.querySelector('nav[aria-label="主导航"] button[aria-label="AI 模型"]')?.click();return;}
-      if(select.getAttribute('aria-pressed')!=='true'){select.click();return;}
-      const board=document.querySelector('.tier-board[data-ranking-id="'+id+'"]');if(!board)return;
-      const expand=document.querySelector('button[data-expand-ladder]');if(expand){expand.click();return;}
-      const rows=[...board.querySelectorAll('.tier-model')].map(el=>({id:el.dataset.modelId,rank:Number(el.dataset.rank),profileId:el.dataset.profileId||'',score:el.querySelector('.tier-model-score strong').textContent.trim(),range:el.querySelector('.tier-range-values')?.textContent.trim()||'',rangeKind:el.querySelector('.tier-model-range')?.dataset.rangeKind||''}));if(!rows.length)return;
-      boards[id]=rows;step++;if(step===ids.length){clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:{boards}}));}
-    },250);})()"#;
-    tauri::async_runtime::spawn(async move {
-        for _ in 0..22 {
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-            if app
-                .state::<AppState>()
-                .store
-                .dir()
-                .join("benchmark-ui-check.json")
-                .exists()
-            {
-                return;
-            }
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.eval(script);
-            }
-        }
-        let state = app.state::<AppState>();
-        let path = state.store.dir().join("benchmark-ui-check.json");
-        if !path.exists() {
-            let _ = crate::storage::write_atomic(
-                &path,
-                &json!({"passed":false,"error":"界面未在 45 秒内完成源站数值核对"}).to_string(),
-            );
-            app.exit(1);
-        }
-    });
+pub fn smoke_if_requested(app:tauri::AppHandle){
+    if !enabled(&app.state::<AppState>()){return}
+    let script=r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0,wait=0;const report={};
+      const button=name=>[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===name);
+      const collect=()=>[...document.querySelectorAll('.scatter-point')].flatMap(e=>(e.dataset.profileIds||'').split('|').filter(Boolean).map(id=>({id,score:Number(e.dataset.score),x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),plotted:true}))).concat([...document.querySelectorAll('.ladder-score-row')].map(e=>({id:e.dataset.profileId,score:Number(e.dataset.score),plotted:false})));
+      const change=value=>{const select=document.querySelector('select[aria-label="模型发布时间"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
+      const timer=setInterval(()=>{wait++;if(wait>150){clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:{error:'UI timeout',step}}));return;}
+        if(step===0){document.querySelector('nav button[aria-label="AI 模型"]')?.click();if(!document.querySelector('.visual-model-page'))return;change('0');step=1;return;}
+        if(step===1){if(document.querySelector('.visual-model-page')?.dataset.releaseWindow!=='0'||!collect().length)return;report.all=collect();change('30');step=2;return;}
+        if(step===2){if(document.querySelector('.visual-model-page')?.dataset.releaseWindow!=='30')return;report.recent=collect();button('六维对比')?.click();step=3;return;}
+        if(step===3){const radar=document.querySelector('.visual-ability .ability-radar');if(!radar)return;report.radar=radar.querySelectorAll('circle').length;document.querySelector('nav button[aria-label="输出速度"]')?.click();step=4;return;}
+        if(step===4){if(!document.querySelector('.speed-summary')||!document.querySelector('.speed-chart > svg'))return;report.speed=[...document.querySelectorAll('.speed-summary strong')].map(e=>Number(e.textContent.replaceAll(',','')));report.libraryRemoved=!document.querySelector('nav button[aria-label="模型库"]');document.querySelector('nav button[aria-label="Token 活动"]')?.click();step=5;return;}
+        if(step===5){if(!document.querySelector('.activity-shares'))return;report.donutLegendsRemoved=!document.querySelector('.activity-share-legend')&&!document.getElementById('activity-details');clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:report}));}
+      },300);})()"#;
+    tauri::async_runtime::spawn(async move{for _ in 0..22{tokio::time::sleep(std::time::Duration::from_secs(2)).await;if app.state::<AppState>().store.dir().join("benchmark-ui-check.json").exists(){break}if let Some(window)=app.get_webview_window("main"){let _=window.eval(script);}}});
 }

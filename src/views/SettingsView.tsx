@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
-import { Button, Modal, Notice, Seg, Switch } from "../components/ui";
+import { Button, Notice, Seg, Switch } from "../components/ui";
 import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
 import { UsageWidgetSettings } from '../components/UsageWidgetSettings';
 import { AppearanceSettings } from '../components/AppearanceSettings';
@@ -48,8 +48,6 @@ export function SettingsView({
   const [activity, setActivity] = useState<ActivityOptions | null>(null);
   const [activityBusy, setActivityBusy] = useState(false);
   const [activityError, setActivityError] = useState("");
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [resetting, setResetting] = useState(false);
   useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
   const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
     if (!activity || activityBusy) return false;
@@ -255,23 +253,6 @@ export function SettingsView({
         <div className="setting-row"><div className="txt"><b>托盘提醒角标</b><span>额度不足时显示红点</span></div><Switch checked={settings.trayAlert} onChange={(v) => set({ trayAlert: v })} label="托盘角标" /></div>
       </div>
 
-      <div className="card section">
-        <h2>
-          <IconSpark size={14} /> 模型资料库
-        </h2>
-        <div className="setting-row">
-          <div className="txt">
-            <b>恢复内置资料</b>
-            <span>清空你对模型卡片的全部本地修改</span>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setConfirmReset(true)}
-          >
-            恢复
-          </Button>
-        </div>
-      </div>
 
       <div className="card section">
         <h2>
@@ -386,10 +367,6 @@ export function SettingsView({
         </div>
       </div>
 
-      {confirmReset && <Modal title="恢复内置模型资料？" onClose={() => { if (!resetting) setConfirmReset(false); }} footer={<><Button disabled={resetting} onClick={() => setConfirmReset(false)}>取消</Button><Button variant="danger" disabled={resetting} onClick={() => {
-        setResetting(true);
-        void api.resetCatalog().then(() => {setConfirmReset(false);toast('已恢复内置模型资料');}).catch(e => toast(errText(e), 'error')).finally(() => setResetting(false));
-      }}>{resetting ? '恢复中…' : '恢复内置资料'}</Button></>}><p>你对模型资料的本地修改将被清除。</p></Modal>}
     </div>
   );
 }

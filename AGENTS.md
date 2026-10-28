@@ -9,7 +9,7 @@
 Windows 桌面应用 Quota：本地优先地查看 AI 服务商余额、额度与用量，并保留模型资料与官方充值入口。
 
 - 技术栈：Tauri 2（Rust）+ React 18 + TypeScript + Vite，界面为苹果简约风格。
-- 六个页面：账户总览 / 我的使用 / AI 模型 / 模型库 / Token 活动 / 设置。「AI 模型」整合独立天梯、能力对比、效率曲线与官方价格。主窗口 label `main`；托盘单击直接打开主窗口。独立贴边用量窗 `usage-widget` 展示今日/累计 Token，不复用旧账户悬浮卡。
+- 六个页面：账户总览 / 我的使用 / AI 模型 / Token 活动 / 输出速度 / 设置。「AI 模型」保留人民币价格与公开配置能力天梯、六维雷达，默认近30天实际发布型号。模型库及其账户/设置入口已移除。主窗口 label `main`；托盘单击直接打开主窗口。独立贴边用量窗 `usage-widget` 展示今日/累计 Token，不复用旧账户悬浮卡。
 - 界面要求（用户明确要求，不要改回去）：
   - **极简表单**：添加/编辑账户只展示平台、账户名称、连接信息、同步方式（账户名称可选；小米与 ChatGPT 使用连接按钮），其余全部收进「高级设置」折叠。
   - **配三步中文教程**：表单顶部要有三步流程说明和「API Key 在哪拿？」入口。
@@ -77,7 +77,7 @@ node scripts/preview-server.cjs 4174
 
 - 只有从官方定价页核实过的条目才标「已核实」，必须带来源链接与核实时间（字段在 `src-tauri/data/model_catalog.json`）。
 - 官网查不到一律写 `unknown`，卡片显示「待核实」，绝不编数字。
-- 模型库的普通启发式抓取只生成候选，人工「采用」后写入本机资料库（`%APPDATA%\Quota\catalog_overrides.json`）。天梯按用户明确授权，使用固定官网表头、单位、档位和精确型号的确定性解析器自动核实，不需人工采用；结构或语义不明确时不得猜数字。
+- 历史模型资料文件保留用于导入与兼容。天梯价格只按官网确定性表头、单位、档位和精确型号核实；结构不明时保留未知，不按启发式自动改价。
 - 同一模型多档价格时，以**标准档、非缓存命中**作为默认输入价；缓存命中、5 分钟缓存写入、1 小时缓存写入分别使用 `cachedInput`、`cacheWrite`、`cacheWriteLong`，无法核实留空，不混用闲时或批量折扣。
 - 「比价」面板的可信度结论（高/中/低/无）由来源数量与一致性打分，逻辑在 `src-tauri/src/pricing.rs`。
 - 模型取数的人工台账在 `docs/model-catalog.md`；改资料库前先看它的取数规则一节。
@@ -203,6 +203,7 @@ node scripts/preview-server.cjs 4174
 | 2026-10-28 独立测评天梯、能力与成本曲线、Token 占比图、暖灰默认配色与标准安装向导（Windows 本地功能构建，验收见 docs/model-benchmarks-1.0.2800.md） | `1.0.2800` | `1.0.2800` |
 | 2026-10-28 修复模型分数失真、完整配置与官方权重，增加源站及真实 WebView 逐条对账（Windows 本地修复构建，验收见 docs/benchmark-validity-1.0.2801.md） | `1.0.2801` | `1.0.2801` |
 | 2026-10-29 通用综合与编程、推理、Agent、知识分榜，新增公开难度校准及置信/敏感性范围（Windows 本地功能构建，验收见 docs/scenario-evaluation-1.0.2900.md） | `1.0.2900` | `1.0.2900` |
+| 2026-10-29 人民币模型天梯、六维对比、Codex 输出速度与淡蓝主题，移除模型库（验收见 docs/model-speed-1.0.3000.md） | `1.0.3000` | `1.0.3000` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 
@@ -218,16 +219,16 @@ node scripts/preview-server.cjs 4174
 - 小米通过隔离的官方登录窗口连接，Cookie 仅在后端和 Windows 凭据管理器中流转。
 - 主窗口使用无系统标题栏布局；窗口按钮及拖动权限仅授予 `main`，关闭必须沿用 Tauri close 事件以遵守托盘设置。小米恢复使用固定官方 `genLoginUrl` 入口，不能只加载首页；认证与套餐查询分开，先保存成功续接的会话。Cookie 的相对 Max-Age 写入凭据库前固定为绝对到期时间，不人为延长服务端登录。运行 `mimo_login_checks`、`mimo_session_checks` 及账户关联回归。
 - ChatGPT 显示订阅内 Codex 额度，显式连接本机 Codex 登录；固定官方额度端点，不复制或刷新 Codex token。不可将这些额度称为网页聊天额度。
-- 默认通用综合保留 Epoch 发布的 ECI 与 90% 区间，明确它是来源的模型组聚合值，不称为同预算或单一配置。编程、推理、Agent、知识分榜用来源公开难度/斜率和同一配置原始记录重估；配置按覆盖选择，不逐项挑最高分，不补零或用任意官网权重拉动名次。场景逐项留出范围是敏感性，不冒充统计置信区间。规则见 `docs/model-benchmarks.md`，场景名单见 `benchmark-policy.json`；AA、LiveBench、官网成绩保留原始对照。旧 `ladder.json` / `ladder_cache.json` 保留兼容，不作为新天梯分数。
-- 评分发布须逐条核对源数据、解析结果、API 和真实打包 WebView 的显示值/名次/配置/区间。`reference-scenarios.py` 与 Rust 独立对账；`benchmark_checks` 另用黄金样本及全量 AA 原分核对；`check-benchmark-ui.ps1` 在隔离无账户、无同步目录中检查安装版；升级脚本支持 `-CheckBenchmarks`。普通 UI 可渲染、数学自洽或模拟预览通过，均不能单独证明评分正确。schema 3 使用 `ai-benchmarks-v3.json`，旧缓存保留但不参与新显示。Epoch 数据按 CC BY 4.0 署名并标明派生计算。
-- 改测评解析或算法运行 `cargo run --release --example benchmark_checks -- --fixtures`；实时来源验证加 `--live`，人工更新内置快照加 `--write-seed`。先运行 `scripts/audit-benchmark-sources.py` 获取公开测试夹具。AA 指数或 LiveBench 表结构升级时保留上次记录并等待明确适配，不能把旧版本标成新版本。
-- 天梯按用户授权自动读取十家厂商的确定性官方价格表，成功核实时更新 `ladder_cache.json`，保存来源、条件与时间；启发式候选不能自动采用。厂商失败或精确型号缺失时保留上次记录并显示原因；排名网站失败不阻断官方价格检查。模型库的人工采用仍写入 `catalog_overrides.json`。
+- 1.0.3000 的能力坐标直接采用 AA v5 非估算原始指数，每个点固定一个完整配置；六维轴只取该配置的真实分项，缺失留空，不拼接配置、不另造综合分。近30天按实际发布日期筛选，不用抓取/首次收录时间。规则见 `docs/model-benchmarks.md`。
+- 评分发布逐条核对原始来源、配置与真实 WebView 坐标。保留历史 Epoch/场景适配回归，当前 UI 不展示这些聚合分数。运行 `verify-visual-models.cjs`、`benchmark_checks -- --fixtures` 和 `verify-benchmark-ui.cjs`；打包后用 `check-benchmark-ui.ps1` 和合成活动资料库验收。
+- 改测评解析先运行 `scripts/audit-benchmark-sources.py`、`scripts/reference-scenarios.py`，再运行 `cargo run --release --example benchmark_checks -- --fixtures`；人工更新种子加 `--write-seed`。来源版本变化保留上次有效记录，不能将旧值标为新测量。
+- 官方定价与测评分别更新，保留来源、单位、配置和时间。厂商或精确型号缺失时保留上次价格与失败状态；测评机构失败不阻断官方价格核实。
 
 - 启动自检可用 `QUOTA_DATA_DIR` 指定绝对路径的隔离配置目录，不迁移个人数据。安装升级流程须与安装包解包启动检查分别记录，不可混称。
 
 ### Token 活动维护
 
-- `activity.rs` 只读 Codex JSONL 和智谱 ZCode SQLite，保存和同步指标，不保存对话、工具参数和凭据。
+- `activity.rs` 只读 Codex JSONL 和智谱 ZCode SQLite，保存和同步用量与计时指标，不保存对话、工具参数和凭据。
 - SSH 连接先识别设备，再由用户选择是否纳入统计；新设备默认不选，允许全部不选。同机别名合并，离线保留选择；取消后停止采集，历史退出 Token 活动、我的使用及悬浮窗汇总，但原始指标和同步记录保留。选择仅作用于当前 Quota 主机，不能因重新识别或旧单主机迁移重新开启。相关改动运行 `verify-ssh-devices.cjs`、`ssh_activity_checks` 及费用/悬浮窗回归。
 - 用量悬浮窗只读既有去重指标，今日/累计口径与我的使用一致并排除 Trae；不得新增采集账本。窗口收起时缩小原生命中区域；关闭主窗口且未开启托盘保留时须退出全应用。改动运行 `widget_checks`、`activity_checks` 及安装包 `scripts/check-widget.ps1`（升级脚本加 `-CheckWidget`），分别记录统计、原生几何和鼠标交互验证。裸 Tauri 原生 example 受本机 WinRT DLL 限制，改用打包程序的隔离检查，不当作已通过。
 - 同步需用户在各设备选择同一个共享目录；不自动猜测云盘目的地。设备 UUID 独立，事件 ID 全局去重，复制日志的确定性设备归属需在文档说明。
@@ -239,3 +240,8 @@ node scripts/preview-server.cjs 4174
 - 1.0.1900 起通过 `quota-usage-v1` 同步账期、支出、累计消费观察及月度参考汇率，不新增 Token 采集或账本。`usage-sync.json` 保存逻辑修订与删除标记，原财务文件格式保持兼容；重叠账期拒绝合并并提示解决。应用入口持有 `billing_lock`，与活动锁顺序固定为先活动后账务。新增验证 `usage_sync_checks`；Harness v0/v1、代际迁移去重及旧云包恢复保护运行 `harness_checks`。所有参与 Harness 的设备需一起更新至 1.0.1900。
 
 本地修复交付记录：2026-10-04 累计消费显示与记录补全，展示版本 `1.0.0401`，包版本 `1.0.401`；以已交付 1.0.0400 为基线，修复字段递增一次。
+
+### 输出速度维护
+
+- 输出速度附于原 `Metric.speed`，不新建 Token 事件或另一套用量账本。按 Codex 逐次用量与完整输出片段计时关联，至少64个非推理输出Token、500毫秒，排除工具响应及无计时记录。保持稳定事件ID，旧包不能抹去已知速度。
+- 升级重读日志只补元数据，不重复计数。速度遵守相同的设备排除与同步规则；SSH只传字段白名单，不传文本或在远端创建文件。运行 `output_speed_checks`、`activity_checks`、`ssh_activity_checks`、`sync_storage_checks`，真实双机/SSH另行记录。

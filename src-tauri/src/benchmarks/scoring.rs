@@ -407,6 +407,7 @@ pub fn calculate(data: &Dataset) -> Board {
         ));
     }
     Board {
+        releases:data.releases.clone(),
         algorithm: ALGORITHM.into(),
         sources: data.sources.clone(),
         models,

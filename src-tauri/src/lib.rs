@@ -65,8 +65,12 @@ pub fn run() {
     if args.get(1).is_some_and(|arg|arg=="--quota-setup"){
         if args.get(2).map(std::path::PathBuf::from).is_none_or(|path|setup::run(path).is_err()){std::process::exit(2)}return
     }
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, _| {if args.iter().any(|arg|arg=="--quota-exit-for-update"){app.exit(0)}else{tray::show_main(app)}}))
+    let builder=tauri::Builder::default();
+    // A deliberately isolated renderer check can coexist with the user's app.
+    let isolated_check=std::env::var("QUOTA_BENCHMARK_SMOKE").ok().as_deref()==Some("1")
+        && std::env::var_os("QUOTA_DATA_DIR").is_some_and(|p|std::path::PathBuf::from(p).is_absolute());
+    let builder=if isolated_check{builder}else{builder.plugin(tauri_plugin_single_instance::init(|app,args,_|{if args.iter().any(|arg|arg=="--quota-exit-for-update"){app.exit(0)}else{tray::show_main(app)}}))};
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -140,6 +144,7 @@ pub fn run() {
             usage_fx::get_monthly_usage_fx,
             usage_fx::save_monthly_usage_fx,
             activity::get_activity,
+            activity::speed::get_output_speed,
             activity::get_sync_overview,
             activity::sync_activity_now,
             activity::get_activity_options,

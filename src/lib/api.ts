@@ -8,10 +8,7 @@ import type {
   AccountTrend,
   AccountView,
   AppInfo,
-  CatalogEntry,
   CustomProbe,
-  ModelCard,
-  PriceComparison,
   ProviderView,
   RechargeEvent,
   Settings,
@@ -22,6 +19,7 @@ import type {
 
 export const api = {
   getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
+  getOutputSpeed: (device='',source='codex',days=7,model='') => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model}),
   refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
   reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
   getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),
@@ -90,26 +88,6 @@ export const api = {
   previewImport: (path: string, password: string) => invoke<ImportPreview>("preview_import", {path, password}),
   importData: (path: string, password: string, fingerprint: string, selection: ImportSelection) =>
     invoke<string>("import_data", {path, password, fingerprint, selection}),
-  modelCards: (provider?: string) =>
-    invoke<ModelCard[]>("model_cards", { provider: provider ?? null }),
-  saveCatalogEntry: (entry: CatalogEntry) => invoke<void>("save_catalog_entry", { entry }),
-  resetCatalog: () => invoke<void>("reset_catalog_overrides"),
-  /** 在模型库里手动隐藏 / 恢复某个模型（存本机 hidden_models.json） */
-  setModelHidden: (modelId: string, hidden: boolean) =>
-    invoke<void>("set_model_hidden", { modelId, hidden }),
-  /** 价格比对：本地资料库 +（可选）官方定价页抓取 +（可选）第三方参考价 */
-  comparePrices: (
-    modelId: string,
-    provider: string,
-    includePage: boolean,
-    includeReference: boolean,
-  ) =>
-    invoke<PriceComparison>("compare_prices", {
-      modelId,
-      provider,
-      includePage,
-      includeReference,
-    }),
   /** 测试自定义余额接口，返回自动发现的金额字段 */
   probeCustomBalance: (input: {
     customUrl?: string | null;

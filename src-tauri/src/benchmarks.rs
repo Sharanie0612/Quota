@@ -3,6 +3,7 @@
 mod adapters;
 pub mod epoch;
 mod scoring;
+pub mod releases;
 pub(crate) mod smoke;
 use crate::commands::AppState;
 pub use adapters::{parse_aa, parse_livebench};
@@ -12,7 +13,7 @@ pub use smoke::smoke_if_requested;
 use std::{collections::BTreeMap, path::Path, sync::Mutex};
 use tauri::{Emitter, Manager, State};
 
-pub const ALGORITHM: &str = "calibrated-scenarios/3.0";
+pub const ALGORITHM: &str = "source-native-configuration/4.0";
 pub const AREAS: [&str; 6] = [
     "reasoning",
     "coding",
@@ -81,6 +82,8 @@ pub struct Dataset {
     pub profiles: Vec<Profile>,
     #[serde(default)]
     pub epoch: Option<epoch::Snapshot>,
+    #[serde(default)]
+    pub releases: Vec<releases::Release>,
 }
 #[derive(Clone, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +172,7 @@ pub struct RankedModel {
 #[derive(Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Board {
+    pub releases: Vec<releases::Release>,
     pub algorithm: String,
     pub sources: Vec<Source>,
     pub models: Vec<RankedModel>,
@@ -210,8 +214,10 @@ pub fn identity(name: &str) -> String {
     key(split_configuration(name).0)
 }
 pub fn load(dir: &Path) -> Dataset {
-    let base: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json"))
+    let mut base: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json"))
         .expect("valid benchmark seed");
+    let release_seed:Dataset=serde_json::from_str(include_str!("../data/model-releases.json")).expect("valid model release seed");
+    replace_source(&mut base,&release_seed,"model-releases");
     let saved = std::fs::read(dir.join("ai-benchmarks-v3.json"))
         .ok()
         .filter(|b| b.len() <= 24 * 1024 * 1024)
@@ -235,6 +241,7 @@ pub fn load(dir: &Path) -> Dataset {
 }
 pub fn valid(data: &Dataset) -> bool {
     data.schema == 3
+        && data.releases.len()<=2000 && data.releases.iter().all(releases::Release::valid)
         && data.epoch.as_ref().is_none_or(epoch::Snapshot::valid)
         && data.sources.len() <= 8
         && data.observations.len() <= 12000
@@ -244,6 +251,7 @@ pub fn valid(data: &Dataset) -> bool {
                 && matches!(
                     s.id.as_str(),
                     "artificial-analysis"
+                        | "model-releases"
                         | "livebench"
                         | "epoch-ai"
                         | "official-openai"
@@ -275,6 +283,7 @@ pub fn valid(data: &Dataset) -> bool {
         })
 }
 fn replace_source(target: &mut Dataset, incoming: &Dataset, id: &str) {
+    if id=="model-releases" {target.releases=incoming.releases.clone();}
     if id == "epoch-ai" {
         target.epoch = incoming.epoch.clone();
     }
@@ -336,6 +345,7 @@ async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, 
     Ok(bytes)
 }
 pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, String>)> {
+    let releases=async {releases::parse(&download(client,releases::URL).await?,&chrono::Utc::now().to_rfc3339())};
     let aa = async {
         let body = download(client, "https://artificialanalysis.ai/leaderboards/models").await?;
         parse_aa(&body, &chrono::Utc::now().to_rfc3339())
@@ -396,17 +406,18 @@ pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, Str
             ..Default::default()
         })
     };
-    let (aa, lb, epoch) = tokio::join!(aa, lb, epoch);
+    let (aa, lb, epoch,releases) = tokio::join!(aa, lb, epoch,releases);
     vec![
         ("artificial-analysis".into(), aa),
         ("livebench".into(), lb),
         ("epoch-ai".into(), epoch),
+        ("model-releases".into(),releases),
     ]
 }
 pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String>)>) -> Dataset {
     for (id, result) in updates {
         match result {
-            Ok(next) if valid(&next) && (!next.observations.is_empty() || next.epoch.is_some()) => {
+            Ok(next) if valid(&next) && (!next.observations.is_empty() || next.epoch.is_some() || !next.releases.is_empty()) => {
                 replace_source(&mut previous, &next, &id)
             }
             other => {

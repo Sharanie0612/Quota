@@ -15,7 +15,7 @@ fn main(){
     let db=rusqlite::Connection::open(root.join("activity.sqlite")).unwrap();
     let today=chrono::Local::now().date_naive();
     for(i,source,day,total)in [(1,"codex",today,100),(2,"zcode",today,50),(3,"trae",today,900),(4,"harness",today.pred_opt().unwrap(),20),(5,"codex",today.succ_opt().unwrap(),800)]{
-        let metric=activity::Metric{id:format!("{i:064x}"),device:"00000000-0000-4000-8000-000000000001".into(),source:source.into(),session:format!("s{i}"),model:"gpt-test".into(),agent:String::new(),tool:String::new(),timestamp:chrono::Local.from_local_datetime(&day.and_hms_opt(0,0,0).unwrap()).earliest().unwrap().timestamp_millis(),kind:"tokens".into(),tokens:activity::Tokens{input:total-10,output:10,cached:10,reasoning:2,total,..Default::default()},channel:String::new(),harness_identity:0,revision:0};
+        let metric=activity::Metric{id:format!("{i:064x}"),device:"00000000-0000-4000-8000-000000000001".into(),source:source.into(),session:format!("s{i}"),model:"gpt-test".into(),agent:String::new(),tool:String::new(),timestamp:chrono::Local.from_local_datetime(&day.and_hms_opt(0,0,0).unwrap()).earliest().unwrap().timestamp_millis(),kind:"tokens".into(),tokens:activity::Tokens{input:total-10,output:10,cached:10,reasoning:2,total,..Default::default()},channel:String::new(),speed:None,harness_identity:0,revision:0};
         assert!(activity::merge_metric(&db,&metric,false).unwrap());assert!(!activity::merge_metric(&db,&metric,false).unwrap());
     }
     let summary=activity::usage_summary(&root).unwrap();

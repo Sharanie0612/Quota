@@ -179,7 +179,8 @@ export interface BenchmarkResult {sourceId:string;version:string;profileId:strin
 export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number}
 export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[];tierLabels:Record<string,string>}
 export interface BenchmarkModel {id:string;name:string;vendor:string;results:BenchmarkResult[];observations:BenchmarkObservation[]}
-export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[];rankings:BenchmarkRanking[]}
+export interface ModelRelease {id:string;name:string;vendor:string;releasedAt:string;url:string}
+export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[];rankings:BenchmarkRanking[];releases?:ModelRelease[]}
 
 export interface ModelPrice {
   cachedInput?: number | null;
@@ -371,6 +372,8 @@ export type RechargeEvent = {
 };
 export interface ActivityTokens { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; total: number }
 export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
+export interface OutputSpeedPoint {timestamp:number;model:string;outputTokens:number;durationMs:number;samples:number}
+export interface OutputSpeedReport {devices:{id:string;name:string}[];models:string[];points:OutputSpeedPoint[];summary:{average:number|null;median:number|null;p95:number|null;samples:number;outputTokens:number};updatedAt:number;bucketMinutes?:number}
 export interface SshHostDiscovery { hosts: string[]; warnings: string[] }
 export interface SshDevice { host:string; home:string; deviceId:string; name:string; included:boolean; aliases:string[]; error?:string }
 export interface SshIdentity { host:string; home:string; deviceId:string; name:string; error:string|null }

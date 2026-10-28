@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-28",
+  "checkedAt": "2026-10-29",
   "method": "AA public original index and LiveBench live frontend declared category weights; independent expected constants, never Quota v1 scores",
   "sources": [
     "https://artificialanalysis.ai/leaderboards/models",
@@ -7,6 +7,12 @@
     "https://livebench.ai/data/20261025/categories.json"
   ],
   "cases": [
+    {
+      "board": "aa",
+      "modelId": "gemini4carbon",
+      "score": 59.425738829526,
+      "setting": "High"
+    },
     {
       "board": "aa",
       "modelId": "claudeopus55",

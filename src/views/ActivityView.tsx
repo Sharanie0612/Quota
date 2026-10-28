@@ -2,23 +2,20 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { confirm, open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { api, errText } from "../lib/api";
-import { activityChannelName, activityFilterLabel, activityModelChannel, activityModelIdentity, activityModelName } from "../lib/activityModels";
+import { activityFilterLabel, activityModelIdentity } from "../lib/activityModels";
 import { toast } from "../lib/store";
 import { newActivityIssues } from "../lib/activityIssues";
 import { mergeSshDevices } from "../lib/sshDevices";
 import { Button, EmptyState, Field, Modal, Notice, Seg, Switch } from "../components/ui";
 import { ActivityCharts } from "../components/ActivityCharts";
-import { ModelLogo } from "../components/ModelLogo";
-import { CacheUsage } from "../components/CacheUsage";
 import { ActivityShares } from '../components/ActivityShares';
 import { ActivityModelPicker } from "../components/ActivityModelPicker";
-import { ActivityDeviceDetails, ActivityModelDetails, TraeUsageDetails } from "../components/ActivityDetails";
 import { activityDeviceChoices } from "../lib/activityDevices";
 
 import "./activity-controls.css";
 
 import { IconChart, IconGear, IconRefresh } from "../components/icons";
-import type { ActivityGroup, ActivityOptions, ActivityReport } from "../lib/types";
+import type { ActivityOptions, ActivityReport } from "../lib/types";
 
 import type { ActivityMetric, ActivityRange } from "../lib/activityCharts";
 
@@ -53,23 +50,6 @@ function ActivityNumber({value,compact}:{value:number|undefined;compact:boolean}
   return <b ref={element} title={value==null?"":number(value)}><span className="activity-number-content">{value==null?"—":compact?new Intl.NumberFormat("zh-CN",{notation:"compact",maximumFractionDigits:2}).formatToParts(value).map((part,index)=><span key={index} className={part.type==="compact"?"activity-summary-unit":undefined}>{part.value}</span>):number(value)}</span></b>;
 }
 
-function Breakdown({ title, rows, calls = false, onModel, format = number }: { format?:(n:number)=>string; title: string; rows: ActivityGroup[]; calls?: boolean; onModel?: (model: string) => void }) {
-  const amount = (row: ActivityGroup) => calls ? row.calls : row.tokens.total;
-  const total = rows.reduce((sum, row) => sum + amount(row), 0);
-  const sorted = [...rows].sort((a, b) => amount(b) - amount(a));
-  return <section className="card activity-breakdown">
-    <h3>{title}</h3>
-    {rows.length ? <table>
-      <thead><tr><th>名称</th><th>{calls ? "调用次数" : "Token"}</th><th>会话</th></tr></thead>
-      <tbody>{sorted.map(row => { const name = activityModelName(row.key) || "未知"; const channel = activityChannelName(activityModelChannel(row.key));
-        return <tr key={row.key}>
-        <td>{onModel ? <button className="activity-model-link" onClick={() => onModel(row.key)} aria-label={`按 ${activityFilterLabel(row.key)} 查看用量图表`}><ModelLogo name={name} size={22} /><span>{name}</span>{channel && <span className="activity-channel-tag">{channel}</span>}</button> : <span>{row.key || "未知"}</span>}<div className="breakdown-track" aria-hidden="true"><span style={{ width: `${total ? amount(row) / total * 100 : 0}%` }} /></div></td>
-        <td>{format(amount(row))}</td><td>{number(row.sessions)}</td>
-      </tr>; })}</tbody>
-    </table> : <p className="hint">当前范围暂无{calls ? "工具调用" : "记录"}。</p>}
-  </section>;
-}
-
 export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}) {
   const [compactNumbers,setCompactNumbers]=useState(true);
   const format=(n:number)=>compactNumbers?new Intl.NumberFormat("zh-CN",{notation:"compact",maximumFractionDigits:2}).format(n):number(n);
@@ -99,8 +79,6 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const [sshHome, setSshHome] = useState("");
   const sshRequest = useRef(0);
   useEffect(() => () => { sshRequest.current++; }, []);
-  const [detail, setDetail] = useState("models");
-  useEffect(()=>{setDetail(model==="vendor:trae"||model.startsWith("channel:")||source==="trae"?"channels":"models");},[model,source]);
   const [connectingTrae, setConnectingTrae] = useState(false);
   const [busy, setBusy] = useState<"collect" | "save" | null>(null);
   const [loading, setLoading] = useState(true);
@@ -249,13 +227,6 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const availableModels = data?.availableModels ?? (report?.scope === modelScope ? report.value.availableModels : []) ?? [];
   const hasActivity = !!totals && (totals.tokens.total > 0 || totals.calls > 0 || totals.sessions > 0);
   const detailData = range ? rangeReport?.query === detailQuery ? rangeReport.value : null : data;
-  // Trae separates models it provides from models reached with the user's own API key.
-  const channelRows = detailData?.channels ?? [];
-  const detailOptions = [{ value: "models", label: "模型" }, { value: "tools", label: "工具" }, { value: "agents", label: "Agent" }, { value: "devices", label: "设备" },
-    ...(channelRows.length || source==="trae" || model==="vendor:trae" || model.startsWith("channel:") ? [{ value: "channels", label: "Trae 明细" }] : [])];
-  const rows = detail === "models" ? detailData?.models ?? [] : detail === "tools" ? detailData?.tools ?? []
-    : detail === "agents" ? detailData?.agents ?? [] : detail === "channels" ? channelRows
-    : detailData?.byDevice ?? [];
   const status = !data ? loading ? "正在读取统计…" : readError ? "统计读取失败" : "暂无统计"
     : data.updatedAt ? `采集于 ${new Date(data.updatedAt).toLocaleString("zh-CN")}` : "尚未采集本地记录";
 
@@ -266,13 +237,9 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     : activityFilterLabel(model);
   const activeFilters = [device ? deviceChoices.find(item => item.id === device)?.label ?? device : "", sourceNames[source], modelLabel].filter(Boolean);
   const clearFilters = () => { setDevice(""); setSource(""); setModel(""); setSelection(null); };
-  const focusModelPicker = (key: string) => {
-    setModel(key);
-    setFiltersOpen(true);
-    modelPicker.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  };
 
   return <div className="content-inner activity-page">
+    {rangeError&&<Notice tone="error">{rangeError}</Notice>}
     <section className="card activity-controls" aria-label="活动筛选与采集">
       <div className="activity-controls-main">
         <Seg value={days} onChange={value => { setDays(value); setModel(""); }} options={[{value:"0",label:"全部历史"},{value:"7",label:"7 天"},{value:"30",label:"30 天"},{value:"90",label:"90 天"},{value:"365",label:"1 年"}]} />
@@ -358,13 +325,11 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
       {[{label:"总 Token",value:totals?.tokens.total,key:"total"},{label:"输入",value:totals?.tokens.input,key:"input"},{label:"输出",value:totals?.tokens.output,key:"output"},{label:"工具调用",value:totals?.calls,key:"tools"},{label:"会话",value:totals?.sessions,key:"sessions"}].map(item=>{
         const isMetric=["total","input","output"].includes(item.key);
         const selected=metric===item.key||(item.key==="input"&&["cached","uncached"].includes(metric));
-        return <button key={item.key} className={item.key==="total"?"activity-summary-primary":isMetric?undefined:"activity-summary-secondary"} aria-pressed={isMetric?selected:undefined} onClick={()=>{
-          if(isMetric)setMetric(item.key as ActivityMetric);
-          else{setDetail(item.key==="tools"?"tools":"models");document.getElementById("activity-details")?.scrollIntoView({behavior:"smooth"});}
-        }}>
+        const Tag=isMetric?'button':'div';
+        return <Tag key={item.key} className={item.key==="total"?"activity-summary-primary":isMetric?undefined:"activity-summary-secondary"} aria-pressed={isMetric?selected:undefined} onClick={isMetric?()=>setMetric(item.key as ActivityMetric):undefined}>
           <span className="activity-summary-label">{item.label}</span>
           <ActivityNumber value={item.value} compact={compactNumbers}/>
-        </button>;
+        </Tag>;
       })}
     </div>
     {["input","cached","uncached"].includes(metric)&&<div className="input-cache-controls"><Seg value={metric} onChange={v=>setMetric(v as ActivityMetric)} options={[{value:"input",label:"全部输入"},{value:"cached",label:"缓存命中"},{value:"uncached",label:"未命中"}]}/><span>{totals?.tokens.input?`命中率 ${(totals.tokens.cached/totals.tokens.input*100).toFixed(1)}%`:"暂无输入"}</span></div>}
@@ -377,15 +342,6 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
         : <>
           <div id="activity-charts"><ActivityCharts key={query} rows={data.daily} days={Number(days)} hourly={data.hourly ?? []} format={format} model={model} metric={metric} setMetric={setMetric} range={range} onRange={range=>setSelection(range ? {query,range} : null)} /></div>
           {detailData&&<ActivityShares report={detailData} format={format} onModel={setModel} onSource={key=>{setSource(key);setModel('');}} onMetric={setMetric}/>}
-          <details className="activity-cache-details"><summary>按模型查看缓存</summary><CacheUsage rows={detailData?.models ?? []} format={format} onModel={setModel}/></details>
-          <div id="activity-details" className="activity-detail-heading"><h3>{range ? range.from === range.to ? range.from : range.from + " — " + range.to : "当前范围"} · 活动明细</h3><Seg value={detail} onChange={setDetail} options={detailOptions} /></div>
-          {range && <div className="usage-selected" role="status"><span>{rangeError || (!detailData ? "读取所选周期…" : `${number(detailData.totals.tokens.total)} Token · ${number(detailData.totals.sessions)} 个会话`)}</span><Button size="sm" onClick={()=>setSelection(null)}>清除日期选择</Button>{rangeError && <Button size="sm" onClick={()=>setReloadKey(k=>k+1)}>重试</Button>}</div>}
-          {detail==="channels" ? <TraeUsageDetails rows={detailData?.models ?? []} channels={channelRows} format={format} onModel={focusModelPicker}/>
-            : detail==="models" ? <section className="card activity-channel-details"><h3>模型使用</h3><ActivityModelDetails rows={rows} format={format} onModel={focusModelPicker}/></section>
-            : detail==="devices" ? <ActivityDeviceDetails rows={detailData?.byDevice ?? []} devices={devices} options={data?.options ?? report?.value.options} format={format} onDevice={id=>{setDevice(id);setModel("");modelPicker.current?.scrollIntoView({block:"start"});}}/>
-            : <Breakdown format={format} title={detail === "tools" ? "工具调用" : "Agent 使用"} calls={detail === "tools"} rows={rows}/>}
-          {detail==="channels"&&detailData?.channels.some(row=>row.key==="unknown"&&row.tokens.total>0)&&<Notice>部分旧记录未包含通道信息。请在记录所属电脑连接本机 Trae 并重新采集，再同步到其他设备；用量总数不变。</Notice>}
         </>}
-    <details className="activity-method"><summary>统计口径与隐私</summary><p className="hint">输入包含缓存命中与缓存写入，推理包含在输出中，不重复相加。历史范围以本地保留记录为准；仅保存用量指标。</p></details>
   </div>;
 }

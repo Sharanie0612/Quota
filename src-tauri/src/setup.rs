@@ -510,10 +510,10 @@ pub fn run(installer: PathBuf) -> Result<(), String> {
     window.label = "setup".into();
     window.title = "Quota 安装".into();
     window.url = tauri::WebviewUrl::App("index.html?window=setup".into());
-    window.width = 900.;
-    window.height = 650.;
-    window.min_width = Some(900.);
-    window.min_height = Some(650.);
+    window.width = 720.;
+    window.height = 540.;
+    window.min_width = Some(720.);
+    window.min_height = Some(540.);
     window.resizable = false;
     window.maximizable = false;
     window.incognito = true;

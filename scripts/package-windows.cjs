@@ -67,6 +67,7 @@ async function main() {
     run('Rust 类型检查', 'cargo', ['check', '--locked'], path.join(root, 'src-tauri')),
     run('纯逻辑', process.execPath, ['scripts/verify-logic.cjs']),
     run('官方模型目录与比价', process.execPath, ['scripts/verify-model-registry.cjs']),
+    run('测评与占比图逻辑', process.execPath, ['scripts/verify-benchmark-views.cjs']),
     run('SSH 来源与同步客户端分类', process.execPath, ['scripts/verify-sync-devices.cjs']),
     run('组件渲染', process.execPath, ['scripts/verify-ui-render.cjs']),
     run('悬浮窗过渡', process.execPath, ['scripts/verify-widget-motion.cjs']),

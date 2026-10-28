@@ -11,18 +11,17 @@ import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
 import { ModelsView } from "./views/ModelsView";
 import { SettingsView } from "./views/SettingsView";
-import { LadderView } from "./views/LadderView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
 import { WorkspaceToolbar } from "./components/WorkspaceToolbar";
 import { setAppearance, useAppearance } from './lib/appearance';
-import { AiModelsView } from './views/AiModelsView';
+import { AiModelsHub } from './views/AiModelsHub';
 import { LaunchAnimation } from './components/LaunchAnimation';
 import appIcon from "../src-tauri/icons/128x128.png";
 
-type View = "accounts" | "models" | "ladder" | "activity" | "costs" | "settings" | "ai-models";
+type View = "accounts" | "models" | "activity" | "costs" | "settings" | "ai-models";
 
 export default function App() {
   const appearance=useAppearance();
@@ -78,15 +77,13 @@ export default function App() {
   };
 
   const title =
-    view === "ai-models" ? "AI 模型" : view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "ladder" ? "AI 模型天梯" : view === "activity" ? "Token 活动" : view === "costs" ? "我的使用" : "设置";
+    view === "ai-models" ? "AI 模型" : view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "activity" ? "Token 活动" : view === "costs" ? "我的使用" : "设置";
   const sub =
     view === "accounts"
       ? accounts.length === 0
         ? "还没有添加账户"
         : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个额度不足` : ""}${failedCount > 0 ? ` · ${failedCount} 个同步异常` : ""}${pendingCount > 0 ? ` · ${pendingCount} 个待查询` : ""}${!lowCount && !failedCount && !pendingCount ? " · 状态正常" : ""}`
-      : view === "ai-models" ? "官方目录、价格与独立比价" : view === "models"
-        ? `${modelCount} 个可用模型`
-        : view === "ladder" ? "能力与价格，一起比较" : view === "activity" ? "每一次使用，都有记录" : view === "costs" ? "用量、支出与订阅" : "让 Quota 按你的习惯工作";
+      : view === "models" ? `${modelCount} 个可用模型` : '';
 
   return (
     <div className={`app${appearance.collapsed?' sidebar-collapsed':''}`}>
@@ -99,7 +96,6 @@ export default function App() {
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
             <span className="brand-title">Quota</span>
-            <span className="brand-sub">你的 AI 用量空间</span>
           </div>
         </div>
 
@@ -124,9 +120,6 @@ export default function App() {
           <IconLayers size={16} />
           模型库
           <span className="count">{modelCount || ""}</span>
-        </button>
-        <button aria-label="AI 模型天梯" title="AI 模型天梯" data-motion-active={view === "ladder"} className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
-          <IconSpark size={17} />AI 模型天梯
         </button>
         <button aria-label="Token 活动" title="Token 活动" data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/>Token 活动</button>
         <button data-motion-active={view === "settings"}
@@ -154,7 +147,7 @@ export default function App() {
         <div className="content" ref={contentRef}>
           <div className="view-transition" key={view}>
         <header className="page-heading content-inner">
-          <div className="page-heading-text"><h1>{title}</h1><p>{sub}</p></div>
+          <div className="page-heading-text"><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>
           <div className="page-actions">
           {view === "accounts" || view === "models" ? (
             <Button
@@ -219,8 +212,7 @@ export default function App() {
             )
           ) : null}
 
-          {view === 'ai-models' ? <AiModelsView onBenchmarks={()=>setView('ladder')}/> : null}
-          {view === "ladder" ? <LadderView autoUpdate={false} /> : null}
+          {view === 'ai-models' ? <AiModelsHub/> : null}
           {view === "activity" ? <ActivityView onOpenSyncSettings={()=>setView('settings')} /> : null}
           {view === "costs" ? <UsageCostsView /> : null}
           {view === "settings" ? (

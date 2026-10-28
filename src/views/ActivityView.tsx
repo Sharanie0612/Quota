@@ -10,6 +10,7 @@ import { Button, EmptyState, Field, Modal, Notice, Seg, Switch } from "../compon
 import { ActivityCharts } from "../components/ActivityCharts";
 import { ModelLogo } from "../components/ModelLogo";
 import { CacheUsage } from "../components/CacheUsage";
+import { ActivityShares } from '../components/ActivityShares';
 import { ActivityModelPicker } from "../components/ActivityModelPicker";
 import { ActivityDeviceDetails, ActivityModelDetails, TraeUsageDetails } from "../components/ActivityDetails";
 import { activityDeviceChoices } from "../lib/activityDevices";
@@ -375,7 +376,8 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
         action={data.updatedAt ? <Button onClick={() => { setDevice(""); setSource(""); setDays("0"); setModel(""); }}>查看全部历史</Button> : undefined} /></section>
         : <>
           <div id="activity-charts"><ActivityCharts key={query} rows={data.daily} days={Number(days)} hourly={data.hourly ?? []} format={format} model={model} metric={metric} setMetric={setMetric} range={range} onRange={range=>setSelection(range ? {query,range} : null)} /></div>
-          <CacheUsage rows={detailData?.models ?? []} format={format} onModel={setModel}/>
+          {detailData&&<ActivityShares report={detailData} format={format} onModel={setModel} onSource={key=>{setSource(key);setModel('');}} onMetric={setMetric}/>}
+          <details className="activity-cache-details"><summary>按模型查看缓存</summary><CacheUsage rows={detailData?.models ?? []} format={format} onModel={setModel}/></details>
           <div id="activity-details" className="activity-detail-heading"><h3>{range ? range.from === range.to ? range.from : range.from + " — " + range.to : "当前范围"} · 活动明细</h3><Seg value={detail} onChange={setDetail} options={detailOptions} /></div>
           {range && <div className="usage-selected" role="status"><span>{rangeError || (!detailData ? "读取所选周期…" : `${number(detailData.totals.tokens.total)} Token · ${number(detailData.totals.sessions)} 个会话`)}</span><Button size="sm" onClick={()=>setSelection(null)}>清除日期选择</Button>{rangeError && <Button size="sm" onClick={()=>setReloadKey(k=>k+1)}>重试</Button>}</div>}
           {detail==="channels" ? <TraeUsageDetails rows={detailData?.models ?? []} channels={channelRows} format={format} onModel={focusModelPicker}/>

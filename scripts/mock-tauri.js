@@ -712,6 +712,14 @@
       switch (cmd) {
         case 'get_appearance': return window.demoAppearance ?? null;
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
+        case 'get_benchmarks':
+        case 'refresh_benchmarks': {
+          const board=await fetch('/benchmark-board.json').then(r=>r.json());
+          const test=new URLSearchParams(location.search).get('benchmarkCase');
+          if(test==='offline')board.sources[0].error='演示：来源暂不可用';
+          if(test==='empty'){board.models=[];board.profiles=[];board.referenceCohort=[];}
+          return board;
+        }
         case 'get_ai_models':
         case 'refresh_ai_models': {
           const result=await fetch('/ai-models.json').then(r=>r.json());
@@ -721,7 +729,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.2700',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2600':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.2800',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2700':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -981,7 +989,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2700",
+            version: "1.0.2800",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

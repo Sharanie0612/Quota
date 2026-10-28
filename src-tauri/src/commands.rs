@@ -19,6 +19,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
 pub struct AppState {
+    pub benchmarks: crate::benchmarks::Cache,
     pub appearance:Mutex<Option<crate::appearance::Preferences>>,
     pub ai_models: Mutex<crate::ai_models::Snapshot>,
     pub ai_models_refreshing: tokio::sync::Mutex<()>,
@@ -60,6 +61,7 @@ impl AppState {
         let hidden_models = store.load_hidden_models();
         let history = HistoryStore::load(store.dir());
         let ai_models=crate::ai_models::load(store.dir());
+        let benchmarks=crate::benchmarks::load(store.dir());
         let appearance=crate::appearance::load(store.dir());
         let mut ladder=crate::ladder::load(store.dir());
         crate::ai_models::apply_to_ladder(&mut ladder,&ai_models);
@@ -81,6 +83,7 @@ impl AppState {
             builder.build().unwrap_or_default()
         };
         Self {
+            benchmarks:crate::benchmarks::Cache{dataset:Mutex::new(benchmarks),refreshing:tokio::sync::Mutex::new(())},
             appearance:Mutex::new(appearance),
             ai_models:Mutex::new(ai_models),
             ai_models_refreshing:tokio::sync::Mutex::new(()),

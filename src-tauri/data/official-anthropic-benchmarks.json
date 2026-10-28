@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "sources": [
+    {
+      "id": "official-anthropic",
+      "name": "Anthropic 官方报告",
+      "url": "https://www.anthropic.com/claude-sonnet-5-5",
+      "version": "Terminal-Bench 4.0 · 厂商公开配置",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00",
+      "records": 5,
+      "error": null,
+      "automatic": false
+    }
+  ],
+  "observations": [
+    {
+      "modelId": "claudesonnet55",
+      "modelName": "Claude Sonnet 5.5",
+      "vendor": "Anthropic",
+      "sourceId": "official-anthropic",
+      "metric": "Terminal-Bench 4.0 · 官网报告",
+      "family": "terminalbench-v4",
+      "version": "Anthropic-published/TerminalBench4",
+      "domain": "coding",
+      "setting": "Max · Claude Code",
+      "value": 70.6,
+      "unit": "percent",
+      "weight": 1.0,
+      "official": true,
+      "url": "https://www.anthropic.com/claude-sonnet-5-5",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00"
+    },
+    {
+      "modelId": "claudeopus55",
+      "modelName": "Claude Opus 5.5",
+      "vendor": "Anthropic",
+      "sourceId": "official-anthropic",
+      "metric": "Terminal-Bench 4.0 · 官网报告",
+      "family": "terminalbench-v4",
+      "version": "Anthropic-published/TerminalBench4",
+      "domain": "coding",
+      "setting": "Xhigh · Claude Code · 生产防护开启，可能回退",
+      "value": 66.4,
+      "unit": "percent",
+      "weight": 1.0,
+      "official": true,
+      "url": "https://www.anthropic.com/claude-opus-5-5",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00"
+    },
+    {
+      "modelId": "claudefable51",
+      "modelName": "Claude Fable 5.1",
+      "vendor": "Anthropic",
+      "sourceId": "official-anthropic",
+      "metric": "Terminal-Bench 4.0 · 官网报告",
+      "family": "terminalbench-v4",
+      "version": "Anthropic-published/TerminalBench4",
+      "domain": "coding",
+      "setting": "官网表列配置（未注明档位）",
+      "value": 55.8,
+      "unit": "percent",
+      "weight": 1.0,
+      "official": true,
+      "url": "https://www.anthropic.com/claude-opus-5-5",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00"
+    },
+    {
+      "modelId": "claudehaiku55",
+      "modelName": "Claude Haiku 5.5",
+      "vendor": "Anthropic",
+      "sourceId": "official-anthropic",
+      "metric": "Terminal-Bench 4.0 · 官网报告",
+      "family": "terminalbench-v4",
+      "version": "Anthropic-published/TerminalBench4",
+      "domain": "coding",
+      "setting": "官网表列配置（未注明档位）",
+      "value": 39.2,
+      "unit": "percent",
+      "weight": 1.0,
+      "official": true,
+      "url": "https://www.anthropic.com/claude-haiku-5-5",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00"
+    },
+    {
+      "modelId": "gpt6luna",
+      "modelName": "GPT-6 Luna",
+      "vendor": "OpenAI",
+      "sourceId": "official-anthropic",
+      "metric": "Terminal-Bench 4.0 · 官网报告",
+      "family": "terminalbench-v4",
+      "version": "Anthropic-published/TerminalBench4",
+      "domain": "coding",
+      "setting": "官网比较表配置（未注明档位）",
+      "value": 16.4,
+      "unit": "percent",
+      "weight": 1.0,
+      "official": true,
+      "url": "https://www.anthropic.com/claude-haiku-5-5",
+      "checkedAt": "2026-10-28T07:11:00.664919+00:00"
+    }
+  ],
+  "profiles": []
+}

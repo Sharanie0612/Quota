@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { BenchmarkBoard } from './types';
 import type {
   AiModelSnapshot,
   ActivityReport, ActivityOptions, SshHostDiscovery, SshIdentity, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
@@ -20,6 +21,8 @@ import type {
 } from "./types";
 
 export const api = {
+  getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
+  refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
   getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),
   refreshAiModels: (force=true) => invoke<AiModelSnapshot>('refresh_ai_models',{force}),
   moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),

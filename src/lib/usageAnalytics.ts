@@ -1,13 +1,14 @@
-import type {ActivityGroup,VendorExpense,CostObservation} from './types';
+import type {ActivityGroup,VendorExpense,CostObservation,MonthlyUsageRate} from './types';
+import {convertedExpense} from './usageCny';
 
 export type UsageGrain='day'|'week'|'month';
-export interface UsageBucket {from:string;to:string;label:string;subscription:number;usage:number;tokens:number;hasCost:boolean;hasSubscription:boolean;hasUsage:boolean}
+export interface UsageBucket {from:string;to:string;label:string;subscription:number;usage:number;tokens:number;hasCost:boolean;hasSubscription:boolean;hasUsage:boolean;missingFx?:boolean}
 export const dayNumber=(value:string)=>{const [year,month,day]=value.split('-').map(Number);return Date.UTC(year,month-1,day)/86400000;};
 export const dayText=(value:number)=>new Date(value*86400000).toISOString().slice(0,10);
 export const localDay=(value=new Date())=>`${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
-export function usageBuckets(expenses:VendorExpense[],daily:ActivityGroup[],from:string,to:string,grain:UsageGrain,currency:string,vendor=''){
+export function usageBuckets(expenses:VendorExpense[],daily:ActivityGroup[],from:string,to:string,grain:UsageGrain,currency:string,vendor='',rates:MonthlyUsageRate[]=[]){
   const today=localDay();
-  const records=expenses.filter(row=>(!vendor||row.vendor===vendor)&&row.currency===currency&&row.from<=today&&row.from<=to&&row.to>=from&&(row.subscription!=null||row.usage!=null));
+  const records=expenses.filter(row=>(!vendor||row.vendor===vendor)&&(currency==='RMB'||row.currency===currency)&&row.from<=today&&row.from<=to&&row.to>=from&&(row.subscription!=null||row.usage!=null));
   const starts=[...daily.map(row=>row.key),...records.map(row=>row.from)].filter(Boolean).sort();
   const ends=[today,...daily.map(row=>row.key),...records.map(row=>row.to)].filter(Boolean).sort();
   const first=from==='1900-01-01'?(starts[0]??today):from,last=to==='9999-12-31'?(ends[ends.length-1]??today):to;
@@ -23,7 +24,12 @@ export function usageBuckets(expenses:VendorExpense[],daily:ActivityGroup[],from
       const overlap=Math.min(dayNumber(row.to),finish)-Math.max(dayNumber(row.from),cursor)+1;
       const length=dayNumber(row.to)-dayNumber(row.from)+1;
       if(overlap<=0||length<=0)continue;
-      bucket.subscription+=(row.subscription??0)*overlap/length;bucket.usage+=(row.usage??0)*overlap/length;bucket.hasCost=true;
+      if(currency==='RMB'){
+        const converted=convertedExpense(row,startDay,endDay,rates);
+        bucket.missingFx ||= converted.missingMonths.length>0;
+        bucket.subscription+=converted.subscription??0;bucket.usage+=converted.usage??0;
+      }else{bucket.subscription+=(row.subscription??0)*overlap/length;bucket.usage+=(row.usage??0)*overlap/length;}
+      bucket.hasCost=true;
       bucket.hasSubscription ||= row.subscription!=null;bucket.hasUsage ||= row.usage!=null;
     }
     bucket.tokens=daily.filter(row=>row.key>=startDay&&row.key<=endDay).reduce((sum,row)=>sum+row.tokens.total,0);

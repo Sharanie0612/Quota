@@ -20,6 +20,46 @@ pub struct Rates {
     pub rates: Vec<MonthlyRate>,
     pub error: Option<String>,
 }
+
+// Derived monthly means have their own cache. Legacy fixed/manual references
+// and their sync protocol remain readable; they never masquerade as averages.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+struct AverageEntry { rate: MonthlyRate, checked_at: i64, observations: usize }
+
+pub fn monthly_average(history:&BTreeMap<chrono::NaiveDate,f64>,value:&str,today:chrono::NaiveDate)->Result<Option<MonthlyRate>,String>{
+    let first=month(value)?;
+    let quotes:Vec<_>=history.iter().filter(|(d,_)|**d>=first&&**d<=today&&d.format("%Y-%m").to_string()==value).collect();
+    if quotes.is_empty(){return Ok(None)}
+    Ok(Some(MonthlyRate{month:value.into(),cny_per_usd:quotes.iter().map(|(_,n)|**n).sum::<f64>()/quotes.len() as f64,date:quotes.last().unwrap().0.to_string(),source:SOURCE.into()}))
+}
+
+async fn fetch_history(state:&AppState)->Result<BTreeMap<chrono::NaiveDate,f64>,String>{
+    let mut response=state.http.get(SOURCE).send().await.map_err(|_|"月均汇率暂时无法获取，请稍后重试")?.error_for_status().map_err(|_|"官方汇率来源暂不可用")?;
+    if response.content_length().is_some_and(|n|n>LIMIT as u64){return Err("汇率响应过大".into())}
+    let mut bytes=Vec::new();
+    while let Some(chunk)=response.chunk().await.map_err(|_|"读取官方汇率失败")?{if bytes.len()+chunk.len()>LIMIT{return Err("汇率响应过大".into())}bytes.extend_from_slice(&chunk)}
+    parse_history(std::str::from_utf8(&bytes).map_err(|_|"官方汇率编码无效")?)
+}
+
+async fn average_rates(state:&AppState,months:Vec<String>)->Result<Rates,String>{
+    let path=state.store.dir().join("monthly-average-fx.json");
+    let read=||->Result<BTreeMap<String,AverageEntry>,String>{
+        match std::fs::read(&path){
+            Ok(bytes)=>{if bytes.len()>1024*1024{return Err("月均汇率缓存过大，原文件已保留".into())}
+                let rows:BTreeMap<String,AverageEntry>=serde_json::from_slice(&bytes).map_err(|_|"月均汇率缓存损坏，原文件已保留")?;
+                if rows.iter().any(|(key,e)|key!=&e.rate.month||!valid(&e.rate)||!e.rate.date.starts_with(&format!("{key}-"))||e.rate.source!=SOURCE||e.observations==0||e.observations>31){return Err("月均汇率缓存无效，原文件已保留".into())}Ok(rows)},
+            Err(e) if e.kind()==std::io::ErrorKind::NotFound=>Ok(BTreeMap::new()),Err(_)=>Err("读取月均汇率失败".into())
+        }
+    };
+    let saved={let _guard=state.billing_lock.lock().map_err(|_|"汇率记录忙碌")?;read()?};
+    let today=chrono::Local::now().date_naive();let current=today.format("%Y-%m").to_string();let now=chrono::Utc::now().timestamp();
+    let needed:Vec<_>=months.iter().filter(|m|month(m).is_ok_and(|d|d<=today)&&saved.get(*m).is_none_or(|e|e.checked_at>now||(*m==&current&&now-e.checked_at>=3600)||(m.as_str()<current.as_str()&&chrono::DateTime::from_timestamp(e.checked_at,0).is_none_or(|d|d.date_naive()<=month(m).unwrap().checked_add_months(chrono::Months::new(1)).unwrap())))).cloned().collect();
+    let fetched=if needed.is_empty(){Ok(BTreeMap::new())}else{fetch_history(state).await};
+    let _guard=state.billing_lock.lock().map_err(|_|"汇率记录忙碌")?;let mut rows=read()?;
+    let error=match fetched{Ok(history)=>{let mut changed=false;for value in needed{if let Some(rate)=monthly_average(&history,&value,today)?{let observations=history.keys().filter(|d|d.format("%Y-%m").to_string()==value&&**d<=today).count();rows.insert(value,AverageEntry{rate,checked_at:now,observations});changed=true;}}if changed{crate::storage::write_atomic(&path,&serde_json::to_string(&rows).map_err(|_|"保存月均汇率失败")?)?}None},Err(e)=>Some(e)};
+    Ok(Rates{rates:months.iter().filter_map(|m|rows.get(m).map(|e|e.rate.clone())).collect(),error})
+}
 fn month(s: &str) -> Result<chrono::NaiveDate, String> {
     let d = chrono::NaiveDate::parse_from_str(&format!("{s}-01"), "%Y-%m-%d")
         .map_err(|_| "月份无效")?;
@@ -146,6 +186,7 @@ pub fn save_manual(dir: &Path, value: &str, rate: Option<f64>) -> Result<(), Str
 pub async fn get_monthly_usage_fx(
     state: State<'_, AppState>,
     months: Vec<String>,
+    average: Option<bool>,
 ) -> Result<Rates, String> {
     if months.len() > 600 {
         return Err("一次最多查看 600 个月的汇率".into());
@@ -153,6 +194,7 @@ pub async fn get_monthly_usage_fx(
     for m in &months {
         month(m)?;
     }
+    if average==Some(true){return average_rates(&state,months).await}
     let existing = {
         let _guard = state.billing_lock.lock().map_err(|_| "汇率记录忙碌")?;
         load(state.store.dir())?

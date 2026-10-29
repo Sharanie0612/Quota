@@ -760,7 +760,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3100',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3200',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -822,7 +822,7 @@
           }
           window.demoVendorExpenses=next;return null;
         }
-        case "get_monthly_usage_fx": return {rates:args.months.map(month=>window.demoMonthlyRates?.[month]||{month,cnyPerUsd:7,date:'2026-09-30',source:'manual'}),error:null};
+        case "get_monthly_usage_fx": return {rates:args.months.filter(month=>!window.demoFxMissing).map(month=>window.demoMonthlyRates?.[month]||{month,cnyPerUsd:7,date:month+'-20',source:'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml'}),error:null};
         case "save_monthly_usage_fx": window.demoMonthlyRates ||= {}; if(args.rate==null)delete window.demoMonthlyRates[args.month];else window.demoMonthlyRates[args.month]={month:args.month,cnyPerUsd:args.rate,date:new Date().toLocaleDateString('sv-SE'),source:'manual'};return null;
         case "get_activity_storage": return {bytes:51692437, files:430, legacyFiles:430, ownLegacyFiles:218,legacyCompatibility:new URLSearchParams(location.search).get("storageCase")==="legacy"};
         case "get_activity_readers": return new URLSearchParams(location.search).get("storageCase")==="legacy"?[{device:"demo-b",version:null,compressed:null}]:[{device:"demo-b",version:"1.0.1700",compressed:true}];
@@ -1020,7 +1020,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3100",
+            version: "1.0.3200",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

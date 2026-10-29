@@ -1,6 +1,7 @@
 // Exercise accounting boundaries and the distinction between live signals and measured speed.
-const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert/strict');
-function load(file){const exports={};const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;new Function('exports',js)(exports);return exports;}
+const fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),assert=require('node:assert/strict');
+const cache=new Map();
+function load(file){file=path.resolve(file);if(cache.has(file))return cache.get(file);const exports={};cache.set(file,exports);const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;new Function('exports','require',js)(exports,id=>id.startsWith('.')?load(path.resolve(path.dirname(file),id+'.ts')):require(id));return exports;}
 const {usageBuckets,reportCsv,filteredObservations}=load('src/lib/usageAnalytics.ts');
 const bill=(vendor,from,to,currency,subscription,usage)=>({vendor,from,to,currency,subscription,usage,planId:null});
 const bills=[bill('custom','2024-02-15','2024-03-14','USD',29,null),bill('custom','2024-02-15','2024-03-14','CNY',null,58),bill('deepseek','2024-02-15','2024-03-14','CNY',0,null)];
@@ -22,6 +23,16 @@ assert(!usageBuckets([bill('custom','9998-01-01','9998-02-01','USD',20,null)],[]
 const csv=reportCsv(['a','b'],[['=SUM(A1)','文,字"'],[null,0],['\t=1',' +cmd']]);
 assert(csv.startsWith('\uFEFF'));assert(csv.includes('"\'=SUM(A1)"'));assert(csv.includes('"文,字"""'));assert(csv.includes('"","0"'));assert(csv.includes('"\' +cmd"'));
 assert.equal(filteredObservations([{label:'工作账户',vendor:'custom',currency:'USD',at:1,accountId:'a'},{label:'工作账户',vendor:'custom',currency:'CNY',at:2,accountId:'a'}],'custom','USD','工作').length,1);
+const rates=[{month:'2024-02',cnyPerUsd:7},{month:'2024-03',cnyPerUsd:8}];
+const rmb=usageBuckets(bills,daily,'2024-02-01','2024-03-31','month','RMB','custom',rates).buckets;
+assert.deepEqual(rmb.map(row=>[Number(row.subscription.toFixed(8)),Number(row.usage.toFixed(8))]),[[105,30],[112,28]]);
+assert(Math.abs(rmb.reduce((sum,row)=>sum+row.subscription+row.usage,0)-275)<1e-10);
+const absent=usageBuckets(bills,daily,'2024-02-01','2024-03-31','month','RMB','custom',rates.slice(0,1)).buckets;
+assert.equal(absent[0].missingFx,false);assert.equal(absent[1].missingFx,true);
+const {convertedExpense}=load('src/lib/usageCny.ts');
+assert.equal(convertedExpense(bill('custom','2024-02-01','2024-02-29','USD',0,null),'2024-02-01','2024-02-29',[]).total,0);
+assert.equal(convertedExpense(bill('custom','2024-02-01','2024-02-29','USD',20,null),'2024-02-01','2024-02-29',[]).total,null);
+assert.equal(convertedExpense(bill('custom','2024-02-01','2024-02-29','CNY',null,null),'2024-02-01','2024-02-29',[]).total,null);
 console.log('PASS leap-day proration, weekly boundaries, currency/vendor isolation, future bills, missing vs free, bounded range and spreadsheet-safe CSV');
 const {liveModelState}=load('src/lib/liveModel.ts');
 const now=100000,task={id:'a',model:'a',startedAt:1000,confirmedOutputTokens:400,measuredOutputTokens:300,measuredDurationMs:2500,measuredResponses:2};

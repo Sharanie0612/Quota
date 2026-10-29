@@ -39,7 +39,7 @@ export const api = {
   openMain: () => invoke<void>('show_main_window'),
   exportReportCsv: (path:string,contents:string) => invoke<void>('export_report_csv',{path,contents}),
   getVendorCosts: (from: string, to: string) => invoke<VendorCostReport>("get_vendor_costs", {from,to}),
-  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months}),
+  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months,average:true}),
   saveMonthlyUsageFx: (month: string, rate: number | null) => invoke<void>("save_monthly_usage_fx",{month,rate}),
   saveVendorExpense: (input: VendorExpense, previous: VendorExpense | null = null) => invoke<void>("save_vendor_expense", {input,previous}),
   getActivityStorage: () => invoke<ActivityStorage>("get_activity_storage"),

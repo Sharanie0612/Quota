@@ -102,7 +102,7 @@ export function UsageWidget() {
         if(!dragging.current)return;moveQueue.current={dx:e.screenX-dragging.current.x,dy:e.screenY-dragging.current.y,finished:true};dragging.current=null;
         e.currentTarget.releasePointerCapture(e.pointerId);void move().then(()=>{if(!root.current?.matches(':hover'))collapse(true);});
       }} onPointerCancel={()=>{if(dragging.current){moveQueue.current={dx:dragging.current.dx,dy:dragging.current.dy,finished:true};dragging.current=null;void move().then(()=>collapse(true));}}}><img className="widget-brand-logo" src={appIcon} alt=""/><span>Quota</span><button className="widget-open" tabIndex={expanded?0:-1} title="打开主面板" aria-label="打开主面板" onClick={()=>void api.openMain().catch(e=>setError(errText(e)))}><IconArrowUpRight size={16}/></button></div>
-      <LiveModelPanel status={speed} compact interactive={expanded} onOpen={()=>void api.openMainView('output-speed').catch(e=>setError(errText(e)))}/>
+      <LiveModelPanel status={speed} interactive={expanded}/>
       <button className="widget-value" tabIndex={expanded?0:-1} onClick={()=>setTotal(v=>!v)} aria-label={`${total?'累计':'今日'} ${fullValue}，点击切换${total?'今日':'累计'}用量`} title={fullValue}><span>{total?'累计 Token':'今日 Token'}<span className="widget-toggle">↔</span></span><strong key={`${total}`}>{value==null?'—':compact(value)}</strong></button>
       <div className={`widget-status ${error?'has-error':''}`} role="status">{error?'更新失败':usage?.partial?'部分来源待更新':''}</div>
     </section>

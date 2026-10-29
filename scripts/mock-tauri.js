@@ -711,6 +711,17 @@
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
         case 'get_appearance': return window.demoAppearance ?? null;
+        case 'get_widget_speed': {
+          if(window.demoLiveStatus)return window.demoLiveStatus;
+          const now=Date.now(),test=new URLSearchParams(location.search).get('widgetLiveCase');
+          window.demoLiveStartedAt??=now-92000;
+          const task={id:'demo-live-a',model:'gpt-6.1-sol',startedAt:window.demoLiveStartedAt,lastEventAt:now,confirmedOutputTokens:test==='pending'?0:1280,measuredOutputTokens:test==='pending'?0:1120,measuredDurationMs:test==='pending'?0:14000,measuredResponses:test==='pending'?0:4};
+          const tasks=test==='idle'?[]:test==='multiple'?[task,{...task,id:'demo-live-b',model:'gpt-6-astra',startedAt:now-42000}]:[task];
+          return {checkedAt:test==='stale'?now-30000:now,lastEventAt:now,activeRequests:tasks.length,enabled:test!=='paused',sourceConfigured:true,filesRead:1,readMs:8,errors:test==='error'?['演示：日志暂时无法读取']:[],tasks,stream:{available:test!=='no-stream',lastDeltaAt:test==='idle'?null:now,chunksLastFiveSeconds:test==='idle'?0:24}};
+        }
+        case 'export_report_csv': window.demoExport=args;return null;
+        case 'plugin:dialog|save': return 'D:\\Quota-demo-report.csv';
+        case 'open_main_view': window.demoOpenedView=args.view;return null;
         case 'refresh_output_speed': emit('output-speed-updated',null);return 0;
         case 'get_output_speed': {
           if(window.demoSpeedReport)return window.demoSpeedReport;
@@ -749,7 +760,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3003',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3100',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -792,7 +803,7 @@
           const modelVendor=key=>key.startsWith("gpt")?"custom":key.toLowerCase().startsWith("glm")?"zhipu":"deepseek";
           const coveredModels={};
           for(const e of expenses.filter(e=>e.from<=args.to&&e.to>=args.from)){const models=activity.models.filter(m=>modelVendor(m.key)===e.vendor);coveredModels[e.vendor]=models;coveredModels[`${e.vendor}:${e.currency}`]=models;}
-          return {expenses,coveredModels,lifetimeTokens:{input:2400000,output:320000,total:2720000,cached:1700000,cacheWrite:50000,reasoning:90000},lifetimeSessions:38,firstDate:new Date(Date.now()-29*86400000).toLocaleDateString('sv-SE'),lastDate:new Date().toLocaleDateString('sv-SE'),accounts:ACCOUNTS.map(a=>({id:a.id,vendor:a.provider==="mimo-plan"?"mimo":a.provider,label:a.label,currency:a.provider==="custom"?"USD":"CNY",cumulativeRecharge:a.provider==="zhipu"?40:null,cumulativeSpend:a.provider==="zhipu"?28.4:null,observedRecharge:null,observedSpend:null,observedFrom:null,observedTo:null,balanceRises:a.provider==="zhipu"?10:0,balanceDrops:a.provider==="zhipu"?2:0,historyFrom:1791072000,historyTo:1791849600,plan:a.provider==="custom"?"plus":null,issues:[]})),plans:[
+          return {expenses,coveredModels,history:window.demoCostHistory??[],lifetimeTokens:{input:2400000,output:320000,total:2720000,cached:1700000,cacheWrite:50000,reasoning:90000},lifetimeSessions:38,firstDate:new Date(Date.now()-29*86400000).toLocaleDateString('sv-SE'),lastDate:new Date().toLocaleDateString('sv-SE'),accounts:ACCOUNTS.map(a=>({id:a.id,vendor:a.provider==="mimo-plan"?"mimo":a.provider,label:a.label,currency:a.provider==="custom"?"USD":"CNY",cumulativeRecharge:a.provider==="zhipu"?40:null,cumulativeSpend:a.provider==="zhipu"?28.4:null,observedRecharge:null,observedSpend:null,observedFrom:null,observedTo:null,balanceRises:a.provider==="zhipu"?10:0,balanceDrops:a.provider==="zhipu"?2:0,historyFrom:1791072000,historyTo:1791849600,plan:a.provider==="custom"?"plus":null,issues:[]})),plans:[
             {id:"plus",vendor:"custom",name:"ChatGPT Plus",currency:"USD",amount:20,months:1,source:"https://learn.chatgpt.com/docs/pricing",verifiedAt:"2026-10-14",condition:"公开月费；不含税费或额外额度购买"},
             {id:"mimo-lite-cn",vendor:"mimo",name:"MiMo Lite 月付",currency:"CNY",amount:39,months:1,source:"https://mimo.mi.com/docs/zh-CN/tokenplan",verifiedAt:"2026-10-14",condition:"中国区公开月费；优惠请按实付填写"},
             {id:"glm-lite",vendor:"zhipu",name:"GLM Coding Lite",currency:"CNY",amount:118,months:1,source:"https://zcode.z.ai/cn",verifiedAt:"2026-10-14",condition:"官网月付标价；优惠请按实付填写"}
@@ -1009,7 +1020,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3003",
+            version: "1.0.3100",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

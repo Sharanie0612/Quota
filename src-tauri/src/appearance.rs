@@ -8,6 +8,8 @@ pub struct Preferences {
     pub mode: String,
     pub collapsed: bool,
     #[serde(default)]
+    pub glass: bool,
+    #[serde(default)]
     pub revision: u64,
 }
 impl Preferences {
@@ -52,6 +54,21 @@ pub fn save_appearance(
     )?;
     *current = Some(preferences.clone());
     drop(current);
+    apply_widget_material(&app,preferences.glass);
     let _ = app.emit("appearance-updated", preferences);
     Ok(())
+}
+
+pub fn apply_widget_material(app:&tauri::AppHandle,enabled:bool){
+    #[cfg(windows)]
+    {
+        use tauri::{Manager,utils::{WindowEffect,config::WindowEffectsConfig}};
+        if let Some(window)=app.get_webview_window(crate::widget::LABEL){
+            let effect=enabled.then_some(WindowEffectsConfig{effects:vec![WindowEffect::Acrylic],state:None,radius:None,color:None});
+            // CSS retains the material treatment when the OS lacks this effect.
+            let _=window.set_effects(effect);
+        }
+    }
+    #[cfg(not(windows))]
+    let _=(app,enabled);
 }

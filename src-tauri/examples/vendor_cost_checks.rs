@@ -216,6 +216,15 @@ fn main() {
     assert_eq!(report.accounts[0].observed_recharge, Some(10.0));
     assert_eq!(report.accounts[0].observed_spend, Some(4.0));
     assert_eq!(report.accounts[0].cumulative_recharge, Some(50.0));
+    assert_eq!(report.history.len(),4);
+    assert_eq!(report.history.last().unwrap().spend_delta,None);
+    let first_change=report.history.iter().find(|row|row.at==at(2).timestamp()).unwrap();
+    assert_eq!(first_change.spend_delta,Some(2.0));
+    assert_eq!(first_change.recharge_delta,Some(10.0));
+    let clipped=vendor_costs::report(&state,"2026-10-05","2026-10-05").unwrap();
+    assert_eq!(clipped.history.len(),1);
+    assert!(clipped.history[0].from.unwrap()<at(5).timestamp());
+    assert_eq!(clipped.history[0].spend_delta,Some(2.0));
     let mut status = state.statuses.lock().unwrap()[&account.id].clone();
     status.last_checked = Some(at(6).to_rfc3339());
     status.balance.as_mut().unwrap().amounts[1].value = 1.0;
@@ -230,6 +239,11 @@ fn main() {
         .accounts[0]
         .observed_spend
         .is_none());
+    let reset=vendor_costs::report(&state,"2026-10-06","2026-10-06").unwrap();
+    assert!(reset.history[0].counter_reset);
+    assert_eq!(reset.history[0].spend_delta,None);
+    assert_eq!(reset.history[0].recharge_delta,Some(0.0));
+    println!("PASS chronological spending history, clipped baseline, recharge separated from spend, unknown first delta and counter reset");
     status.last_checked = Some(at(7).to_rfc3339());
     status.balance.as_mut().unwrap().currency = "Credits".into();
     state

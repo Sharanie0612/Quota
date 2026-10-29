@@ -91,3 +91,29 @@
   .speed-count strong { font-size:23px; }.speed-pending { padding:12px 16px; }.speed-pending>span { margin-left:16px; }
   .speed-chart { padding:18px 16px 12px; }.speed-chart-tools { width:100%; justify-content:space-between; }.speed-models { padding:18px 16px 6px; }
 }
+
+/* A quiet chart surface, with one primary metric and lighter supporting data. */
+.speed-workspace { border-radius:20px; }
+.speed-controls { background:var(--surface);padding:16px 24px; }
+.speed-summary { grid-template-columns:1.45fr 1fr .7fr; padding:23px 28px 15px; }
+.speed-summary .speed-average strong {font-size:44px;color:var(--brand-strong,var(--text));}
+.speed-summary strong {font-size:27px;letter-spacing:-.6px;}
+.speed-summary section+section {border-left:0;padding-left:24px;margin-left:20px;}
+.speed-summary p {font-size:13px;}
+.speed-chart {border-top:0;padding-top:12px;}
+.speed-chart-heading h2 {font-size:16px;}
+.speed-chart-heading>div>span {font-size:13px;}
+.speed-chart-tools .seg {background:var(--surface-3);}
+.speed-plot>svg {height:clamp(260px,calc(100dvh - 555px),440px);margin-top:16px;}
+.speed-grid {stroke-dasharray:2 6;opacity:.8;}
+.speed-tick {font-size:13px;}
+.speed-legend {gap:8px 16px;padding-top:14px;margin-top:6px;border-top:1px solid var(--border);}
+.speed-legend button {font-size:14px; padding:7px 10px;border-radius:9px;}
+.speed-legend i {width:14px;height:3px;border-radius:3px;}
+.speed-tooltip {border-radius:12px;box-shadow:0 8px 28px color-mix(in srgb,var(--text) 10%,transparent);}
+.speed-models {border-radius:18px;}
+.speed-model-number {display:grid;gap:7px;min-width:105px;justify-items:end;}
+.speed-model-number>span {height:4px;width:100px;border-radius:4px;background:var(--surface-3);overflow:hidden;}
+.speed-model-number i {display:block;height:100%;border-radius:4px;}
+@media(max-width:1150px){.speed-summary{grid-template-columns:1.2fr 1fr .7fr;padding:20px 23px 12px;}.speed-summary .speed-average strong{font-size:37px;}.speed-summary strong{font-size:25px;}.speed-summary section+section{padding-left:14px;margin-left:12px;}.speed-plot>svg{height:clamp(220px,calc(100dvh - 635px),380px);}}
+@media(max-width:850px){.speed-summary{grid-template-columns:1fr 1fr;}.speed-summary .speed-count{grid-column:1/-1;}.speed-controls{padding:16px;}}

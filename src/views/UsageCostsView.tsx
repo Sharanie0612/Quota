@@ -1,8 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import {save as saveDialog} from '@tauri-apps/plugin-dialog';
+import {UsageOverview} from '../components/UsageOverview';
+import {SpendingHistory} from '../components/SpendingHistory';
+import {localDay} from '../lib/usageAnalytics';
+import './usage-workbench.css';
+import { useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, errText } from "../lib/api";
 import { vendorRows, vendorNames, endOfSubscription, expensePortions, sumTokens, effectiveVendorPrice } from "../lib/vendorCosts";
-import { monthKey, monthRange, monthLabel, shiftMonth, restoreUsageRange } from "../lib/usageMonths";
+import { monthKey, monthRange, shiftMonth, restoreUsageRange } from "../lib/usageMonths";
 import type { ActivityReport, VendorCostReport, VendorExpense, MonthlyUsageRate } from "../lib/types";
 import { Button, EmptyState, Field, Modal, Notice, Seg } from "../components/ui";
 import { ModelLogo } from "../components/ModelLogo";
@@ -27,6 +32,7 @@ export function UsageCostsView(){
   const [draftFrom,setDraftFrom]=useState(initial.mode==='all'?'':initial.from);
   const [draftTo,setDraftTo]=useState(initial.mode==='all'?'':initial.to);
   const [search,setSearch]=useState('');
+  const [tab,setTab]=useState('overview'),[vendor,setVendor]=useState(''),[currency,setCurrency]=useState('CNY'),[customOpen,setCustomOpen]=useState(false);
   const [rates,setRates]=useState<MonthlyUsageRate[]>([]);
   const [fxError,setFxError]=useState('');
   const [fxReload,setFxReload]=useState(0);
@@ -46,15 +52,28 @@ export function UsageCostsView(){
   const [subscription,setSubscription]=useState("");
   const [usage,setUsage]=useState("");
   const [saving,setSaving]=useState(false);
-  const query=`${from}|${to}`;
+  const query=`${from}|${to}|${vendor}`;
+  const reloadData=useRef<()=>void>(()=>{});
   useEffect(()=>{setActivity(null);setFinance(null);setLoading(true);},[query]);
   useEffect(()=>{
-    let live=true;setLoading(true);setError("");
+    let live=true,inFlight=false,queued=false;setError("");
     if(!from||!to||from>to){setError("请选择有效的起止日期");setLoading(false);return;}
-    void Promise.all([api.getActivity("","without-trae",0,"",from,to),api.getVendorCosts(from,to)])
-      .then(([a,f])=>{if(live){setActivity(a);setFinance(f);}}).catch(e=>{if(live)setError(errText(e));}).finally(()=>{if(live)setLoading(false);});
+    const load=async()=>{
+      if(!live)return;
+      if(inFlight){queued=true;return;}
+      inFlight=true;
+      do {
+        queued=false;
+        try {const [a,f]=await Promise.all([api.getActivity("","without-trae",0,vendor?`vendor:${vendor}`:"",from,to),api.getVendorCosts(from,to)]);if(live){setActivity(a);setFinance(f);setError('');}}
+        catch(e){if(live)setError(errText(e));}
+        finally{if(live)setLoading(false);}
+      }while(queued&&live);
+      inFlight=false;
+    };
+    reloadData.current=()=>void load();void load();
     return()=>{live=false;};
-  },[query,reload]);
+  },[query,from,to,vendor]);
+  useEffect(()=>{if(reload)reloadData.current();},[reload]);
   useEffect(()=>{
     let live=true;const cleanups:(()=>void)[]=[];
     for(const event of ["activity-updated","accounts-updated"])void listen(event,()=>setReload(n=>n+1)).then(un=>{if(live)cleanups.push(un);else un();}).catch(()=>undefined);
@@ -67,17 +86,18 @@ export function UsageCostsView(){
   const fxMonths=useMemo(()=>[...new Set([referenceMonth,...(finance?.expenses??[]).filter(e=>e.currency==='USD').flatMap(e=>expensePortions(e,from,to).map(p=>p.month))])].sort(),[finance,from,to,referenceMonth]);
   const displayedRate=rates.find(r=>r.month===referenceMonth);
   const fxQuery=fxMonths.join('|');
-  useEffect(()=>{let live=true;setFxError('');void api.getMonthlyUsageFx(fxQuery.split('|')).then(r=>{if(live){setRates(r.rates);setFxError(r.error??'');}}).catch(e=>{if(live)setFxError(errText(e));});return()=>{live=false;};},[fxQuery,fxReload,reload]);
-  const visibleRows=rows.filter(r=>!search.trim()||`${r.name} ${r.rows.map(m=>m.key).join(' ')}`.toLowerCase().includes(search.trim().toLowerCase()));
+  useEffect(()=>{let live=true;setFxError('');void api.getMonthlyUsageFx(fxQuery.split('|')).then(r=>{if(live){setRates(r.rates);setFxError(r.error??'');}}).catch(e=>{if(live)setFxError(errText(e));});return()=>{live=false;};},[fxQuery,fxReload]);
+  const scopedRows=rows.filter(row=>!vendor||row.id===vendor);
+  const visibleRows=scopedRows.filter(r=>!search.trim()||`${r.name} ${r.rows.map(m=>m.key).join(' ')}`.toLowerCase().includes(search.trim().toLowerCase()));
   const selectedTokens=sumTokens(activity?.models??[]);
-  const coveredTokens=rows.reduce((n,r)=>n+r.covered.total,0);
-  const pricedRows=rows.filter(r=>r.amounts.length);
+  const coveredTokens=scopedRows.reduce((n,r)=>n+r.covered.total,0);
+  const pricedRows=scopedRows.filter(r=>r.amounts.length);
   const referenceCny=pricedRows.length&&!pricedRows.some(r=>r.cny==null)?pricedRows.reduce((n,r)=>n+(r.cny??0),0):null;
-  const partial=rows.some(r=>r.amounts.some(a=>a.partial));
+  const partial=scopedRows.some(r=>r.amounts.some(a=>a.partial));
   const applyRange=(mode:string,first:string,last:string)=>{setFrom(first);setTo(last);setRangeMode(mode);setDraftFrom(mode==='all'?'':first);setDraftTo(mode==='all'?'':last);try{localStorage.setItem('quota-my-usage-range',JSON.stringify({from:first,to:last,mode}));}catch{/* Preferences are optional. */}};
   const chooseMonth=(month:string)=>{const range=monthRange(month);if(range)applyRange('month',range.from,range.to);};
-  const preset=(mode:string)=>{if(mode==='all'){applyRange(mode,'1900-01-01','9999-12-31');return;}if(mode==='custom'){setRangeMode(mode);if(!draftFrom)setDraftFrom(monthRange(currentMonth)!.from);if(!draftTo)setDraftTo(day(new Date()));return;}chooseMonth(rangeMode==='all'?currentMonth:selectedMonth);};
-  const summaries=["CNY","USD"].map(currency=>({currency,amount:rows.flatMap(r=>r.amounts).filter(a=>a.currency===currency).reduce((n,a)=>n+a.total,0),known:rows.filter(r=>r.amounts.some(a=>a.currency===currency)).length}));
+  const preset=(mode:string)=>{setCustomOpen(mode==='custom');if(['week','quarter','year'].includes(mode)){const last=new Date(),first=new Date();if(mode==='year'){first.setMonth(0,1);}else first.setDate(first.getDate()-(mode==='week'?6:89));applyRange('custom',localDay(first),localDay(last));return;}if(mode==='all'){applyRange(mode,'1900-01-01','9999-12-31');return;}if(mode==='custom'){setRangeMode(mode);if(!draftFrom)setDraftFrom(monthRange(currentMonth)!.from);if(!draftTo)setDraftTo(day(new Date()));return;}chooseMonth(rangeMode==='all'?currentMonth:selectedMonth);};
+  const summaries=["CNY","USD"].map(currency=>({currency,amount:scopedRows.flatMap(r=>r.amounts).filter(a=>a.currency===currency).reduce((n,a)=>n+a.total,0),known:scopedRows.filter(r=>r.amounts.some(a=>a.currency===currency)).length}));
   const openEditor=(id:string,record?:VendorExpense,independent=false)=>{
     const start=independent?day(new Date()):rangeMode==='all'?monthRange(currentMonth)!.from:from;
     const value=record??{vendor:id,from:start,to:independent?endOfSubscription(start,1):rangeMode==='all'?monthRange(currentMonth)!.to:to,currency:id==="custom"?"USD":"CNY",subscription:null,usage:null,planId:null};
@@ -109,19 +129,21 @@ export function UsageCostsView(){
   const today=day(new Date());
   const billStatus=(e:VendorExpense)=>e.from>today?'upcoming':e.to<today?'ended':'active';
   const managedExpenses=(finance?.expenses??[]).filter(e=>(!managerVendor||e.vendor===managerVendor)&&(managerStatus==='all'||billStatus(e)===managerStatus)).sort((a,b)=>b.from.localeCompare(a.from)||a.vendor.localeCompare(b.vendor));
-  const subscriptionCount=finance?.expenses.filter(e=>e.subscription!=null&&billStatus(e)==='active').length??0;
   const billingVendors=Object.entries(vendorNames).filter(([id])=>['custom','deepseek','mimo','moonshot','zhipu'].includes(id)||finance?.expenses.some(e=>e.vendor===id)||rows.some(r=>r.id===id&&r.rows.length>0));
   const saveFx=async(reset=false)=>{if(!fxEdit)return;const n=Number(fxEdit.value);if(!reset&&(!Number.isFinite(n)||n<0.01||n>100)){toast('请输入 0.01–100 之间的汇率','error');return;}setFxSaving(true);try{await api.saveMonthlyUsageFx(fxEdit.month,reset?null:n);setFxEdit(null);setFxReload(n=>n+1);toast(reset?'已恢复官方月度参考':'已保存本月固定参考');}catch(e){toast(errText(e),'error');}finally{setFxSaving(false);}};
+  const exportCsv=async(contents:string,suffix:string)=>{try{const path=await saveDialog({title:'导出当前统计',defaultPath:`Quota-${suffix}-${day(new Date())}.csv`,filters:[{name:'CSV报表',extensions:['csv']}]});if(path){await api.exportReportCsv(path,contents);toast('报表已导出');}}catch(error){toast(errText(error),'error');}};
   return <div className="content-inner usage-costs">
-    <div className="usage-costs-intro"><span className="hint">全部设备 · 不含 Trae</span><Button disabled={busy} onClick={()=>void sync()}><IconRefresh size={14} className={busy?"spin":""}/>{busy?"更新中…":"更新用量"}</Button></div>
-    <section className="card my-usage-range">
-      <div className="my-usage-range-head"><div><span className="usage-eyebrow">统计时间</span><h3>{rangeMode==='month'?monthLabel(selectedMonth):rangeMode==='all'?'全部历史':'自定义期间'}</h3></div><Seg value={rangeMode} onChange={preset} options={[{value:'month',label:'按月统计'},{value:'all',label:'全部历史'},{value:'custom',label:'自定义'}]}/></div>
-      {rangeMode==='month'?<div className="usage-month-controls"><Button aria-label="上一个月" disabled={!shiftMonth(selectedMonth,-1)} onClick={()=>chooseMonth(shiftMonth(selectedMonth,-1)!)}>‹</Button><input className="input" aria-label="统计月份" type="month" min="1900-01" max="9999-12" value={selectedMonth} onChange={e=>chooseMonth(e.target.value)}/><Button aria-label="下一个月" disabled={!shiftMonth(selectedMonth,1)} onClick={()=>chooseMonth(shiftMonth(selectedMonth,1)!)}>›</Button><Button variant="quiet" disabled={selectedMonth===currentMonth} onClick={()=>chooseMonth(currentMonth)}>回到本月</Button><span className="hint">{from} — {to}{selectedMonth===currentMonth?' · 用量截至当前':''}</span></div>:rangeMode==='custom'?<div className="vendor-cost-filters"><Field label="开始日期"><input className="input" type="date" value={draftFrom} onChange={e=>setDraftFrom(e.target.value)}/></Field><Field label="结束日期"><input className="input" type="date" value={draftTo} onChange={e=>setDraftTo(e.target.value)}/></Field><Button variant="primary" disabled={!draftFrom||!draftTo||draftFrom>draftTo} onClick={()=>applyRange('custom',draftFrom,draftTo)}>应用日期</Button><span className="hint">当前统计 {from === '1900-01-01' && to === '9999-12-31' ? '全部历史' : `${from} — ${to}`}</span></div>:<p className="hint">{finance?.firstDate??'暂无记录'} — {finance?.lastDate??'今天'} · 全部已采集历史</p>}
-    </section>
-    <section className="card usage-subscriptions-entry"><div className="usage-subscriptions-mark"><IconWallet size={22}/></div><div><h3>订阅与账期</h3><p>{subscriptionCount?`${subscriptionCount} 个订阅进行中`:'记录订阅周期与实付费用'}</p></div><Button onClick={()=>setManager(true)} disabled={!finance}>管理账期</Button></section>
+    <header className="usage-heading"><h1>我的使用</h1><div><Button variant="quiet" disabled={busy} aria-label="更新我的使用" onClick={()=>void sync()}><IconRefresh size={16} className={busy?'spin':''}/>{busy?'更新中':'更新记录'}</Button><Button variant="primary" onClick={()=>openEditor(vendor||'custom',undefined,true)}><IconPlus size={15}/>添加账期</Button></div></header>
+    <div className="usage-workbench-controls card"><div className="usage-range-primary"><Seg value={rangeMode==='month'?'month':rangeMode==='all'?'all':customOpen?'custom':from===localDay(new Date(new Date().getFullYear(),0,1))&&to===day(new Date())?'year':day(new Date())===to&&Math.round((Date.parse(to)-Date.parse(from))/86400000)===6?'week':day(new Date())===to&&Math.round((Date.parse(to)-Date.parse(from))/86400000)===89?'quarter':'custom'} onChange={preset} options={[{value:'month',label:'按月'},{value:'week',label:'近7天'},{value:'quarter',label:'近90天'},{value:'year',label:'今年'},{value:'all',label:'全部'},{value:'custom',label:'自定义'}]}/><div className="usage-global-filters"><select className="select" aria-label="统计厂商" value={vendor} onChange={event=>setVendor(event.target.value)}><option value="">全部厂商</option>{Object.entries(vendorNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select>{tab!=='prices'&&<Seg value={currency} onChange={setCurrency} options={[{value:'CNY',label:'人民币'},{value:'USD',label:'美元'}]}/>}</div></div>
+    {rangeMode==='month'?<div className="usage-period-row"><Button aria-label="上一个月" disabled={!shiftMonth(selectedMonth,-1)} onClick={()=>chooseMonth(shiftMonth(selectedMonth,-1)!)}>‹</Button><input className="input" aria-label="统计月份" type="month" value={selectedMonth} min="1900-01" max="9999-12" onChange={event=>chooseMonth(event.target.value)}/><Button aria-label="下一个月" disabled={!shiftMonth(selectedMonth,1)} onClick={()=>chooseMonth(shiftMonth(selectedMonth,1)!)}>›</Button><Button size="sm" variant="quiet" onClick={()=>chooseMonth(currentMonth)} disabled={selectedMonth===currentMonth}>本月</Button></div>:customOpen?<div className="usage-period-row"><input className="input" aria-label="统计开始日期" type="date" value={draftFrom} onChange={event=>setDraftFrom(event.target.value)}/><span>至</span><input className="input" aria-label="统计结束日期" type="date" value={draftTo} onChange={event=>setDraftTo(event.target.value)}/><Button variant="primary" disabled={!draftFrom||!draftTo||draftFrom>draftTo} onClick={()=>{applyRange('custom',draftFrom,draftTo);setCustomOpen(false);}}>应用日期</Button></div>:<div className="usage-period-row"><span>{rangeMode==='all'?'全部历史':`${from} — ${to}`}</span><Button size="sm" variant="quiet" onClick={()=>{setDraftFrom(rangeMode==='all'?monthRange(currentMonth)!.from:from);setDraftTo(rangeMode==='all'?day(new Date()):to);setCustomOpen(true);}}>修改日期</Button></div>}</div>
+    <div className="usage-view-tabs"><Seg value={tab} onChange={setTab} options={[{value:'overview',label:'统计'},{value:'history',label:'消费历史'},{value:'prices',label:'实际 Token 单价'}]}/></div>
+    {loading&&tab!=='prices'&&<section className="card usage-cost-placeholder" role="status">正在读取用量与支出记录…</section>}
+    {!loading&&activity&&finance&&tab==='overview'&&<UsageOverview activity={activity} finance={finance} from={from} to={to} vendor={vendor} currency={currency} onCurrency={setCurrency} onAdd={()=>openEditor(vendor||'custom',undefined,true)} onPrices={()=>setTab('prices')} onExport={(contents,suffix)=>void exportCsv(contents,suffix)}/>}
+    {!loading&&finance&&tab==='history'&&<SpendingHistory finance={finance} from={from} to={to} vendor={vendor} currency={currency} onEdit={expense=>{setManager(false);openEditor(expense.vendor,expense,true);}} onAdd={()=>openEditor(vendor||'custom',undefined,true)} onExport={(contents,suffix)=>void exportCsv(contents,suffix)}/>}
     {error&&<Notice tone="error" actions={<Button onClick={()=>setReload(n=>n+1)}>重试</Button>}>{error}</Notice>}
     {!!activity?.errors.length&&<Notice tone="warn">{activity.errors.join("；")}。用量可能不完整，实际均价也会受影响。</Notice>}
     {!!activity?.syncErrors?.length&&<Notice tone="warn">部分同步未完成：{activity.syncErrors.join('；')}。可在设置中重试，本机记录仍保留。</Notice>}
+    {tab==='prices'&&<>
     <div className="my-usage-summary"><section className="card"><span>{rangeMode==='month'?'所选月份':'所选期间'} · Token</span><strong>{loading?'—':count(selectedTokens.total)}</strong><small>{loading?'正在读取用量':`输入 ${count(selectedTokens.input)} · 输出 ${count(selectedTokens.output)}`}</small></section><section className="card"><span>全部历史 · Token</span><strong>{finance?count(finance.lifetimeTokens.total):'—'}</strong><small>{finance?`${count(finance.lifetimeSessions)} 个会话 · 全部设备`:'正在读取历史'}</small><Button size="sm" variant="quiet" onClick={()=>preset('all')}>查看全部历史</Button></section><section className="card"><span>{rangeMode==='month'?'月度费用':'期间费用'} · {partial?'分摊参考':'人民币参考'}</span><strong>{loading?'—':money(referenceCny,'CNY')}</strong><small>{loading?'正在读取费用':summaries.filter(s=>s.known).map(s=>money(s.amount,s.currency)).join(' + ')||'尚未记录费用'}</small></section><section className="card"><span>每百万 Token · 人民币参考</span><strong>{loading?'—':money(effectiveVendorPrice(referenceCny,coveredTokens),'CNY')}</strong><small>{loading?'正在核对费用覆盖':`已记录费用覆盖 ${count(coveredTokens)} Token`}</small></section></div>
     <details className="product-details"><summary>费用覆盖 {pricedRows.length} / {rows.length} 家厂商{partial?' · 含分摊参考':''}<span>统计口径</span></summary><p>均价仅计入已记录费用的日期。{partial?'部分账期按自然日分摊，供期间比较参考。':'完整账期使用整期实付费用。'}用量来自 Token 活动，排除 Trae。</p><p>在设置中开启跨设备同步，即可同步账期、支出与月度汇率。</p></details>
     <details className="card my-usage-fx"><summary>月度汇率参考 <span className="hint">{displayedRate?`${referenceMonth} · $1 ≈ ¥${displayedRate.cnyPerUsd.toFixed(4)}`:`${referenceMonth} · 尚未获取参考`} · 可调整</span></summary><p className="hint">每月固定采用上月末最后一次公布的 ECB 参考值，跨月分别折算；缺少汇率时不猜。原始美元金额保留，不是实际换汇结算价。</p>{fxError&&<Notice tone="warn">{fxError}<Button size="sm" onClick={()=>setFxReload(n=>n+1)}>重试获取</Button></Notice>}<div className="my-usage-fx-list">{fxMonths.map(month=>{const r=rates.find(r=>r.month===month);return <div key={month}><b>{month}</b><span>{r?`$1 ≈ ¥${r.cnyPerUsd.toFixed(4)}`:'待补充'}<small>{r?(r.source==='manual'?'手动固定参考':`ECB · ${r.date}`):'尚无该月参考'}</small></span><Button size="sm" onClick={()=>setFxEdit({month,value:r?String(r.cnyPerUsd):''})}>调整</Button></div>;})}</div></details>
@@ -138,13 +160,14 @@ export function UsageCostsView(){
         <div className="usage-cost-scroll"><table className="vendor-model-table"><thead><tr><th>模型</th><th>Token</th><th>输入 / 输出</th><th>缓存命中</th><th>用量占比</th></tr></thead><tbody>{row.families.map(f=><tr key={f.key}><td><div className="usage-cost-model"><ModelLogo name={f.key} size={22}/><span title={f.variants.map(v=>v.key).join("、")}>{f.key||"未知模型"}{f.variants.length>1&&<small>{f.variants.length} 个运行档位合并显示</small>}</span></div></td><td>{count(f.tokens.total)}</td><td>{count(f.tokens.input)} / {count(f.tokens.output)}</td><td>{count(f.tokens.cached)}</td><td>{row.totals.total?(f.tokens.total/row.totals.total*100).toFixed(1)+"%":"—"}</td></tr>)}</tbody></table></div>
       </div>
     </details>)}
+    </>}
     {fxEdit&&<Modal title={`${fxEdit.month} · 固定汇率参考`} onClose={()=>{if(!fxSaving)setFxEdit(null);}} footer={<><Button disabled={fxSaving} onClick={()=>void saveFx(true)}>恢复官方参考</Button><span className="spacer"/><Button variant="primary" disabled={fxSaving} onClick={()=>void saveFx()}>保存参考</Button></>}><Field label="1 美元折合人民币"><input className="input" type="number" min="0.01" max="100" step="any" value={fxEdit.value} onChange={e=>setFxEdit({...fxEdit,value:e.target.value})}/></Field><p className="hint">手动值会标为个人参考，并固定保存到本机；不会覆盖原始费用。恢复官方参考后重新获取上月末公布值。</p></Modal>}
     {manager&&!edit&&<Modal title="订阅与账期" wide onClose={()=>setManager(false)} footer={<><Button onClick={()=>setManager(false)}>完成</Button><Button variant="primary" disabled={loading} onClick={()=>openEditor(managerVendor||'custom',undefined,true)}><IconPlus size={14}/>添加账期</Button></>}>
       <div className="usage-billing-filters"><Field label="厂商"><select className="select" value={managerVendor} onChange={e=>setManagerVendor(e.target.value)}><option value="">全部厂商</option>{billingVendors.map(([id,name])=><option value={id} key={id}>{name}</option>)}</select></Field><Seg value={managerStatus} onChange={setManagerStatus} options={[{value:'all',label:'全部'},{value:'active',label:'进行中'},{value:'upcoming',label:'未开始'},{value:'ended',label:'已结束'}]}/></div>
       <div className="usage-billing-list">{managedExpenses.length?managedExpenses.map(e=><article className="usage-billing-item" key={`${e.vendor}-${e.from}-${e.to}-${e.currency}`}><div className="usage-billing-brand"><ProviderLogo provider={e.vendor==='custom'?'openai':e.vendor} size={28}/><div><b>{vendorNames[e.vendor]??e.vendor}</b><small>{e.planId?finance?.plans.find(p=>p.id===e.planId)?.name??'订阅套餐':e.subscription!=null?'实付订阅':'按量消费'} · {billStatus(e)==='active'?'进行中':billStatus(e)==='upcoming'?'未开始':'已结束'}</small></div></div><div><b>{e.from} — {e.to}</b><small>订阅 {money(e.subscription,e.currency)} · 按量 {money(e.usage,e.currency)}</small></div><Button size="sm" disabled={loading} onClick={()=>openEditor(e.vendor,e,true)}>编辑账期</Button></article>):<EmptyState icon={<IconWallet size={24}/>} title="暂无匹配账期" desc="添加订阅开始、结束时间和实付费用，即可按月统计。"/>}</div>
     </Modal>}
     {edit&&<Modal title={`${vendorNames[edit.vendor]??edit.vendor} · ${manager?'管理订阅与账期':'记录实际支出'}`} wide onClose={()=>{if(!saving)setEdit(null);}} footer={<>{original?<Button disabled={saving} onClick={()=>void save(true)}>清除此记录</Button>:<Button disabled={saving} onClick={()=>setEdit(null)}>取消</Button>}<span className="spacer"/><Button variant="primary" disabled={saving||!edit.from||!edit.to||edit.from>edit.to} onClick={()=>void save()}>{saving?"保存中…":"保存账期"}</Button></>}>
-      {manager&&!original&&<Field label="厂商"><select className="select" disabled={saving} value={edit.vendor} onChange={e=>{setEdit({...edit,vendor:e.target.value,planId:null,currency:e.target.value==='custom'?'USD':'CNY'});setSubscription('');setUsage('');}}>{billingVendors.map(([id,name])=><option value={id} key={id}>{name}</option>)}</select></Field>}
+      {!original&&<Field label="厂商"><select className="select" disabled={saving} value={edit.vendor} onChange={e=>{setEdit({...edit,vendor:e.target.value,planId:null,currency:e.target.value==='custom'?'USD':'CNY'});setSubscription('');setUsage('');}}>{billingVendors.map(([id,name])=><option value={id} key={id}>{name}</option>)}</select></Field>}
       <Field label="订阅套餐"><select className="select" disabled={saving} value={edit.planId??""} onChange={e=>selectPlan(e.target.value)}><option value="">手动填写实付 / 无订阅</option>{finance?.plans.filter(p=>p.vendor===edit.vendor).map(p=><option value={p.id} key={p.id}>{p.name} · {money(p.amount,p.currency)} / {p.months===12?"年":"月"}</option>)}</select></Field>
       {selectedPlan&&<Notice>{selectedPlan.condition} · 核实于 {selectedPlan.verifiedAt}<Button size="sm" onClick={()=>void api.openExternal(selectedPlan.source).catch(e=>toast(errText(e),"error"))}>官网来源</Button></Notice>}
       <div className="usage-rate-fields"><Field label="订阅 / 消费周期开始"><input className="input" type="date" disabled={saving} value={edit.from} onChange={e=>setEdit({...edit,from:e.target.value,to:selectedPlan?endOfSubscription(e.target.value,selectedPlan.months):edit.to})}/></Field><Field label="周期结束（含当日）" hint="可单独调整；自定义结束时间后按实付记录。"><input className="input" type="date" disabled={saving} min={edit.from} value={edit.to} onChange={e=>setEdit({...edit,to:e.target.value,planId:null})}/></Field></div>

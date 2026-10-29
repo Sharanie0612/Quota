@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { UsageWidget } from './components/UsageWidget';
 import "./styles.css";
+import "./polish.css";
 import { initializeAppearance } from './lib/appearance';
 import { SetupView } from './views/SetupView';
 

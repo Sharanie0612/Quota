@@ -1,12 +1,12 @@
 use chrono::TimeZone;
 use quota_lib::{activity,widget};
 fn main(){
-    assert_eq!(widget::handle_region(292,186,1.0,false),(270,43,292,143));
-    assert_eq!(widget::handle_region(438,279,1.5,true),(0,64,33,214));
+    assert_eq!(widget::handle_region(324,276,1.0,false),(302,88,324,188));
+    assert_eq!(widget::handle_region(486,414,1.5,true),(0,132,33,282));
     assert_eq!(widget::handle_region(10,50,2.0,false),(0,0,10,50));
     assert_eq!(widget::bounds(0,0,1920,1040,1.0,false,false,50),(1898,470,22,100));
-    assert_eq!(widget::bounds(-1920,-100,1920,1040,1.5,true,true,0),(-1920,-100,438,279));
-    assert_eq!(widget::bounds(-1920,0,1920,1040,1.0,true,false,100),(-292,854,292,186));
+    assert_eq!(widget::bounds(-1920,-100,1920,1040,1.5,true,true,0),(-1920,-100,486,414));
+    assert_eq!(widget::bounds(-1920,0,1920,1040,1.0,true,false,100),(-324,764,324,276));
     assert_eq!(widget::bounds(0,0,100,80,2.0,true,false,50),(0,0,100,80));
     println!("PASS edge placement: negative monitor origins, DPI, top/bottom bounds, small work areas");
     let root=std::env::temp_dir().join(format!("quota-widget-check-{}",uuid::Uuid::new_v4()));

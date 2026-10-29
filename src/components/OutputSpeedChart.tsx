@@ -1,19 +1,23 @@
-import {useMemo,useState} from 'react';
+import {useId,useMemo,useState} from 'react';
+import {smoothPath} from '../lib/smoothPath';
 import type {OutputSpeedPoint,OutputSpeedReport} from '../lib/types';
 import {speedBucketLabel,speedSeries,speedTimeTicks,speedValue} from '../lib/outputSpeed';
 import {useChartSize} from '../lib/useChartSize';
 import {ModelLogo} from './ModelLogo';
-export const speedNumber=(n:number|null|undefined)=>n==null?'—':n.toLocaleString('zh-CN',{maximumFractionDigits:1});
+export const speedNumber=(n:number|null|undefined)=>n==null?'—':n.toLocaleString('zh-CN',{maximumFractionDigits:n>0&&n<1?2:1});
 export function speedColor(model:string,models:string[]){
   const palette=['var(--chart-1)','var(--chart-3)','var(--chart-2)','var(--chart-4)','var(--chart-5)','var(--chart-rest)'];
   return palette[Math.max(0,[...models].sort().indexOf(model))%palette.length];
 }
 export function OutputSpeedChart({data,period,onSelectModel}:{data:OutputSpeedReport;period:string;onSelectModel:(model:string)=>void}){
   const size=useChartSize(1000,340);
+  const chartId=useId().replaceAll(':','');
   const [cursor,setCursor]=useState<number|null>(null);
   const series=useMemo(()=>speedSeries(data.points),[data.points]);
   const times=useMemo(()=>[...new Set(data.points.map(p=>p.timestamp))].sort((a,b)=>a-b),[data.points]);
-  const ceiling=Math.max(20,Math.ceil(data.points.reduce((max,p)=>Math.max(max,speedValue(p)??0),0)/20)*20);
+  const maximum=Math.max(20,...data.points.map(point=>speedValue(point)??0));
+  const power=10**Math.floor(Math.log10(maximum/5)),step=([1,2,2.5,5,10].find(value=>value*power>=maximum/5)??10)*power;
+  const ceiling=Math.ceil(maximum/step)*step,yTicks=Array.from({length:Math.round(ceiling/step)+1},(_,i)=>i*step);
   const left=60,right=size.width-22,top=26,bottom=size.height-44;
   const start=data.rangeStart,end=Math.max(start+10_000,data.rangeEnd),grain=data.bucketSeconds*1000;
   const x=(time:number)=>left+Math.max(0,Math.min(1,(time-start)/(end-start)))*(right-left);
@@ -34,12 +38,12 @@ export function OutputSpeedChart({data,period,onSelectModel}:{data:OutputSpeedRe
       onMouseMove={event=>move(event.clientX,event.currentTarget.getBoundingClientRect())}
       onFocus={()=>setCursor(times[times.length-1]??null)} onBlur={()=>setCursor(null)}
       onKeyDown={event=>{if(event.key==='Escape'){setCursor(null);return;}if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();const index=Math.max(0,times.indexOf(cursor??times[times.length-1]!));setCursor(times[Math.max(0,Math.min(times.length-1,index+(event.key==='ArrowLeft'?-1:1)))]??null);}}>
-      {[0,1,2,3,4].map(i=><g key={i}><line x1={left} x2={right} y1={y(ceiling*i/4)} y2={y(ceiling*i/4)} className="speed-grid"/><text x={left-12} y={y(ceiling*i/4)+5} textAnchor="end" className="speed-tick">{speedNumber(ceiling*i/4)}</text></g>)}
+      {yTicks.map(value=><g key={value}><line x1={left} x2={right} y1={y(value)} y2={y(value)} className="speed-grid"/><text x={left-12} y={y(value)+5} textAnchor="end" className="speed-tick">{speedNumber(value)}</text></g>)}
       {ticks.map((at,i)=><text key={at} x={x(at)} y={size.height-10} textAnchor={i===0?'start':i===ticks.length-1?'end':'middle'} className="speed-tick">{timeLabel(at)}</text>)}
-      {series.map(s=><g key={s.model} style={{color:speedColor(s.model,data.models)}}>
-        <path d={s.rows.map((point,i)=>`${i&&point.timestamp-s.rows[i-1].timestamp<=grain?'L':'M'}${center(point)},${y(speedValue(point)!)}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
-        {s.rows.map(point=><circle key={point.timestamp} cx={center(point)} cy={y(speedValue(point)!)} r={cursor===point.timestamp?5:3.5} fill="var(--surface)" stroke="currentColor" strokeWidth="2"/>)}
-      </g>)}
+      {series.map((s,index)=>{const segments:OutputSpeedPoint[][]=[];for(const point of s.rows){const last=segments[segments.length-1];if(last&&point.timestamp-last[last.length-1].timestamp<=grain)last.push(point);else segments.push([point]);}return <g key={s.model} style={{color:speedColor(s.model,data.models)}}>
+        <defs><linearGradient id={`${chartId}-${index}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".13"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs>
+        {segments.map((segment,indexSegment)=>{const points=segment.map(point=>({x:center(point),y:y(speedValue(point)!)})),path=smoothPath(points);return <g key={indexSegment}>{points.length>1&&<path d={`${path}L${points[points.length-1].x},${bottom}L${points[0].x},${bottom}Z`} fill={`url(#${chartId}-${index})`}/>}<path d={path} fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"/>{segment.filter(point=>segment.length===1||cursor===point.timestamp).map(point=><circle key={point.timestamp} cx={center(point)} cy={y(speedValue(point)!)} r={cursor===point.timestamp?5:3.5} fill="var(--surface)" stroke="currentColor" strokeWidth="2.2"/>)}</g>;})}
+      </g>;})}
       {!!active.length&&<line x1={activeX} x2={activeX} y1={top} y2={bottom} className="speed-crosshair"/>}
     </svg>
     {!!active.length&&<div className="speed-tooltip" role="tooltip" style={{left:Math.max(8,Math.min(size.width-320,activeX-155)),top:12}}>

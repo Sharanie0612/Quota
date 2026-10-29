@@ -1,3 +1,4 @@
+pub mod report_export;
 mod aliyun;
 pub mod activity;
 pub mod usage_costs;
@@ -137,6 +138,7 @@ pub fn run() {
             widget::get_widget_options,
             widget::save_widget_options,
             widget::get_widget_usage,
+            widget::get_widget_speed,
             widget::widget_ready,
             widget::set_widget_expanded,
             widget::move_widget,
@@ -144,6 +146,7 @@ pub fn run() {
             exchange::get_exchange_rate,
             usage_fx::get_monthly_usage_fx,
             usage_fx::save_monthly_usage_fx,
+            report_export::export_report_csv,
             activity::get_activity,
             activity::speed::get_output_speed,
             activity::speed_live::refresh_output_speed,

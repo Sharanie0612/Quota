@@ -64,6 +64,7 @@ fn incremental(root:&Path){
  assert_eq!(reader.tick(&dir).unwrap(),0);assert_eq!(speed::report(&dir,"","",0,"").unwrap().summary.samples,0);
  writer.write_all(first[count_start..split].as_bytes()).unwrap();assert_eq!(reader.tick(&dir).unwrap(),0);
  writer.write_all(b"\n").unwrap();assert_eq!(reader.tick(&dir).unwrap(),1);assert_eq!(reader.tick(&dir).unwrap(),0);
+ let live=activity::speed_live::status(&dir);assert_eq!(live.tasks.len(),1);let task=&live.tasks[0];assert_eq!(task.model,"fixture-model");assert_eq!(task.confirmed_output_tokens,200);assert_eq!(task.measured_output_tokens,200);assert_eq!(task.measured_duration_ms,2000);assert_eq!(task.measured_responses,1);
  let report=speed::report_minutes(&dir,"","",0,"",10,30).unwrap();assert_eq!(report.summary.average,Some(100.));assert_eq!(report.summary.duration_ms,2000);assert_eq!(report.recent[0].output_tokens,200);assert_eq!(report.recent[0].speed,100.);assert_eq!(report.by_model.len(),1);assert_eq!(report.coverage.output_records,1);assert_eq!(report.coverage.timed_records,1);
  let mut settings=activity::options(&dir);settings.auto_collect=false;activity::save_options(&dir,&settings).unwrap();writer.write_all(response(t+10_000,2,110,10,(350,50),false).as_bytes()).unwrap();assert_eq!(reader.tick(&dir).unwrap(),0);
  settings.auto_collect=true;activity::save_options(&dir,&settings).unwrap();assert_eq!(reader.tick(&dir).unwrap(),1);writer.write_all(envelope(t+20_000,"event_msg",json!({"type":"task_complete"})).as_bytes()).unwrap();reader.tick(&dir).unwrap();assert_eq!(activity::speed_live::status(&dir).active_requests,0);
@@ -72,7 +73,19 @@ fn incremental(root:&Path){
  let missing=root.join("missing-source");setup(&missing,&root.join("absent"),"00000000-0000-4000-8000-000000000008");let mut unavailable=activity::speed_live::LocalReader::default();unavailable.tick(&missing).unwrap();assert!(!activity::speed_live::status(&missing).errors.is_empty());unavailable.tick(&missing).unwrap();assert!(!activity::speed_live::status(&missing).errors.is_empty());
  println!("PASS incremental tail, pending usage without invented speed, partial JSONL retry, raw-record reconciliation, weighted bins, pause/resume and shared-cursor replay");
 }
+fn stream_metadata(root:&Path){
+ let home=root.join("stream-fixture");fs::create_dir_all(&home).unwrap();
+ assert!(!activity::speed_live::stream_activity(&home,10_000).available);
+ let db=rusqlite::Connection::open(home.join("logs_2.sqlite")).unwrap();
+ db.execute_batch("CREATE TABLE logs(ts INTEGER,ts_nanos INTEGER,target TEXT,feedback_log_body TEXT);CREATE INDEX idx_logs_ts ON logs(ts);").unwrap();
+ for (seconds,nanos,method) in [(5,0,"item/agentMessage/delta"),(9,999_999_999,"item/agentMessage/delta"),(10,0,"item/agentMessage/delta"),(10,1_000_000,"item/agentMessage/delta"),(4,999_999_999,"item/agentMessage/delta"),(9,0,"item/reasoning/delta")] {
+ db.execute("INSERT INTO logs VALUES(?1,?2,'codex_app_server::outgoing_message',?3)",rusqlite::params![seconds,nanos,method]).unwrap();
+ }
+ let value=activity::speed_live::stream_activity(&home,10_000);assert!(value.available);assert_eq!(value.chunks_last_five_seconds,3);assert_eq!(value.last_delta_at,Some(10_000));
+ db.execute_batch("DROP TABLE logs").unwrap();assert!(!activity::speed_live::stream_activity(&home,10_000).available);
+ println!("PASS optional stream schema, five-second metadata window, future/reasoning exclusion and no per-token inference");
+}
 fn main(){
-    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);incremental(&root);
+    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);incremental(&root);stream_metadata(&root);
     if let Some(home)=std::env::args().nth(1){let dir=root.join("live-isolated");setup(&dir,Path::new(&home),OWNER);activity::collect(&dir).unwrap();let report=speed::report(&dir,"","codex",7,"").unwrap();println!("LIVE {}",serde_json::to_string(&report.summary).unwrap());fs::write(root.join("live-speed-report.json"),serde_json::to_vec(&report).unwrap()).unwrap();}
 }

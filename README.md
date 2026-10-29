@@ -23,13 +23,13 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前分支为 1.0.3003**：人民币模型天梯、六维对比、输出速度读取与界面重构，明确已完成输出、时间均值和记录核对。上方固定下载链接由公开发布页管理；本轮是本地交付，macOS 未验收，详见 [交付记录](docs/model-speed-1.0.3003.md)。
+**当前开发版本为 1.0.3100**：重构「我的使用」、消费历史和输出速度，贴边悬浮窗增加模型工作状态，提供白 / 淡蓝 / 深蓝配色与液态玻璃开关。本轮为 Windows 本地交付，公开下载链接仍指向已发布版本；macOS 未完成本轮验收。详见 [交付记录](docs/usage-live-1.0.3100.md)。
 
 ## 开始使用
 
 1. **添加账户**：在「账户总览」选择平台，填入 API Key 或连接官方登录，保存即可。账户名称可选，其他参数收进「高级设置」。
-2. **查看活动**：在「Token 活动」点击「更新用量」，读取本机已有记录。SSH 设备、Trae 和自定义日志目录在「采集设置」中配置。
-3. **按需同步**：在「设置」选择共享目录，各设备使用同一个云盘或 NAS 文件夹；登录信息在每台设备单独配置。
+2. **查看使用与支出**：在「我的使用」选择月份、厂商和币种，添加订阅或按量账期。消费历史可回看已保存的金额变化，当前统计可以导出 CSV。
+3. **开启桌面状态**：在「设置」开启用量悬浮窗，鼠标移入屏幕边缘查看模型工作状态。跨设备使用时选择同一个云盘或 NAS 文件夹；登录信息在各设备单独配置。
 
 充值入口只打开官方页面。统计基于实际保留的记录，不能替代厂商账单或订阅额度。
 
@@ -38,11 +38,21 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 | 页面 | 主要用途 |
 | --- | --- |
 | **账户总览** | 余额、订阅余量、查询状态与低余额提醒；累计充值和消费分别记录 |
-| **我的使用** | 按自然月或自定义日期看用量、订阅支出和实际单价；账期独立管理，美元按固定月度参考汇率折算 |
+| **我的使用** | 按月 / 周 / 自定义范围分析用量与费用，查看历史账期及账户消费，导出 CSV，核对实际 Token 单价 |
 | **AI 模型** | 人民币价格 × 公开配置能力天梯，当前主力、近30天更新测评及六维对比 |
 | **Token 活动** | Codex、ZCode、Harness、可选 Trae 的趋势与环形占比，按来源、模型和设备筛选 |
-| **输出速度** | Codex 客户端输出 tokens/s 曲线，按时间、模型、设备筛选，随活动记录去重同步 |
-| **设置** | 管理配色、采集频率、通知、用量悬浮窗、备份、迁移和跨设备同步 |
+| **输出速度** | 已完成响应的加权速度曲线，按时间、模型、设备筛选；悬浮窗显示当前任务进度 |
+| **设置** | 配色、明暗、液态玻璃、采集频率、通知、悬浮窗、备份和跨设备同步 |
+
+### 我的使用
+
+三个视图共用时间与厂商筛选：
+
+- **统计**：按月、近 7 天、近 90 天、今年、全部或自定义日期查看；趋势可切换费用 / Token，以及日、周、月粒度。模型、厂商、设备用量可分别汇总。
+- **消费历史**：查看完整账期列表，按状态筛选并编辑；账户消费曲线展示厂商返回的累计消费，明细保留消费与充值各自的变化。
+- **实际 Token 单价**：保留厂商与模型明细，按已记录费用和同期覆盖用量计算每百万 Token 的实际成本。美元继续使用固定月度参考汇率。
+
+统计趋势、分组用量和消费历史均可导出当前范围的 CSV。跨期费用按自然日分摊；未记录金额保持空缺，充值不计作消费，历史计数重置时不编造增量。「我的使用」继续排除 Trae；详细规则见 [活动与费用统计](docs/activity-stats.md)。
 
 ### AI 模型
 
@@ -55,7 +65,11 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 ### 输出速度
 
-按客户端实际输出片段计时，排除工具和思考等待；有效输出至少 64 Token、0.5 秒。本机每秒增量读取，完整输出结束后记录速度。按时间范围与粒度显示加权均值，可切换逐条记录核对Token和耗时，支持模型、设备筛选与原账本去重同步。现有日志不提供逐Token计数，不将读取频率称为实时测速。当前接入 Codex，其他 harness 通过相同测量接口扩展。[完整口径](docs/output-speed.md)。
+主页面集中显示时段均速、最近一次输出和已计时次数。曲线支持时间、模型、设备及均值粒度筛选；空档保留，切到「记录」可逐条核对 Token 与耗时。
+
+贴边悬浮窗顶部显示当前模型、任务耗时、已确认输出和本轮均速；多个本机任务可切换查看。本机以 1 秒为目标周期检查新增记录，可用时另显示 Codex 最近 5 秒的接收片段数。
+
+**速度只在响应用量完整后更新。** 接收片段是本机 Codex 的全局活动信号，不能归属到所选模型，也不等于 Token。现有来源不提供逐 Token 计数，不根据字符数、心跳或任务总耗时伪造实时 tokens/s。有效输出至少 64 Token、0.5 秒，均值按输出时长加权。[完整口径](docs/output-speed.md)。
 
 ### Token 活动
 
@@ -69,7 +83,11 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 ### 外观与桌面
 
-默认 Quota 淡蓝白配色，也可选择 Codex、Claude、VS Code、GitHub 配色，并切换明暗或跟随系统。侧边栏支持收起；Windows 主窗口浮动时采用圆角，最大化、全屏及分屏采用直角。Windows 安装器提供中文 / 英文向导、目标目录、安装进度与完成页。
+默认 Quota 使用白色内容区、淡蓝侧栏和深蓝强调色，与 Logo 保持一致。Codex、Claude、VS Code、GitHub 配色分别保留灰阶、暖色、编辑器分区与清晰边线的特点，均支持明暗和跟随系统。
+
+「设置 → 外观 → 液态玻璃」可为导航、工具栏和悬浮窗开启通透材质，默认关闭。它是 Quota 的跨平台视觉实现；Windows 悬浮窗可结合系统 Acrylic，不依赖 Apple 私有接口。系统减少动效或高对比度模式下会降低相关效果。
+
+侧栏收起时先完成布局，再做位移动画，减少图表反复重排。贴边弹窗使用固定画布展开，支持中途反向、拖动贴边及键盘收起。Windows 主窗口保留浮动圆角与最大化 / 分屏直角，安装器保留中文 / 英文向导。
 
 ### 支持的账户
 
@@ -88,29 +106,31 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-以下为 **1.0.3003** 真实前端组件的浏览器预览。账户与活动使用演示数据，模型分数来自本轮公开快照；不代表真实账户、账单或 SSH 查询结果，榜单会随来源更新。
+以下为 **1.0.3100** 构建后的真实前端预览。账户、账期、用量与运行状态使用合成数据；模型资料沿用已有公开快照。不代表个人账单、真实测速或 SSH 验收。
 
-![人民币价格与公开配置能力天梯](assets/readme/ai-models-3003.png)
+![我的使用：时间与厂商筛选、用量与费用趋势](assets/readme/usage-overview-3100.png)
 
 <details>
-<summary>六维对比、输出速度与 Token 占比</summary>
+<summary>消费历史与模型工作状态</summary>
 
-![同一配置的六维能力对比](assets/readme/model-comparison-3003.png)
+![历史账期支出与编辑入口](assets/readme/spending-history-3100.png)
 
-![Codex 模型输出速度曲线](assets/readme/output-speed-3003.png)
+![账户累计消费曲线与充值、消费增量](assets/readme/consumption-records-3100.png)
 
-![逐条核对输出Token、耗时与速度](assets/readme/output-records-3003.png)
+![已完成响应的加权速度趋势](assets/readme/output-speed-3100.png)
 
-![来源、模型和输入缓存的 Token 环形占比图](assets/readme/token-shares-3003.png)
+![贴边悬浮窗中的模型工作状态](assets/readme/live-widget-3100.png)
 
 </details>
 
 <details>
-<summary>配色设置与 Windows 安装向导</summary>
+<summary>保留的模型对比与外观设置</summary>
 
-![Quota 默认淡蓝配色与明暗模式设置](assets/readme/appearance-3003.png)
+![同一配置的六维能力对比](assets/readme/model-comparison-3100.png)
 
-![Windows 安装向导支持语言与升级流程](assets/readme/installer-3003.png)
+![Quota 配色、明暗模式与液态玻璃开关](assets/readme/appearance-3100.png)
+
+![Quota 深色外观](assets/readme/appearance-dark-3100.png)
 
 </details>
 
@@ -136,7 +156,7 @@ npm ci
 npm run tauri dev
 ```
 
-开发端口为 `1420`。尚未合并的功能请切换到对应功能分支；当前 1.0.3003 为 `codex/feat/model-ladder-output-speed`。
+开发端口为 `1420`。本轮本地工作分支为 `codex/feat/usage-live-polish`，尚未推送；不要假定远程仓库已有当前开发版。
 
 | 平台 | 构建入口 | 说明 |
 | --- | --- | --- |
@@ -148,13 +168,17 @@ Windows 详细环境见 [构建指南](docs/build-windows.md)。macOS 构建工�
 ```bash
 npm run typecheck
 npm run build
-cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo check --examples --locked --manifest-path src-tauri/Cargo.toml
 node scripts/verify-logic.cjs
-node scripts/verify-ui-render.cjs
+node scripts/verify-usage-analytics.cjs
+node scripts/verify-vendor-costs.cjs
+node scripts/verify-widget-motion.cjs
 cargo run --release --manifest-path src-tauri/Cargo.toml --example activity_checks
+cargo run --release --manifest-path src-tauri/Cargo.toml --example vendor_cost_checks
+cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_checks
 ```
 
-本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
+本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
 ## 文档与贡献
 

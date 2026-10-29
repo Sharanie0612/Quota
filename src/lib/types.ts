@@ -376,13 +376,15 @@ export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: num
 export interface OutputSpeedPoint { timestamp:number; model:string; outputTokens:number; durationMs:number; samples:number }
 export interface OutputSpeedSummary { average:number|null; median:number|null; p95:number|null; samples:number; outputTokens:number; durationMs:number }
 export interface CompletedOutput { id:string; model:string; device:string; startedAt:number; completedAt:number; outputTokens:number; durationMs:number; speed:number }
+export interface RunningModelTask {id:string;model:string;startedAt:number;lastEventAt:number;confirmedOutputTokens:number;measuredOutputTokens:number;measuredDurationMs:number;measuredResponses:number}
+export interface LiveModelStatus {checkedAt:number|null;lastEventAt:number|null;activeRequests:number;enabled:boolean;sourceConfigured:boolean;filesRead:number;readMs:number;errors:string[];tasks:RunningModelTask[];stream:{available:boolean;lastDeltaAt:number|null;chunksLastFiveSeconds:number}}
 export interface OutputSpeedReport {
   devices:{id:string;name:string}[]; models:string[]; points:OutputSpeedPoint[]; summary:OutputSpeedSummary;
   updatedAt:number; bucketMinutes?:number; bucketSeconds:number; collectionIntervalSeconds:number;
   collectionEnabled:boolean; collectedAt:number|null; errors:string[]; rangeStart:number; rangeEnd:number;
   recent:CompletedOutput[]; byModel:{model:string;summary:OutputSpeedSummary;latestAt:number}[];
   coverage:{outputRecords:number;timedRecords:number}; localMonitoring:boolean;
-  live:{checkedAt:number|null;lastEventAt:number|null;activeRequests:number;enabled:boolean;sourceConfigured:boolean;filesRead:number;readMs:number;errors:string[]};
+  live:LiveModelStatus;
 }
 export interface SshHostDiscovery { hosts: string[]; warnings: string[] }
 export interface SshDevice { host:string; home:string; deviceId:string; name:string; included:boolean; aliases:string[]; error?:string }
@@ -399,6 +401,7 @@ export interface UsageBill { amount: number; currency: string }
 export interface VendorExpense { vendor: string; from: string; to: string; currency: string; subscription: number | null; usage: number | null; planId: string | null }
 export interface SubscriptionPrice { id: string; vendor: string; name: string; currency: string; amount: number; months: number; source: string; verifiedAt: string; condition: string }
 export interface FinanceAccount { id: string; vendor: string; label: string; currency: string; cumulativeRecharge: number | null; cumulativeSpend: number | null; observedRecharge: number | null; observedSpend: number | null; observedFrom: number | null; observedTo: number | null; balanceRises: number; balanceDrops: number; historyFrom: number | null; historyTo: number | null; plan: string | null; issues: string[] }
-export interface VendorCostReport { accounts: FinanceAccount[]; expenses: VendorExpense[]; plans: SubscriptionPrice[]; coveredModels: Record<string, ActivityGroup[]>; lifetimeTokens: ActivityTokens; lifetimeSessions: number; firstDate: string | null; lastDate: string | null }
+export interface CostObservation {accountId:string;vendor:string;label:string;at:number;from:number|null;currency:string;cumulativeSpend:number|null;cumulativeRecharge:number|null;spendDelta:number|null;rechargeDelta:number|null;counterReset:boolean}
+export interface VendorCostReport {history?:CostObservation[]; accounts: FinanceAccount[]; expenses: VendorExpense[]; plans: SubscriptionPrice[]; coveredModels: Record<string, ActivityGroup[]>; lifetimeTokens: ActivityTokens; lifetimeSessions: number; firstDate: string | null; lastDate: string | null }
 export interface MonthlyUsageRate { month: string; cnyPerUsd: number; date: string; source: string }
 export interface MimoLoginStatus { state: "waiting" | "closed" | "connected"; message: string; connectionId: string | null }

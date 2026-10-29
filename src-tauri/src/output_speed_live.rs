@@ -10,6 +10,28 @@ pub const POLL_MS: u64 = 1000;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default, rename_all="camelCase")]
+pub struct RunningTask {
+    pub id:String,pub model:String,pub started_at:i64,pub last_event_at:i64,
+    pub confirmed_output_tokens:u64,pub measured_output_tokens:u64,
+    pub measured_duration_ms:u64,pub measured_responses:u64,
+}
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default, rename_all="camelCase")]
+pub struct StreamActivity {pub available:bool,pub last_delta_at:Option<i64>,pub chunks_last_five_seconds:u64}
+/// Only count notification metadata. Never SELECT diagnostic log bodies, text
+/// deltas, tool outputs or connection identifiers into the application.
+pub fn stream_activity(home:&Path,at:i64)->StreamActivity {
+    let path=home.join("logs_2.sqlite");if !path.is_file(){return Default::default()}
+    let result=(||->rusqlite::Result<StreamActivity>{
+        let db=rusqlite::Connection::open_with_flags(path,rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        db.busy_timeout(Duration::from_millis(80))?;
+        let (chunks,last):(u64,Option<i64>)=db.query_row("SELECT COUNT(*), MAX(ts*1000+ts_nanos/1000000) FROM logs WHERE ts>=?1 AND ts<=?2 AND ts*1000+ts_nanos/1000000>=?3 AND ts*1000+ts_nanos/1000000<=?4 AND target='codex_app_server::outgoing_message' AND feedback_log_body LIKE '%item/agentMessage/delta%'",rusqlite::params![(at-5000)/1000,at/1000,at-5000,at],|row|Ok((row.get::<_,i64>(0)?.max(0) as u64,row.get(1)?)))?;
+        Ok(StreamActivity{available:true,last_delta_at:last,chunks_last_five_seconds:chunks})
+    })();result.unwrap_or_default()
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default, rename_all="camelCase")]
 pub struct Status {
     pub checked_at: Option<i64>,
     pub last_event_at: Option<i64>,
@@ -19,6 +41,8 @@ pub struct Status {
     pub files_read: usize,
     pub read_ms: u64,
     pub errors: Vec<String>,
+    pub tasks:Vec<RunningTask>,
+    pub stream:StreamActivity,
 }
 
 #[derive(Default)]
@@ -26,7 +50,7 @@ pub struct LocalReader {
     home: PathBuf,
     discovered: Option<Instant>,
     signatures: BTreeMap<PathBuf, Option<(u64, SystemTime)>>,
-    active: BTreeMap<PathBuf, (i64, Option<i64>)>,
+    active: BTreeMap<PathBuf, RunningTask>,
     discovery_errors: Vec<String>,
 }
 impl LocalReader {
@@ -74,15 +98,22 @@ impl LocalReader {
                 Ok(count)=>{
                     changed+=count;status.files_read+=1;*signature=Some(current);
                     let c=cursor(connection,&path.to_string_lossy())?;
-                    self.active.insert(path.clone(),(c.speed.last_event_at,c.speed.active_since));
+                    let start=c.speed.active_since.unwrap_or(0);
+                    let (confirmed,measured,duration,responses):(u64,u64,u64,u64)=if start>0 {
+                        connection.query_row("SELECT COALESCE(SUM(MAX(COALESCE(json_extract(body,'$.tokens.output'),0)-COALESCE(json_extract(body,'$.tokens.reasoning'),0),0)),0),COALESCE(SUM(json_extract(body,'$.speed.outputTokens')),0),COALESCE(SUM(json_extract(body,'$.speed.durationMs')),0),SUM(CASE WHEN json_extract(body,'$.speed') IS NOT NULL THEN 1 ELSE 0 END) FROM metrics WHERE json_extract(body,'$.source')='codex' AND json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.timestamp')>=?1 AND json_extract(body,'$.session')=?2 AND json_extract(body,'$.model')=?3",rusqlite::params![start,super::label(&c.session),c.model],|row|Ok((row.get::<_,i64>(0)?.max(0) as u64,row.get::<_,i64>(1)?.max(0) as u64,row.get::<_,i64>(2)?.max(0) as u64,row.get::<_,Option<i64>>(3)?.unwrap_or(0).max(0) as u64))).map_err(|_|"读取当前任务用量失败")?
+                    }else{(0,0,0,0)};
+                    self.active.insert(path.clone(),RunningTask{id:super::hash(&c.session),model:c.model,started_at:start,last_event_at:c.speed.last_event_at,confirmed_output_tokens:confirmed,measured_output_tokens:measured,measured_duration_ms:duration,measured_responses:responses});
                 }
                 Err(error)=>status.errors.push(error),
             }
         }
         let at=now();
         status.checked_at=Some(at);
-        status.last_event_at=self.active.values().map(|(at,_)|*at).filter(|at|*at>0).max();
-        status.active_requests=self.active.values().filter(|(last,start)|start.is_some()&&*last<=at+1000&&at-*last<900_000).count();
+        status.last_event_at=self.active.values().map(|task|task.last_event_at).filter(|at|*at>0).max();
+        status.tasks=self.active.values().filter(|task|task.started_at>0&&task.last_event_at<=at+1000&&at-task.last_event_at<900_000).cloned().collect();
+        status.tasks.sort_by_key(|task|std::cmp::Reverse(task.last_event_at));let mut seen=std::collections::BTreeSet::new();status.tasks.retain(|task|seen.insert(task.id.clone()));status.tasks.truncate(16);
+        status.active_requests=status.tasks.len();
+        status.stream=stream_activity(&home,at);
         status.read_ms=started.elapsed().as_millis() as u64;
         self.save(dir,&status)?;
         Ok(changed)

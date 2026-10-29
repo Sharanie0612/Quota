@@ -1,3 +1,4 @@
+import {listen} from '@tauri-apps/api/event';
 import { useEffect, useRef, useState } from "react";
 import { AccountSheet } from "./components/AccountSheet";
 import { IconChart, IconClock, IconGear, IconSpeed, IconPlus, IconRefresh, IconSpark, IconWallet } from "./components/icons";
@@ -13,6 +14,7 @@ import { OutputSpeedView } from "./views/OutputSpeedView";
 import { SettingsView } from "./views/SettingsView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
+import {useSidebarMotion} from './lib/useSidebarMotion';
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
 import { WorkspaceToolbar } from "./components/WorkspaceToolbar";
@@ -25,10 +27,12 @@ type View = "accounts" | "output-speed" | "activity" | "costs" | "settings" | "a
 
 export default function App() {
   const appearance=useAppearance();
+  const sidebarMotion=useSidebarMotion(appearance.collapsed);
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
 
   const [view, setView] = useState<View>("accounts");
+  useEffect(()=>{const un=listen<string>('navigate-main',event=>{if(['costs','output-speed','activity','settings'].includes(event.payload))setView(event.payload as View);});return()=>{void un.then(stop=>stop());};},[]);
   const nav = useSlidingHighlight<HTMLElement>(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
@@ -89,7 +93,7 @@ export default function App() {
       <LaunchAnimation/>
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>
-      <button type="button" className="sidebar-toggle" aria-label={appearance.collapsed?'展开侧边栏':'收起侧边栏'} aria-expanded={!appearance.collapsed} aria-controls="main-sidebar" title={appearance.collapsed?'展开侧边栏':'收起侧边栏'} onClick={()=>setAppearance({collapsed:!appearance.collapsed})}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>{appearance.collapsed?<path d="m12 9 3 3-3 3"/>:<path d="m16 9-3 3 3 3"/>}</svg></button>
+      <button type="button" className="sidebar-toggle" aria-label={appearance.collapsed?'展开侧边栏':'收起侧边栏'} aria-expanded={!appearance.collapsed} aria-controls="main-sidebar" title={appearance.collapsed?'展开侧边栏':'收起侧边栏'} onClick={()=>{sidebarMotion.capture();setAppearance({collapsed:!appearance.collapsed});}}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>{appearance.collapsed?<path d="m12 9 3 3-3 3"/>:<path d="m16 9-3 3 3 3"/>}</svg></button>
       <aside className="sidebar" id="main-sidebar">
         <div className="brand" data-tauri-drag-region>
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
@@ -106,20 +110,20 @@ export default function App() {
           onClick={() => setView("accounts")}
         >
           <IconWallet size={16} />
-          账户总览
+          <span className="nav-label">账户总览</span>
           <span className="count">{accounts.length || ""}</span>
         </button>
-        <button aria-label="我的使用" title="我的使用" data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconChart size={17}/>我的使用</button>
-        <button aria-label="AI 模型" data-motion-active={view === 'ai-models'} className={`nav-item${view === 'ai-models'?' active':''}`} onClick={()=>setView('ai-models')} title="AI 模型"><IconSpark size={17}/>AI 模型</button>
-        <button aria-label="Token 活动" title="Token 活动" data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/>Token 活动</button>
-        <button aria-label="输出速度" title="输出速度" data-motion-active={view === "output-speed"} className={`nav-item${view === "output-speed" ? " active" : ""}`} onClick={() => setView("output-speed")}><IconSpeed size={17}/>输出速度</button>
+        <button aria-label="我的使用" title="我的使用" data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconChart size={17}/><span className="nav-label">我的使用</span></button>
+        <button aria-label="AI 模型" data-motion-active={view === 'ai-models'} className={`nav-item${view === 'ai-models'?' active':''}`} onClick={()=>setView('ai-models')} title="AI 模型"><IconSpark size={17}/><span className="nav-label">AI 模型</span></button>
+        <button aria-label="Token 活动" title="Token 活动" data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/><span className="nav-label">Token 活动</span></button>
+        <button aria-label="输出速度" title="输出速度" data-motion-active={view === "output-speed"} className={`nav-item${view === "output-speed" ? " active" : ""}`} onClick={() => setView("output-speed")}><IconSpeed size={17}/><span className="nav-label">输出速度</span></button>
         <button data-motion-active={view === "settings"}
           aria-label="设置" title="设置"
           className={`nav-item${view === "settings" ? " active" : ""}`}
           onClick={() => setView("settings")}
         >
           <IconGear size={16} />
-          设置
+          <span className="nav-label">设置</span>
         </button>
         </nav>
 
@@ -133,11 +137,11 @@ export default function App() {
         </div>
       </aside>
 
-      <main className={`main${view==='ai-models'||view==='output-speed'?' main-wide':''}`}>
+      <main ref={sidebarMotion.ref} className={`main${view==='ai-models'||view==='output-speed'||view==='costs'?' main-wide':''}`}>
         <WorkspaceToolbar onUsage={() => setView('costs')} onSync={() => setView('settings')}/>
         <div className="content" ref={contentRef}>
           <div className="view-transition" key={view}>
-        {view!=='ai-models'&&view!=='output-speed'&&<header className="page-heading content-inner">
+        {view!=='ai-models'&&view!=='output-speed'&&view!=='costs'&&<header className="page-heading content-inner">
           <div className="page-heading-text"><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>
           <div className="page-actions">
           {view === "accounts" ? (

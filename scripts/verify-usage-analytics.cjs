@@ -1,0 +1,37 @@
+// Exercise accounting boundaries and the distinction between live signals and measured speed.
+const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert/strict');
+function load(file){const exports={};const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;new Function('exports',js)(exports);return exports;}
+const {usageBuckets,reportCsv,filteredObservations}=load('src/lib/usageAnalytics.ts');
+const bill=(vendor,from,to,currency,subscription,usage)=>({vendor,from,to,currency,subscription,usage,planId:null});
+const bills=[bill('custom','2024-02-15','2024-03-14','USD',29,null),bill('custom','2024-02-15','2024-03-14','CNY',null,58),bill('deepseek','2024-02-15','2024-03-14','CNY',0,null)];
+const daily=[{key:'2024-02-29',tokens:{total:200}},{key:'2024-03-01',tokens:{total:300}}];
+const usd=usageBuckets(bills,daily,'2024-02-01','2024-03-31','month','USD','custom');
+assert.equal(usd.error,'');assert.deepEqual(usd.buckets.map(b=>[b.subscription,b.usage,b.tokens]),[[15,0,200],[14,0,300]]);
+assert(usd.buckets.every(b=>b.hasSubscription&&!b.hasUsage));
+const yuan=usageBuckets(bills,daily,'2024-02-29','2024-03-01','day','CNY','custom');
+assert.deepEqual(yuan.buckets.map(b=>[b.subscription,b.usage,b.tokens]),[[0,2,200],[0,2,300]]);
+assert(yuan.buckets.every(b=>!b.hasSubscription&&b.hasUsage));
+const free=usageBuckets(bills,[],'2024-02-14','2024-02-15','day','CNY','deepseek').buckets;
+assert.equal(free[0].hasCost,false);assert.equal(free[1].hasCost,true);assert.equal(free[1].subscription,0);
+const weeks=usageBuckets(bills,daily,'2024-02-28','2024-03-06','week','USD','custom').buckets;
+assert.deepEqual(weeks.map(b=>[b.from,b.to]),[['2024-02-28','2024-03-03'],['2024-03-04','2024-03-06']]);
+assert.equal(weeks.reduce((n,b)=>n+b.subscription,0),8);
+assert(usageBuckets([],[],'2020-01-01','2026-01-01','day','CNY').error);
+assert(usageBuckets([],[],'2024-02-02','2024-02-01','day','CNY').error);
+assert(!usageBuckets([bill('custom','9998-01-01','9998-02-01','USD',20,null)],[],'9998-01-01','9998-02-01','month','USD').buckets.some(b=>b.hasCost));
+const csv=reportCsv(['a','b'],[['=SUM(A1)','文,字"'],[null,0],['\t=1',' +cmd']]);
+assert(csv.startsWith('\uFEFF'));assert(csv.includes('"\'=SUM(A1)"'));assert(csv.includes('"文,字"""'));assert(csv.includes('"","0"'));assert(csv.includes('"\' +cmd"'));
+assert.equal(filteredObservations([{label:'工作账户',vendor:'custom',currency:'USD',at:1,accountId:'a'},{label:'工作账户',vendor:'custom',currency:'CNY',at:2,accountId:'a'}],'custom','USD','工作').length,1);
+console.log('PASS leap-day proration, weekly boundaries, currency/vendor isolation, future bills, missing vs free, bounded range and spreadsheet-safe CSV');
+const {liveModelState}=load('src/lib/liveModel.ts');
+const now=100000,task={id:'a',model:'a',startedAt:1000,confirmedOutputTokens:400,measuredOutputTokens:300,measuredDurationMs:2500,measuredResponses:2};
+const status={checkedAt:now,enabled:true,sourceConfigured:true,errors:[],tasks:[task],stream:{available:true,lastDeltaAt:now,chunksLastFiveSeconds:15}};
+assert.equal(liveModelState(status,now).speed,120);assert.equal(liveModelState(status,now).phase,'模型工作中');
+assert.equal(liveModelState({...status,tasks:[{...task,measuredResponses:0}]},now).speed,null);
+assert.equal(liveModelState({...status,enabled:false},now).speed,null);
+assert.equal(liveModelState(status,now+6100).speed,null);
+assert.equal(liveModelState({...status,errors:['blocked']},now).phase,'读取异常');
+assert.equal(liveModelState({...status,tasks:[]},now).phase,'Codex 正在输出');
+assert.equal(liveModelState({...status,tasks:[],stream:{...status.stream,lastDeltaAt:now+5000}},now).receiving,false);
+assert.equal(liveModelState({...status,tasks:[task,{...task,id:'b',model:'b'}]},now,'b').task.model,'b');
+console.log('PASS weighted measured speed, pending response, stale/paused/error handling, global stream signal and task selection');

@@ -1239,12 +1239,13 @@ pub fn app_info(state: State<'_, AppState>) -> serde_json::Value {
 }
 
 #[tauri::command]
-pub fn show_main_window(app: AppHandle, account: Option<String>) {
+pub fn show_main_window(app: AppHandle, account: Option<String>,view:Option<String>) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+    if let Some(view)=view.filter(|v|matches!(v.as_str(),"output-speed"|"activity"|"costs"|"settings")){let _=app.emit("navigate-main",view);}
     // 可按账户 id 定位编辑面板
     if let Some(id) = account.filter(|s| !s.trim().is_empty()) {
         let _ = app.emit("focus-account", id);

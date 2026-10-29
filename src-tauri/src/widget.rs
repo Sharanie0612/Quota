@@ -6,6 +6,8 @@ use tauri::PhysicalSize;
 use crate::commands::AppState;
 
 pub const LABEL: &str = "usage-widget";
+pub const EXPANDED_WIDTH: f64 = 324.0;
+pub const EXPANDED_HEIGHT: f64 = 276.0;
 #[derive(Default)]
 struct DragOrigin(std::sync::Mutex<Option<(PhysicalPosition<i32>,f64)>>);
 #[derive(Clone, Serialize, Deserialize)]
@@ -21,8 +23,8 @@ pub fn options(app: &tauri::AppHandle) -> Options {
 /// Physical work-area coordinates; supports negative monitor origins and per-monitor DPI.
 pub fn bounds(x: i32, y: i32, width: u32, height: u32, scale: f64, expanded: bool, left: bool, percent: u8) -> (i32,i32,u32,u32) {
     let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
-    let w = ((if expanded { 292.0 } else { 22.0 }) * scale).round().max(1.0).min(width.max(1) as f64) as u32;
-    let h = ((if expanded { 186.0 } else { 100.0 }) * scale).round().max(1.0).min(height.max(1) as f64) as u32;
+    let w = ((if expanded { EXPANDED_WIDTH } else { 22.0 }) * scale).round().max(1.0).min(width.max(1) as f64) as u32;
+    let h = ((if expanded { EXPANDED_HEIGHT } else { 100.0 }) * scale).round().max(1.0).min(height.max(1) as f64) as u32;
     let top = (height as f64 * f64::from(percent.min(100)) / 100.0 - h as f64 / 2.0).round().max(0.0).min(height.saturating_sub(h) as f64) as i32;
     (if left { x } else { x.saturating_add(width.saturating_sub(w) as i32) }, y.saturating_add(top), w, h)
 }
@@ -74,12 +76,13 @@ pub fn handle_region(width:u32,height:u32,scale:f64,left:bool)->(i32,i32,i32,i32
 pub fn setup(app: &tauri::AppHandle) -> tauri::Result<()> {
     app.manage(DragOrigin::default());
     WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?window=usage-widget".into()))
-        .title("Quota 用量悬浮窗").inner_size(if cfg!(windows){292.0}else{22.0},if cfg!(windows){186.0}else{100.0}).decorations(false).shadow(false)
+        .title("Quota 用量悬浮窗").inner_size(if cfg!(windows){EXPANDED_WIDTH}else{22.0},if cfg!(windows){EXPANDED_HEIGHT}else{100.0}).decorations(false).shadow(false)
         .transparent(true).background_color(tauri::window::Color(0,0,0,0))
         .resizable(false).maximizable(false).minimizable(false).always_on_top(true)
         .skip_taskbar(true).focused(false).visible(false).incognito(true)
         .on_navigation(|url| matches!(url.host_str(),Some("tauri.localhost"|"localhost"|"127.0.0.1")) || url.scheme()=="tauri")
         .build()?;
+    if let Some(prefs)=crate::appearance::load(app.state::<AppState>().store.dir()){crate::appearance::apply_widget_material(app,prefs.glass);}
     Ok(())
 }
 #[tauri::command]
@@ -129,6 +132,10 @@ pub fn move_widget(app:tauri::AppHandle,window:tauri::WebviewWindow,dx:f64,dy:f6
 pub async fn get_widget_usage(app: tauri::AppHandle) -> Result<crate::activity::UsageSummary,String> {
     tauri::async_runtime::spawn_blocking(move || crate::activity::usage_summary(app.state::<AppState>().store.dir())).await.map_err(|_| "读取用量失败")?
 }
+#[tauri::command]
+pub fn get_widget_speed(app:tauri::AppHandle)->crate::activity::speed_live::Status {
+    crate::activity::speed_live::status(app.state::<AppState>().store.dir())
+}
 
 /// Integration checks run inside the packaged executable because bare Tauri test
 /// executables cannot load this machine's WinRT API set. Never run on personal data.
@@ -154,6 +161,14 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
                 let pos=win.inner_position().map_err(|_|"无法读取位置")?;let size=win.inner_size().map_err(|_|"无法读取大小")?;
                 if (pos.x,pos.y,size.width,size.height)!=(x,y,w,h){return Err(format!("窗口几何不符: {:?} != {:?}",(pos.x,pos.y,size.width,size.height),(x,y,w,h)));}
                 #[cfg(windows)] check_region(&win,expanded,false)?;
+            }
+            for expanded in [false,true] {
+                set_widget_expanded(app.clone(),win.clone(),expanded)?;
+                for glass in [true,false] {
+                    crate::appearance::apply_widget_material(&app,glass);
+                    std::thread::sleep(std::time::Duration::from_millis(150));
+                    #[cfg(windows)] check_region(&win,expanded,false)?;
+                }
             }
             if set_widget_expanded(app.clone(),main.clone(),true).is_ok(){return Err("窗口身份保护失效".into());}
             if move_widget(app.clone(),main.clone(),0.0,0.0,true).is_ok(){return Err("移动窗口身份保护失效".into());}
@@ -186,7 +201,7 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
             Ok(())
         };
         let result=check();let ok=result.is_ok();
-        let evidence=serde_json::json!({"ok":ok,"error":result.err(),"checks":["frontend-ready","frameless-topmost","native-size-position","fixed-hover-viewport","collapsed-hit-region","repeat-expand-collapse","drag-save-collapse","left-right-docking","window-identity","close-to-tray","single-instance-restore","disabled-hidden"],"exitOnMainCloseExpected":true});
+        let evidence=serde_json::json!({"ok":ok,"error":result.err(),"checks":["frontend-ready","frameless-topmost","native-size-position","fixed-hover-viewport","collapsed-hit-region","repeat-expand-collapse","glass-material-hit-region","drag-save-collapse","left-right-docking","window-identity","close-to-tray","single-instance-restore","disabled-hidden"],"exitOnMainCloseExpected":true});
         let state=app.state::<AppState>();let _=crate::storage::write_atomic(&state.store.dir().join("widget-native-check.json"),&evidence.to_string());
         if ok {if let Some(main)=app.get_webview_window("main"){let _=main.close();}else{app.exit(1);}}else{app.exit(1);}
     });

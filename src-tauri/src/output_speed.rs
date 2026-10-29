@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::Path};
 use tauri::Manager;
+pub const COLLECTION_INTERVAL_SECONDS:u64=10;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -107,12 +108,19 @@ pub struct Summary {
 #[serde(rename_all = "camelCase")]
 pub struct Report {
     pub devices: Vec<OptionsDevice>, pub models: Vec<String>, pub points: Vec<Point>, pub summary: Summary, pub updated_at: i64, pub bucket_minutes: u32,
+    pub bucket_seconds:u32,pub collection_interval_seconds:u64,pub collection_enabled:bool,pub collected_at:Option<i64>,pub errors:Vec<String>,pub range_start:i64,pub range_end:i64,
 }
 pub fn report(dir: &Path, device: &str, source: &str, days: u32, model: &str) -> Result<Report, String> {
+    report_window(dir,device,source,days,model,0,0)
+}
+pub fn report_window(dir:&Path,device:&str,source:&str,days:u32,model:&str,resolution:u32,lookback_hours:u32)->Result<Report,String>{
+    if ![0,10,60,300,3600,21600,86400].contains(&resolution)||lookback_hours>24{return Err("输出速度时间范围无效".into())}
     let db = database(dir)?; let settings = options(dir); let excluded = settings.excluded_devices();
+    let range_end=now();let rolling=if lookback_hours>0{Some(range_end-i64::from(lookback_hours)*3_600_000)}else{None};
     let today = chrono::Local::now().date_naive();
-    let first = if days > 0 { today.checked_sub_days(chrono::Days::new((days-1).into())) } else { None };
-    let bucket_minutes=if days==1{5}else{60};let bucket_ms=i64::from(bucket_minutes)*60_000;
+    let first = if lookback_hours==0 && days > 0 { today.checked_sub_days(chrono::Days::new((days-1).into())) } else { None };
+    let bucket_seconds=if resolution>0{resolution}else if lookback_hours>0{60}else if days==1{300}else if days==0{86400}else if days>=30{21600}else{3600};
+    let bucket_minutes=bucket_seconds/60;let bucket_ms=i64::from(bucket_seconds)*1000;
     let mut statement = db.prepare("SELECT body FROM metrics WHERE json_extract(body,'$.speed') IS NOT NULL").map_err(|_| "读取输出速度失败")?;
     let rows = statement.query_map([], |row| row.get::<_, String>(0)).map_err(|_| "读取输出速度失败")?;
     let mut available = std::collections::BTreeSet::new(); let mut rates = Vec::<f64>::new();
@@ -121,14 +129,16 @@ pub fn report(dir: &Path, device: &str, source: &str, days: u32, model: &str) ->
         let event: Metric = serde_json::from_str(&row.map_err(|_| "读取输出速度失败")?).map_err(|_| "输出速度记录损坏")?;
         let Some(sample) = &event.speed else { continue };
         if !sample.valid(&event) || excluded.contains(&event.device) || (!device.is_empty() && device != event.device) || (!source.is_empty() && source != event.source) { continue; }
-        let Some(time) = chrono::DateTime::from_timestamp_millis(event.timestamp) else { continue };
+        let Some(time) = chrono::DateTime::from_timestamp_millis(sample.completed_at) else { continue };
         let date = time.with_timezone(&chrono::Local).date_naive();
-        if date > today || first.is_some_and(|first| date < first) { continue; }
+        if date > today || first.is_some_and(|first| date < first)||rolling.is_some_and(|first|sample.completed_at<first)||sample.completed_at>range_end { continue; }
         available.insert(event.model.clone());
         if !model.is_empty() && model != event.model { continue; }
         rates.push(sample.output_tokens as f64 * 1000. / sample.duration_ms as f64);
         summary.samples += 1; summary.output_tokens = summary.output_tokens.saturating_add(sample.output_tokens); duration = duration.saturating_add(sample.duration_ms);
-        let hour = event.timestamp.div_euclid(bucket_ms) * bucket_ms;
+        let local_ms=time.with_timezone(&chrono::Local).naive_local().and_utc().timestamp_millis();
+        let hour=chrono::DateTime::from_timestamp_millis(local_ms.div_euclid(bucket_ms)*bucket_ms)
+            .and_then(|date|date.naive_utc().and_local_timezone(chrono::Local).earliest()).map(|date|date.timestamp_millis()).unwrap_or(sample.completed_at.div_euclid(bucket_ms)*bucket_ms);
         let point = buckets.entry((hour, event.model.clone())).or_insert_with(|| Point { timestamp:hour, model:event.model.clone(), ..Default::default() });
         point.output_tokens = point.output_tokens.saturating_add(sample.output_tokens); point.duration_ms = point.duration_ms.saturating_add(sample.duration_ms); point.samples += 1;
     }
@@ -139,9 +149,11 @@ pub fn report(dir: &Path, device: &str, source: &str, days: u32, model: &str) ->
         summary.median = Some(if rates.len()%2 == 0 { (rates[middle-1]+rates[middle])/2. } else { rates[middle] });
         summary.p95 = Some(rates[((rates.len() as f64 * 0.95).ceil() as usize).saturating_sub(1)]);
     }
-    Ok(Report { devices:known_device_names(&db,&settings)?.into_iter().filter(|d|!excluded.contains(&d.id)).collect(), models:available.into_iter().collect(), points:buckets.into_values().collect(), summary, updated_at:now(),bucket_minutes })
+    let range_start=rolling.or_else(||first.and_then(|date|date.and_hms_opt(0,0,0)?.and_local_timezone(chrono::Local).earliest().map(|d|d.timestamp_millis()))).unwrap_or_else(||buckets.keys().next().map(|(time,_)|*time).unwrap_or(range_end-3_600_000));
+    let status:Value=std::fs::read(dir.join("output-speed-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+    Ok(Report { devices:known_device_names(&db,&settings)?.into_iter().filter(|d|!excluded.contains(&d.id)).collect(), models:available.into_iter().collect(), points:buckets.into_values().collect(), summary, updated_at:range_end,bucket_minutes,bucket_seconds,collection_interval_seconds:COLLECTION_INTERVAL_SECONDS,collection_enabled:settings.auto_collect,collected_at:status["collectedAt"].as_i64(),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),range_start,range_end })
 }
 #[tauri::command]
-pub async fn get_output_speed(app:tauri::AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>) -> Result<Report,String> {
-    tauri::async_runtime::spawn_blocking(move || report(app.state::<AppState>().store.dir(),&device.unwrap_or_default(),&source.unwrap_or_default(),days.unwrap_or(7),&model.unwrap_or_default())).await.map_err(|_| "读取输出速度失败")?
+pub async fn get_output_speed(app:tauri::AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,bucket_seconds:Option<u32>,lookback_hours:Option<u32>) -> Result<Report,String> {
+    tauri::async_runtime::spawn_blocking(move || report_window(app.state::<AppState>().store.dir(),&device.unwrap_or_default(),&source.unwrap_or_default(),days.unwrap_or(7),&model.unwrap_or_default(),bucket_seconds.unwrap_or(0),lookback_hours.unwrap_or(0))).await.map_err(|_| "读取输出速度失败")?
 }

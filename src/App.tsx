@@ -133,11 +133,11 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main">
+      <main className={`main${view==='ai-models'||view==='output-speed'?' main-wide':''}`}>
         <WorkspaceToolbar onUsage={() => setView('costs')} onSync={() => setView('settings')}/>
         <div className="content" ref={contentRef}>
           <div className="view-transition" key={view}>
-        <header className="page-heading content-inner">
+        {view!=='ai-models'&&view!=='output-speed'&&<header className="page-heading content-inner">
           <div className="page-heading-text"><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>
           <div className="page-actions">
           {view === "accounts" ? (
@@ -155,7 +155,7 @@ export default function App() {
             添加账户
           </Button> : null}
           </div>
-        </header>
+        </header>}
           {info?.storageIssues?.length ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
               <Notice tone="error" actions={<Button size="sm" onClick={() => setView("settings")}>查看配置目录</Button>}>

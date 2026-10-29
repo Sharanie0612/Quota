@@ -23,6 +23,9 @@ fn synthetic(root:&Path){
     let path=home.join("sessions/fixture.jsonl");fs::write(&path,&log).unwrap();activity::collect(&dir).unwrap();
     let report=speed::report(&dir,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.summary.output_tokens,300);assert!((report.summary.average.unwrap()-120.).abs()<1e-9);assert_eq!(report.summary.median,Some(150.));assert_eq!(report.summary.p95,Some(200.));assert_eq!(report.points.len(),1);
     assert_eq!(speed::report(&dir,"","codex",0,"another-model").unwrap().summary.samples,0);
+    let detailed=speed::report_window(&dir,"","codex",0,"",10,0).unwrap();assert_eq!(detailed.points.len(),2);assert_eq!(detailed.summary.average,Some(120.));assert_eq!(detailed.points.iter().map(|p|p.output_tokens).sum::<u64>(),300);
+    assert!(speed::report_window(&dir,"","codex",0,"",13,0).is_err());
+    assert_eq!(chrono::DateTime::from_timestamp_millis(report.points[0].timestamp).unwrap().with_timezone(&chrono::Local).format("%H:%M").to_string(),"00:00");
     assert_eq!(speed::report(&dir,"","codex",1,"").unwrap().bucket_minutes,5);
     assert_eq!(speed::report(&dir,"","codex",7,"").unwrap().bucket_minutes,60);
     let tokens=activity::report(&dir,None,None,None).unwrap().totals.tokens.total;assert_eq!(tokens,3390);
@@ -39,7 +42,18 @@ fn synthetic(root:&Path){
     let mut cursor=activity::Cursor::default();for line in [envelope(t,"session_meta",json!({"id":"untimed"})),envelope(t+1,"turn_context",json!({"model":"unknown"})),envelope(t+2,"token_usage_record",json!({"response_id":"untimed","usage":{"output_tokens":40,"reasoning_output_tokens":0}})),envelope(t+3,"event_msg",json!({"type":"token_count","info":{"total_token_usage":{"input_tokens":1,"output_tokens":40,"total_tokens":41}}}))]{if let Some(event)=activity::parse_codex(&serde_json::from_str(&line).unwrap(),&mut cursor,OWNER){assert!(event.speed.is_none());}}
     println!("PASS weighted throughput, reasoning/tool exclusion, missing timing, replay migration, old-client sync, deduplication, excluded devices and private-content rejection");
 }
+fn fast_cycle(root:&Path){
+ let dir=root.join("fast");let home=root.join("fast-logs");fs::create_dir_all(home.join("sessions")).unwrap();setup(&dir,&home,OWNER);
+ let t=chrono::Utc::now().timestamp_millis()-8000;let path=home.join("sessions/fast.jsonl");
+ let first=envelope(t,"session_meta",json!({"id":"fast-fixture"}))+&envelope(t+1,"turn_context",json!({"model":"fast-model"}))+&response(t,1,240,40,(240,40),false);
+ fs::write(&path,&first).unwrap();assert_eq!(activity::collect_output_speed(&dir).unwrap(),1);
+ let mut settings=activity::options(&dir);settings.auto_collect=false;activity::save_options(&dir,&settings).unwrap();fs::write(&path,first+&response(t+4000,2,110,10,(350,50),false)).unwrap();
+ assert_eq!(activity::collect_output_speed(&dir).unwrap(),0);assert_eq!(speed::report(&dir,"","",0,"").unwrap().summary.samples,1);
+ settings.auto_collect=true;activity::save_options(&dir,&settings).unwrap();assert_eq!(activity::collect_output_speed(&dir).unwrap(),1);assert_eq!(activity::collect_output_speed(&dir).unwrap(),0);assert_eq!(activity::collect(&dir).unwrap(),0);
+ let report=speed::report_window(&dir,"","",1,"",10,1).unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.summary.average,Some(120.));assert_eq!(report.collection_interval_seconds,10);assert!(report.collected_at.is_some());assert_eq!(activity::report(&dir,None,None,None).unwrap().totals.tokens.total,2350);
+ println!("PASS fast Codex collection, pause/resume, shared ledger deduplication, 10-second buckets and local calendar aggregation");
+}
 fn main(){
-    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);
+    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);
     if let Some(home)=std::env::args().nth(1){let dir=root.join("live-isolated");setup(&dir,Path::new(&home),OWNER);activity::collect(&dir).unwrap();let report=speed::report(&dir,"","codex",7,"").unwrap();println!("LIVE {}",serde_json::to_string(&report.summary).unwrap());fs::write(root.join("live-speed-report.json"),serde_json::to_vec(&report).unwrap()).unwrap();}
 }

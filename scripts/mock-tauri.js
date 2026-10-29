@@ -713,10 +713,14 @@
         case 'get_appearance': return window.demoAppearance ?? null;
         case 'get_output_speed': {
           if(window.demoSpeedReport)return window.demoSpeedReport;
-          const models=['gpt-6.1-sol','gpt-6-astra'];
+          const models=['gpt-6.1-sol','gpt-6-astra'],now=Date.now();
+          const bucketSeconds=Number(args.bucketSeconds)||(args.lookbackHours?60:args.days===1?300:args.days===0?86400:args.days>=30?21600:3600);
+          const span=args.lookbackHours?3600000:args.days===1?86400000:args.days===0?90*86400000:args.days*86400000;
           const empty=new URLSearchParams(location.search).get('speedCase')==='empty';
-          const points=empty?[]:Array.from({length:32},(_,i)=>models.map((model,j)=>({timestamp:Date.now()-((31-i)*3600000),model,outputTokens:Math.round((72+j*18+Math.sin(i/3+j)*12)*4000),durationMs:4000000,samples:20+i%7}))).flat().filter(p=>!args.model||p.model===args.model);
-          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points,summary:{average:empty?null:83.2,median:empty?null:80.4,p95:empty?null:112.7,samples:empty?0:824,outputTokens:empty?0:281303},updatedAt:Date.now()};
+          const raw=empty?[]:Array.from({length:96},(_,i)=>models.map((model,j)=>({timestamp:Math.floor((now-span*(95-i)/96)/(bucketSeconds*1000))*bucketSeconds*1000,model,outputTokens:Math.round((72+j*18+Math.sin(i/9+j)*12)*30),durationMs:30000,samples:3}))).flat().filter(p=>(!args.model||p.model===args.model)&&(!args.device||args.device!=='demo-b'||p.model==='gpt-6-astra'));
+          const groups=new Map();for(const point of raw){const key=point.timestamp+'|'+point.model;const previous=groups.get(key);if(previous){previous.outputTokens+=point.outputTokens;previous.durationMs+=point.durationMs;previous.samples+=point.samples;}else groups.set(key,{...point});}const points=[...groups.values()];
+          const duration=points.reduce((sum,p)=>sum+p.durationMs,0),outputTokens=points.reduce((sum,p)=>sum+p.outputTokens,0),rates=points.map(p=>p.outputTokens*1000/p.durationMs).sort((a,b)=>a-b);
+          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points,summary:{average:duration?outputTokens*1000/duration:null,median:rates.length?rates[Math.floor(rates.length/2)]:null,p95:rates.length?rates[Math.ceil(rates.length*.95)-1]:null,samples:points.reduce((sum,p)=>sum+p.samples,0),outputTokens},updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:10,collectionEnabled:true,collectedAt:now,errors:[],rangeStart:now-span,rangeEnd:now};
         }
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_benchmarks':
@@ -736,7 +740,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3001',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3002',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -996,7 +1000,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3001",
+            version: "1.0.3002",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

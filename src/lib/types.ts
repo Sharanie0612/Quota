@@ -374,7 +374,7 @@ export type RechargeEvent = {
 export interface ActivityTokens { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; total: number }
 export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
 export interface OutputSpeedPoint {timestamp:number;model:string;outputTokens:number;durationMs:number;samples:number}
-export interface OutputSpeedReport {devices:{id:string;name:string}[];models:string[];points:OutputSpeedPoint[];summary:{average:number|null;median:number|null;p95:number|null;samples:number;outputTokens:number};updatedAt:number;bucketMinutes?:number}
+export interface OutputSpeedReport {devices:{id:string;name:string}[];models:string[];points:OutputSpeedPoint[];summary:{average:number|null;median:number|null;p95:number|null;samples:number;outputTokens:number};updatedAt:number;bucketMinutes?:number;bucketSeconds:number;collectionIntervalSeconds:number;collectionEnabled:boolean;collectedAt:number|null;errors:string[];rangeStart:number;rangeEnd:number}
 export interface SshHostDiscovery { hosts: string[]; warnings: string[] }
 export interface SshDevice { host:string; home:string; deviceId:string; name:string; included:boolean; aliases:string[]; error?:string }
 export interface SshIdentity { host:string; home:string; deviceId:string; name:string; error:string|null }

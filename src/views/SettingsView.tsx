@@ -137,7 +137,8 @@ export function SettingsView({
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
         <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
-        <div className="setting-row"><div className="txt"><b>采集频率</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        <div className="setting-row"><div className="txt"><b>完整采集周期</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,10,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,10,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        <div className="setting-row"><div className="txt"><b>Codex 输出速度采集</b></div><span>每10秒</span></div>
         {activityError && <Notice tone="warn">{activityError}</Notice>}
       </div>
       <div className="card section">

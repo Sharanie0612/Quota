@@ -533,13 +533,10 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     let mut o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
     let mut errors=Vec::new();let mut count=0;
-    count+=collect_codex(&mut db,Path::new(&o.codex_home),&o.device_id,&mut errors);
+    count+=collect_codex_sources(dir,&mut db,&mut o,&mut errors)?;
     for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
     if o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
-    let mut devices=o.ssh_devices();
-    count+=ssh::collect_devices(&mut db,&mut devices,&mut errors);
-    o.codex_ssh_devices=Some(devices);save_options(dir,&o)?;
     let sync_errors:Vec<String>=if sync_enabled {
         sync(dir,&mut db,&o).err().into_iter().collect()
     } else {
@@ -548,6 +545,20 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     };
     errors.extend(sync_errors.iter().cloned());
     crate::storage::write_atomic(&dir.join("activity-status.json"),&serde_json::json!({"at":now(),"errors":errors,"syncErrors":sync_errors}).to_string())?;Ok(count)
+}
+fn collect_codex_sources(dir:&Path,db:&mut Connection,o:&mut Options,errors:&mut Vec<String>)->Result<usize,String>{
+    let mut own_errors=Vec::new();
+    let mut count=collect_codex(db,Path::new(&o.codex_home),&o.device_id,&mut own_errors);
+    let mut devices=o.ssh_devices();count+=ssh::collect_devices(db,&mut devices,&mut own_errors);
+    o.codex_ssh_devices=Some(devices);save_options(dir,o)?;
+    crate::storage::write_atomic(&dir.join("output-speed-status.json"),&serde_json::json!({"collectedAt":now(),"errors":own_errors}).to_string())?;
+    errors.extend(own_errors);Ok(count)
+}
+pub fn collect_output_speed(dir:&Path)->Result<usize,String>{
+    let mut o=options(dir);if !o.auto_collect{return Ok(0)}
+    let mut db=database(dir)?;
+    db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_|"保存设备失败")?;
+    collect_codex_sources(dir,&mut db,&mut o,&mut Vec::new())
 }
 #[tauri::command]
 pub async fn get_activity(app:AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();report_range(state.store.dir(),device,source,days,model,from,to)}).await.map_err(|_|"读取统计失败")?}
@@ -611,26 +622,31 @@ pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),S
 }
 pub fn spawn(app:AppHandle){tauri::async_runtime::spawn(async move{
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-    let mut last_collect=None;let mut last_sync=None;
+    let mut last_collect=None;let mut last_sync=None;let mut last_speed=None;
     loop {
         let o={let state=app.state::<AppState>();options(state.store.dir())};
         let should_collect = o.auto_collect && last_collect.is_none_or(|t:std::time::Instant|t.elapsed().as_secs()>=o.collect_interval_seconds.clamp(5,3600));
+        let should_speed = o.auto_collect && last_speed.is_none_or(|t:std::time::Instant|t.elapsed().as_secs()>=speed::COLLECTION_INTERVAL_SECONDS);
         let should_sync = !o.sync_dir.is_empty() && last_sync.is_none_or(|t:std::time::Instant|t.elapsed().as_secs()>=300);
-        if should_collect || should_sync {
+        if should_collect || should_sync || should_speed {
+            let started=std::time::Instant::now();
             let handle=app.clone();
             let completed=tauri::async_runtime::spawn_blocking(move||{
                 let state=handle.state::<AppState>();let Ok(_guard)=state.activity_lock.try_lock() else{return false};
-                if should_collect { let _=collect_cycle(state.store.dir(),should_sync); }
-                else if should_sync {
+                let mut changed=false;
+                if should_collect { changed=collect_cycle(state.store.dir(),should_sync).is_ok_and(|n|n>0); }
+                else if should_speed {changed=collect_output_speed(state.store.dir()).is_ok_and(|n|n>0);}
+                if !should_collect && should_sync {
                     let result = database(state.store.dir()).and_then(|mut db| sync(state.store.dir(),&mut db,&options(state.store.dir())));
                     let previous:Value=fs::read(state.store.dir().join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
                     let _=crate::storage::write_atomic(&state.store.dir().join("activity-status.json"),&serde_json::json!({"at":now(),"errors":previous.get("errors").cloned().unwrap_or(serde_json::json!([])),"syncErrors":result.err().into_iter().collect::<Vec<_>>()}).to_string());
                 }
                 if should_sync { let _=crate::usage_sync::sync(&state); }
-                let _=handle.emit("activity-updated",());
+                if should_collect||should_sync||changed{let _=handle.emit("activity-updated",());}
+                else {let _=handle.emit("output-speed-updated",());}
                 true
             }).await.unwrap_or(false);
-            if completed{let at=std::time::Instant::now();if should_collect{last_collect=Some(at);}if should_sync{last_sync=Some(at);}}
+            if completed{if should_collect{last_collect=Some(started);}if should_collect||should_speed{last_speed=Some(started);}if should_sync{last_sync=Some(started);}}
         }
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }

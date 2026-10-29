@@ -514,6 +514,7 @@ textarea {
   max-width: 1080px;
   margin: 0 auto;
 }
+.main-wide .content-inner{max-width:none;width:100%;box-sizing:border-box}.main-wide .content{padding:22px 24px 32px}.main-wide .page-heading{margin-bottom:18px}
 
 /* ---------------------------------------------------------------- 按钮 */
 

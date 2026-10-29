@@ -29,7 +29,7 @@ export function plotPrice(entry: LadderEntry, metric: LadderMetric, currency: st
   return converted != null && Number.isFinite(converted) ? converted : null;
 }
 /** Fit both axes to the current data, without jittering or dropping models. */
-export function ladderScale(points: { cost: number; score: number }[]) {
+export function ladderScale(points: { cost: number; score: number }[],bounds=plotBounds) {
   const valid=points.filter(p=>Number.isFinite(p.cost)&&p.cost>=0&&Number.isFinite(p.score)&&p.score>=0&&p.score<=100);
   const costs=valid.map(p=>p.cost), scores=valid.map(p=>p.score);
   const lowCost=costs.length?Math.min(...costs):0, highCost=costs.length?Math.max(...costs):1;
@@ -44,7 +44,7 @@ export function ladderScale(points: { cost: number; score: number }[]) {
   const lower=hasZero?0:Math.max(Math.log(Number.MIN_VALUE),lo-padding);
   const upper=Math.min(hasZero?transform(Number.MAX_VALUE):Math.log(Number.MAX_VALUE),Math.max(hi+padding,lower+.000001));
   const minCost=inverse(lower),max=inverse(upper);
-  const x=(value:number)=>plotBounds.left+(transform(value)-lower)/(upper-lower)*(plotBounds.right-plotBounds.left);
+  const x=(value:number)=>bounds.left+(transform(value)-lower)/(upper-lower)*(bounds.right-bounds.left);
   const lowScore=scores.length?Math.min(...scores):0,highScore=scores.length?Math.max(...scores):100;
   const scorePadding=Math.max(.5,(highScore-lowScore)*.06);
   const rawMin=Math.max(0,lowScore-scorePadding),rawMax=Math.min(100,highScore+scorePadding);
@@ -53,7 +53,7 @@ export function ladderScale(points: { cost: number; score: number }[]) {
   const step=[1,2,5,10].map(n=>n*base).find(n=>n>=targetStep)!;
   const edgeStep=step/5;
   const min=Math.max(0,Math.floor(rawMin/edgeStep)*edgeStep),maxScore=Math.min(100,Math.ceil(rawMax/edgeStep)*edgeStep);
-  const y=(value:number)=>plotBounds.bottom-(value-min)/(maxScore-min)*(plotBounds.bottom-plotBounds.top);
+  const y=(value:number)=>bounds.bottom-(value-min)/(maxScore-min)*(bounds.bottom-bounds.top);
   const scoreTicks=[Number(min.toFixed(8))];
   for(let value=Math.ceil(min/step)*step;value<maxScore;value+=step){
     const tick=Number(value.toFixed(8));

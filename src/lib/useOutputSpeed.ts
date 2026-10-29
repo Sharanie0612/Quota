@@ -27,10 +27,10 @@ export function useOutputSpeed(device:string,model:string,days:number,minutes:nu
     };
     const schedule=()=>{if(document.visibilityState==='visible')void load();};
     reload.current=schedule;
-    const subscriptions=['output-speed-updated','activity-updated'].map(name=>listen(name,schedule));
+    const subscriptions=['activity-updated'].map(name=>listen(name,schedule));
     // Coalesce concurrent events, keep the last successful result and preserve
     // the chart cursor. Slow reads cannot starve the page with cancelled calls.
-    const timer=setInterval(schedule,1000);
+    const timer=setInterval(schedule,5000);
     document.addEventListener('visibilitychange',schedule);
     void load();
     return()=>{disposed=true;clearInterval(timer);document.removeEventListener('visibilitychange',schedule);for(const promise of subscriptions)void promise.then(stop=>stop()).catch(()=>{});};

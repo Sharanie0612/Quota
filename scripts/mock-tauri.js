@@ -724,7 +724,7 @@
         case 'open_main_view': window.demoOpenedView=args.view;return null;
         case 'refresh_output_speed': emit('output-speed-updated',null);return 0;
         case 'get_output_speed': {
-          if(window.demoSpeedReport)return window.demoSpeedReport;
+          if(window.demoSpeedReport)return structuredClone(window.demoSpeedReport);
           const models=['gpt-6.1-sol','gpt-6-astra'],now=Date.now();
           const bucketSeconds=Number(args.bucketSeconds)||3600;
           const minutes=args.lookbackMinutes||args.lookbackHours*60;
@@ -740,7 +740,7 @@
           for(const row of selected){const timestamp=Math.floor(row.completedAt/(bucketSeconds*1000))*bucketSeconds*1000,key=timestamp+'|'+row.model;const point=groups.get(key)||{timestamp,model:row.model,outputTokens:0,durationMs:0,samples:0};point.outputTokens+=row.outputTokens;point.durationMs+=row.durationMs;point.samples++;groups.set(key,point);}
           const byModel=models.map(model=>{const rows=all.filter(r=>r.model===model);return {model,summary:summarize(rows),latestAt:Math.max(0,...rows.map(r=>r.completedAt))};}).filter(row=>row.summary.samples);
           const enabled=test!=='paused',localMonitoring=!args.device||args.device==='demo-a';
-          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,recent:selected.sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
+          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,calls:[...selected].sort((a,b)=>b.completedAt-a.completedAt),recent:[...selected].sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
         }
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_benchmarks':
@@ -760,7 +760,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3200',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3300',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -1020,7 +1020,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3200",
+            version: "1.0.3300",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

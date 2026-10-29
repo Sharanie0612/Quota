@@ -1,4 +1,4 @@
-/* Content stays opaque; glass belongs to navigation and transient controls. */
+/* Material is confined to surfaces; the native transparent canvas stays clear. */
 :root { --radius-lg:20px; --radius:11px; --motion-ease:cubic-bezier(.2,.8,.2,1); }
 .app { overflow:hidden; }
 .main { border-radius:22px; background:var(--surface-2); }
@@ -58,22 +58,6 @@ html[data-color-theme="github"] .sidebar-nav .motion-highlight { border-radius:6
 html[data-glass="on"] .app {position:relative;isolation:isolate;background:var(--bg);}
 html[data-glass="on"] .glass-backdrop {display:block;}
 html[data-glass="on"] .main,html[data-glass="on"] .sidebar {z-index:1;position:relative;}
-html[data-glass="on"] .main {background:color-mix(in srgb,var(--surface) 28%,transparent);border-color:color-mix(in srgb,var(--surface) 65%,var(--border));}
-html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .seg,html[data-glass="on"] .card,html[data-glass="on"] .usage-kpis {
-  background:linear-gradient(135deg,color-mix(in srgb,var(--surface) 64%,transparent),color-mix(in srgb,var(--surface) 34%,transparent));
-  backdrop-filter:blur(24px) saturate(1.35);-webkit-backdrop-filter:blur(24px) saturate(1.35);
-  border-color:color-mix(in srgb,var(--surface) 68%,var(--border));
-  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--surface) 90%,transparent),inset 1px 0 0 color-mix(in srgb,var(--surface) 75%,transparent),0 8px 26px color-mix(in srgb,var(--text) 5%,transparent);
-}
-html[data-glass="on"] .sidebar {background:color-mix(in srgb,var(--surface) 18%,transparent);box-shadow:none;}
-html[data-glass="on"] .workspace-toolbar {background:color-mix(in srgb,var(--surface) 32%,transparent);}
-html[data-glass="on"] .motion-highlight {background:color-mix(in srgb,var(--surface) 72%,transparent);border:1px solid color-mix(in srgb,var(--surface) 90%,transparent);}
-html[data-glass="on"] .widget-panel::before {background:radial-gradient(ellipse at 15% 0%,color-mix(in srgb,var(--blue) 12%,transparent),transparent 80%),linear-gradient(145deg,color-mix(in srgb,var(--surface) 80%,transparent),color-mix(in srgb,var(--blue-soft) 42%,transparent));backdrop-filter:blur(28px) saturate(1.4);-webkit-backdrop-filter:blur(28px) saturate(1.4);box-shadow:inset 1px 1px 0 color-mix(in srgb,var(--surface) 95%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--surface) 70%,transparent);}
-html[data-glass="on"] .side-left .widget-panel {border-radius:0 24px 24px 0;}
-@media(forced-colors:active) {
-  html[data-glass="on"] .glass-backdrop {display:none;}
-  html[data-glass="on"] .main,html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .card,html[data-glass="on"] .usage-kpis,html[data-glass="on"] .seg,html[data-glass="on"] .motion-highlight,html[data-glass="on"] .widget-panel::before {background:var(--surface)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important;}
-}
 .task-panel-heading {display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text-2);margin-bottom:7px;}
 .task-list {max-height:102px;overflow:auto;scrollbar-width:thin;}
 .task-row {display:flex;align-items:center;gap:9px;min-height:46px;padding:5px 0;}

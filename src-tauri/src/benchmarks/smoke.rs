@@ -18,7 +18,7 @@ pub fn benchmark_smoke_report(app:tauri::AppHandle,window:tauri::WebviewWindow,s
         for row in all{
             let id=row["id"].as_str().ok_or("缺少配置标识")?;let profile=expected.get(id).ok_or("未知测评配置")?;
             if !seen.insert(id)||row["score"].as_f64().is_none_or(|score|(score-profile.index).abs()>0.000001){return Err(format!("{id} 分数或配置重复"))}
-            if row["plotted"]==true && (row["width"].as_f64().is_none_or(|n|n<500.)||row["height"].as_f64().is_none_or(|n|n<300.)||row["x"].as_f64().is_none_or(|n|!n.is_finite()||n<61.||n>row["width"].as_f64().unwrap_or(0.)-37.)||row["y"].as_f64().is_none_or(|n|!n.is_finite()||n<43.||n>row["height"].as_f64().unwrap_or(0.)-79.)){return Err("价格与能力坐标越界".into())}
+            if row["plotted"]==true && (row["width"].as_f64().is_none_or(|n|n<500.)||row["height"].as_f64().is_none_or(|n|n<300.)||row["x"].as_f64().is_none_or(|n|!n.is_finite()||n<53.||n>row["width"].as_f64().unwrap_or(0.)-29.)||row["y"].as_f64().is_none_or(|n|!n.is_finite()||n<37.||n>row["height"].as_f64().unwrap_or(0.)-63.)){return Err("价格与能力坐标越界".into())}
         }
         let today=chrono::Local::now().date_naive();let first=today-chrono::Days::new(29);
         let edition=board.sources.iter().find(|s|s.id=="artificial-analysis").and_then(|s|s.edition.as_ref()).ok_or("缺少测评更新时间来源")?;
@@ -45,7 +45,7 @@ pub fn smoke_if_requested(app:tauri::AppHandle){
     if !enabled(&app.state::<AppState>()){return}
     let script=r#"(()=>{if(window.__quotaBenchmarkSmoke)return;window.__quotaBenchmarkSmoke=true;let step=0,wait=0;const report={};
       const button=name=>[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===name);
-      const collect=()=>[...document.querySelectorAll('.scatter-point')].flatMap(e=>(e.dataset.profileIds||'').split('|').filter(Boolean).map(id=>({id,score:Number(e.dataset.score),x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),plotted:true,width:Number(e.ownerSVGElement.dataset.plotWidth),height:Number(e.ownerSVGElement.dataset.plotHeight)}))).concat([...document.querySelectorAll('.ladder-score-row')].map(e=>({id:e.dataset.profileId,score:Number(e.dataset.score),plotted:false})));
+      const collect=()=>[...document.querySelectorAll('.scatter-point')].flatMap(e=>JSON.parse(e.dataset.members||'[]').map(p=>({...p,plotted:true,width:Number(e.ownerSVGElement.dataset.plotWidth),height:Number(e.ownerSVGElement.dataset.plotHeight)}))).concat([...document.querySelectorAll('.ladder-score-row')].map(e=>({id:e.dataset.profileId,score:Number(e.dataset.score),plotted:false})));
       const change=value=>{const select=document.querySelector('select[aria-label="测评范围"]');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));};
       const timer=setInterval(()=>{wait++;if(wait>150){clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:{error:'UI timeout',step}}));return;}
         if(step===0){document.querySelector('nav button[aria-label="AI 模型"]')?.click();if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='main30'||!collect().length)return;report.primary=collect();change('all');step=1;return;}

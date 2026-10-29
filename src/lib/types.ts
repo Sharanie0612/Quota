@@ -382,7 +382,7 @@ export interface OutputSpeedReport {
   devices:{id:string;name:string}[]; models:string[]; points:OutputSpeedPoint[]; summary:OutputSpeedSummary;
   updatedAt:number; bucketMinutes?:number; bucketSeconds:number; collectionIntervalSeconds:number;
   collectionEnabled:boolean; collectedAt:number|null; errors:string[]; rangeStart:number; rangeEnd:number;
-  recent:CompletedOutput[]; byModel:{model:string;summary:OutputSpeedSummary;latestAt:number}[];
+  recent:CompletedOutput[]; calls:CompletedOutput[]; byModel:{model:string;summary:OutputSpeedSummary;latestAt:number}[];
   coverage:{outputRecords:number;timedRecords:number}; localMonitoring:boolean;
   live:LiveModelStatus;
 }

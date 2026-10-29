@@ -33,11 +33,11 @@ assert.ok(scale.x(2)<scale.x(2.01));assert.ok(scale.y(90)>scale.y(91));
 const duplicated=ladderScale([...points,...Array.from({length:30},()=>points[1])]);
 assert.equal(scale.x(2),duplicated.x(2));assert.equal(scale.y(90),duplicated.y(90));
 for(const point of points){assert.ok(Number.isFinite(scale.x(point.cost)));assert.ok(Number.isFinite(scale.y(point.score)));}
-assert.equal(scale.ticks[0],0);assert.equal(scale.ticks.at(-1),scale.max);
+assert.equal(scale.ticks[0],0);assert.ok(scale.ticks.at(-1)<=scale.max);
 for(let i=1;i<scale.ticks.length;i++)assert.ok(scale.ticks[i]>scale.ticks[i-1]);
 const perfect=ladderScale([{cost:0,score:100}]);assert.ok(Number.isFinite(perfect.y(100)));
 const narrow=ladderScale([{cost:.002,score:81},{cost:.003,score:82}]);
-assert.ok(narrow.min>79&&narrow.maxScore<84);
+assert.ok(narrow.min<=76&&narrow.maxScore>=87,'near-equal scores must not exaggerate a one-point gap');
 assert.ok(narrow.minCost>0&&narrow.minCost<.002&&narrow.max>.003&&narrow.max<.004);
 assert.ok(narrow.x(.003)-narrow.x(.002)>500);
 for(const values of [[],[{cost:0,score:50}],[{cost:.01,score:50}],[{cost:Number.MIN_VALUE,score:100}],[{cost:Number.MAX_VALUE,score:0}],[{cost:0,score:50},{cost:Number.MAX_VALUE,score:51}]]){

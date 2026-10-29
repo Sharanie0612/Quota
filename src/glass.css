@@ -1,0 +1,31 @@
+.glass-filter-defs {position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;}
+html[data-glass="on"] {--glass-rim:color-mix(in srgb,var(--surface) 86%,transparent);--glass-shade:color-mix(in srgb,var(--text) 9%,transparent);}
+html[data-glass="on"] .glass-backdrop {background:linear-gradient(125deg,var(--bg),color-mix(in srgb,var(--blue-soft) 78%,var(--surface)) 50%,var(--bg));}
+html[data-glass="on"] .glass-backdrop i {filter:blur(16px);}
+html[data-glass="on"] .glass-backdrop i:first-child {background:radial-gradient(ellipse,color-mix(in srgb,var(--blue) 25%,var(--surface)) 0%,transparent 68%);}
+html[data-glass="on"] .main {background:color-mix(in srgb,var(--surface) 14%,transparent);}
+html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .seg,html[data-glass="on"] .card,html[data-glass="on"] .usage-kpis {
+  background:radial-gradient(ellipse at var(--glass-x,25%) var(--glass-y,0%),color-mix(in srgb,var(--surface) 62%,transparent),transparent 75%),linear-gradient(145deg,color-mix(in srgb,var(--surface) 30%,transparent),color-mix(in srgb,var(--surface) 12%,transparent));
+  border-color:var(--glass-rim);
+  backdrop-filter:blur(12px) saturate(1.5);-webkit-backdrop-filter:blur(12px) saturate(1.5);
+  box-shadow:inset 0 1.5px 1px var(--glass-rim),inset 1px 0 1px var(--glass-rim),inset 0 -1px 1px var(--glass-shade),0 8px 28px color-mix(in srgb,var(--text) 4%,transparent);
+}
+html[data-glass="on"] .sidebar {background:color-mix(in srgb,var(--surface) 10%,transparent);box-shadow:none;}
+html[data-glass="on"] .workspace-toolbar {background:color-mix(in srgb,var(--surface) 20%,transparent);}
+html[data-glass="on"] .motion-highlight {background:linear-gradient(130deg,color-mix(in srgb,var(--surface) 78%,transparent),color-mix(in srgb,var(--surface) 30%,transparent));border-color:var(--glass-rim);box-shadow:inset 1px 1px 1px var(--glass-rim),inset -1px -1px 1px color-mix(in srgb,var(--surface) 45%,transparent),0 3px 12px var(--glass-shade);}
+html[data-glass="on"] .seg {border:1px solid var(--glass-rim);}
+@supports(backdrop-filter:url(#quota-glass-refraction)) {
+  html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .seg,html[data-glass="on"] .motion-highlight {backdrop-filter:url(#quota-glass-refraction) blur(6px) saturate(1.5);-webkit-backdrop-filter:url(#quota-glass-refraction) blur(6px) saturate(1.5);}
+}
+/* A single clipped layer follows the existing animation, including the collapsed tab. */
+html[data-glass="on"] .widget-panel::before {
+  background:radial-gradient(ellipse at 5% 0%,color-mix(in srgb,var(--surface) 94%,transparent),transparent 62%),linear-gradient(140deg,color-mix(in srgb,var(--surface) 80%,transparent),color-mix(in srgb,var(--blue-soft) 68%,transparent));
+  border-color:var(--glass-rim);backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);
+  box-shadow:inset 1.5px 1.5px 1px var(--glass-rim),inset 0 -1.5px 1px color-mix(in srgb,var(--surface) 65%,transparent);
+}
+html[data-color-mode="dark"][data-glass="on"] .card,html[data-color-mode="dark"][data-glass="on"] .usage-kpis {background:linear-gradient(140deg,color-mix(in srgb,var(--surface) 65%,transparent),color-mix(in srgb,var(--surface) 44%,transparent));border-color:color-mix(in srgb,var(--surface) 35%,var(--border));}
+html[data-color-mode="dark"][data-glass="on"] .widget-panel::before {background:linear-gradient(140deg,color-mix(in srgb,var(--surface) 92%,transparent),color-mix(in srgb,var(--surface) 80%,transparent));border-color:var(--border-strong);}
+@media(forced-colors:active) {
+  html[data-glass="on"] .glass-backdrop {display:none;}
+  html[data-glass="on"] .main,html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .card,html[data-glass="on"] .usage-kpis,html[data-glass="on"] .seg,html[data-glass="on"] .motion-highlight,html[data-glass="on"] .widget-panel::before {background:var(--surface)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important;}
+}

@@ -46,12 +46,12 @@ export function ladderScale(points: { cost: number; score: number }[],bounds=plo
   const minCost=inverse(lower),max=inverse(upper);
   const x=(value:number)=>bounds.left+(transform(value)-lower)/(upper-lower)*(bounds.right-bounds.left);
   const lowScore=scores.length?Math.min(...scores):0,highScore=scores.length?Math.max(...scores):100;
-  const scorePadding=Math.max(.5,(highScore-lowScore)*.06);
+  const scorePadding=Math.max(5,(highScore-lowScore)*.06);
   const rawMin=Math.max(0,lowScore-scorePadding),rawMax=Math.min(100,highScore+scorePadding);
   const targetStep=Math.max(.1,(rawMax-rawMin)/6);
   const base=10**Math.floor(Math.log10(targetStep));
   const step=[1,2,5,10].map(n=>n*base).find(n=>n>=targetStep)!;
-  const edgeStep=step/5;
+  const edgeStep=step;
   const min=Math.max(0,Math.floor(rawMin/edgeStep)*edgeStep),maxScore=Math.min(100,Math.ceil(rawMax/edgeStep)*edgeStep);
   const y=(value:number)=>bounds.bottom-(value-min)/(maxScore-min)*(bounds.bottom-bounds.top);
   const scoreTicks=[Number(min.toFixed(8))];
@@ -61,11 +61,12 @@ export function ladderScale(points: { cost: number; score: number }[],bounds=plo
   }
   if(y(scoreTicks[scoreTicks.length-1])-y(maxScore)>32)scoreTicks.push(Number(maxScore.toFixed(8)));
   else if(scoreTicks.length>1)scoreTicks[scoreTicks.length-1]=Number(maxScore.toFixed(8));
-  const ticks:number[]=[minCost];
+  const ticks:number[]=hasZero?[0]:[];
   for(let exponent=-323;exponent<=308;exponent++)for(const multiple of [1,2,5]){
     const value=multiple*10**exponent;
-    if(Number.isFinite(value)&&value>minCost&&value<max&&x(value)-x(ticks[ticks.length-1])>64)ticks.push(value);
+    if(Number.isFinite(value)&&value>=minCost&&value<=max&&(!ticks.length||x(value)-x(ticks[ticks.length-1])>64))ticks.push(value);
   }
-  if(x(max)-x(ticks[ticks.length-1])>64)ticks.push(max);else if(ticks.length>1)ticks[ticks.length-1]=max;else ticks.push(max);
+  // Very narrow ranges still need useful values; ordinary ranges use clean 1/2/5 ticks.
+  if(ticks.length<2){ticks.length=0;ticks.push(lowCost,...(highCost>lowCost?[highCost]:[]));}
   return {max,min,minCost,maxScore,x,y,ticks,scoreTicks};
 }

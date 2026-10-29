@@ -1,4 +1,17 @@
 .ladder-chart-block { margin-bottom: 18px; }
+.scatter-marker {fill:var(--surface);stroke:var(--border-strong);stroke-width:1.5;}
+.scatter-marker.is-cluster {fill:var(--blue-soft);stroke:var(--blue);}
+.scatter-badge {fill:var(--blue);font-size:12px;font-weight:650;pointer-events:none;}
+.scatter-point:focus-visible .scatter-marker {stroke:var(--blue);stroke-width:2.5;}
+.scatter-picker {border-top:1px solid var(--border);padding-top:12px;margin-top:8px;}
+.scatter-picker header {display:flex;justify-content:space-between;align-items:center;font-size:14px;}
+.scatter-picker>div {max-height:230px;overflow:auto;}
+.scatter-picker>div>button {display:grid;grid-template-columns:24px minmax(0,1fr) 70px 100px;gap:10px;align-items:center;width:100%;border:0;background:none;color:var(--text);font:inherit;font-size:14px;text-align:left;padding:12px 8px;border-radius:10px;cursor:pointer;}
+.scatter-picker>div>button:hover {background:var(--blue-soft);}
+.scatter-picker span {overflow:hidden;text-overflow:ellipsis;}
+.scatter-picker small {display:block;color:var(--text-2);font-size:12px;margin-top:4px;}
+.scatter-picker b,.scatter-picker strong {font-weight:500;}
+.scatter-picker strong {text-align:right;}
 .ladder-chart-block > .chart-heading { gap: 16px; align-items: flex-start; padding: 0 2px 16px; }
 .ladder-chart-block > .chart-heading > .hint { flex-shrink: 0; padding-top: 4px; }
 .scatter-chart { padding: 18px; min-width: 0; }

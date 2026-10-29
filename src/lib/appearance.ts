@@ -47,7 +47,7 @@ function apply() {
 export function initializeAppearance() {
   if(initialized||typeof window==='undefined')return;
   initialized=true;snapshot=read();apply();
-  let frame=0;document.addEventListener('pointermove',event=>{if(!snapshot.glass||frame||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg');if(!surface)return;const x=event.clientX,y=event.clientY;frame=requestAnimationFrame(()=>{frame=0;const rect=surface.getBoundingClientRect();surface.style.setProperty('--glass-x',`${x-rect.left}px`);surface.style.setProperty('--glass-y',`${y-rect.top}px`);});},{passive:true});
+  let frame=0;document.addEventListener('pointermove',event=>{if(!snapshot.glass||frame||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg,.usage-kpis');if(!surface)return;const x=event.clientX,y=event.clientY;frame=requestAnimationFrame(()=>{frame=0;const rect=surface.getBoundingClientRect();surface.style.setProperty('--glass-x',`${x-rect.left}px`);surface.style.setProperty('--glass-y',`${y-rect.top}px`);});},{passive:true});
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',apply);
   window.addEventListener('storage',event=>{if(event.key===KEY){snapshot=read();apply();}});
   void listen<Appearance>('appearance-updated',event=>accept(event.payload)).then(()=>invoke<Appearance|null>('get_appearance')).then(accept).catch(()=>undefined);

@@ -39,7 +39,7 @@ pub struct Report {
     pub summary:Summary, pub updated_at:i64, pub bucket_minutes:u32,
     pub bucket_seconds:u32, pub collection_interval_seconds:u64,
     pub collection_enabled:bool, pub collected_at:Option<i64>, pub errors:Vec<String>,
-    pub range_start:i64, pub range_end:i64, pub recent:Vec<CompletedOutput>,
+    pub range_start:i64, pub range_end:i64, pub recent:Vec<CompletedOutput>, pub calls:Vec<CompletedOutput>,
     pub by_model:Vec<ModelSummary>, pub coverage:Coverage,
     pub live:speed_live::Status, pub local_monitoring:bool,
 }
@@ -107,14 +107,15 @@ pub fn report_minutes(dir:&Path,device:&str,source:&str,days:u32,model:&str,reso
         let (owner,name)=row.map_err(|_|"读取计时覆盖率失败")?;
         if !excluded.contains(&owner)&&(device.is_empty()||device==owner)&&(model.is_empty()||model==name)&&(source.is_empty()||source=="codex"){coverage.output_records+=1;}
     }
-    measured.sort_by(|a,b|b.completed_at.cmp(&a.completed_at).then_with(||a.id.cmp(&b.id)));measured.truncate(24);
+    measured.sort_by(|a,b|b.completed_at.cmp(&a.completed_at).then_with(||a.id.cmp(&b.id)));
+    let calls=measured.clone();measured.truncate(24);
     let range_start=if requested_start>0{requested_start}else{buckets.keys().next().map(|(time,_)|*time).unwrap_or(end-3_600_000)};
     let local_monitoring=device.is_empty()||device==settings.device_id;
     let live=if local_monitoring{speed_live::status(dir)}else{Default::default()};
     let status:Value=std::fs::read(dir.join("output-speed-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let errors=if local_monitoring{live.errors.clone()}else{status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default()};
     let collected_at=if local_monitoring{live.checked_at.or_else(||status["collectedAt"].as_i64())}else{status["collectedAt"].as_i64()};
-    Ok(Report {devices:known_device_names(&db,&settings)?.into_iter().filter(|d|!excluded.contains(&d.id)).collect(),models:models.into_iter().collect(),points:buckets.into_values().collect(),summary,updated_at:end,bucket_minutes:bucket_seconds/60,bucket_seconds,collection_interval_seconds:if local_monitoring{1}else{super::COLLECTION_INTERVAL_SECONDS},collection_enabled:settings.auto_collect,collected_at,errors,range_start,range_end:end,recent:measured,by_model,coverage,live,local_monitoring})
+    Ok(Report {devices:known_device_names(&db,&settings)?.into_iter().filter(|d|!excluded.contains(&d.id)).collect(),models:models.into_iter().collect(),points:buckets.into_values().collect(),summary,updated_at:end,bucket_minutes:bucket_seconds/60,bucket_seconds,collection_interval_seconds:if local_monitoring{1}else{super::COLLECTION_INTERVAL_SECONDS},collection_enabled:settings.auto_collect,collected_at,errors,range_start,range_end:end,recent:measured,calls,by_model,coverage,live,local_monitoring})
 }
 #[tauri::command]
 pub async fn get_output_speed(app:tauri::AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,bucket_seconds:Option<u32>,lookback_hours:Option<u32>,lookback_minutes:Option<u32>)->Result<Report,String>{

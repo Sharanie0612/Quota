@@ -21,7 +21,7 @@ fn synthetic(root:&Path){
     let mut log=envelope(t,"session_meta",json!({"session_id":"synthetic"}))+&envelope(t+1,"turn_context",json!({"model":"fixture-model"}));
     log+=&response(t+1000,1,240,40,(240,40),false);log+=&response(t+10000,2,110,10,(350,50),false);log+=&response(t+20000,3,40,0,(390,50),true);
     let path=home.join("sessions/fixture.jsonl");fs::write(&path,&log).unwrap();activity::collect(&dir).unwrap();
-    let report=speed::report(&dir,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.summary.output_tokens,300);assert!((report.summary.average.unwrap()-120.).abs()<1e-9);assert_eq!(report.summary.median,Some(150.));assert_eq!(report.summary.p95,Some(200.));assert_eq!(report.points.len(),1);
+    let report=speed::report(&dir,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.calls.len(),2);assert_eq!(report.calls[0].speed,200.);assert_eq!(report.calls[1].speed,100.);assert_eq!(report.summary.output_tokens,300);assert!((report.summary.average.unwrap()-120.).abs()<1e-9);assert_eq!(report.summary.median,Some(150.));assert_eq!(report.summary.p95,Some(200.));assert_eq!(report.points.len(),1);
     assert_eq!(speed::report(&dir,"","codex",0,"another-model").unwrap().summary.samples,0);
     let detailed=speed::report_window(&dir,"","codex",0,"",10,0).unwrap();assert_eq!(detailed.points.len(),2);assert_eq!(detailed.summary.average,Some(120.));assert_eq!(detailed.points.iter().map(|p|p.output_tokens).sum::<u64>(),300);
     assert!(speed::report_window(&dir,"","codex",0,"",13,0).is_err());
@@ -85,7 +85,20 @@ fn stream_metadata(root:&Path){
  db.execute_batch("DROP TABLE logs").unwrap();assert!(!activity::speed_live::stream_activity(&home,10_000).available);
  println!("PASS optional stream schema, five-second metadata window, future/reasoning exclusion and no per-token inference");
 }
+fn full_calls(root:&Path){
+ let dir=root.join("all-calls");let home=root.join("all-calls-logs");fs::create_dir_all(home.join("sessions")).unwrap();setup(&dir,&home,OWNER);
+ let t=chrono::Utc::now().timestamp_millis()-100_000;
+ let mut log=envelope(t,"session_meta",json!({"id":"all-calls"}))+&envelope(t+1,"turn_context",json!({"model":"history-model"}));
+ for index in 1..=33 {log+=&response(t+(index as i64)*2000,index,if index==1{240}else{110},if index==1{40}else{10},(240+(index-1)*110,40+(index-1)*10),false);}
+ fs::write(home.join("sessions/history.jsonl"),log).unwrap();activity::collect(&dir).unwrap();
+ let report=speed::report(&dir,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,33);assert_eq!(report.calls.len(),33);assert_eq!(report.recent.len(),24);
+ assert_eq!(report.calls.iter().map(|r|&r.id).collect::<std::collections::BTreeSet<_>>().len(),33);
+ assert!(report.calls.windows(2).all(|p|p[0].completed_at>=p[1].completed_at));
+ assert!(speed::report(&dir,"","codex",0,"other").unwrap().calls.is_empty());
+ assert!(speed::report(&dir,"other","codex",0,"").unwrap().calls.is_empty());
+ println!("PASS complete per-call history beyond 24 records, stable IDs, order and model/device filtering");
+}
 fn main(){
-    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);incremental(&root);stream_metadata(&root);
+    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);incremental(&root);stream_metadata(&root);full_calls(&root);
     if let Some(home)=std::env::args().nth(1){let dir=root.join("live-isolated");setup(&dir,Path::new(&home),OWNER);activity::collect(&dir).unwrap();let report=speed::report(&dir,"","codex",7,"").unwrap();println!("LIVE {}",serde_json::to_string(&report.summary).unwrap());fs::write(root.join("live-speed-report.json"),serde_json::to_vec(&report).unwrap()).unwrap();}
 }

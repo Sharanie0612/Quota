@@ -59,16 +59,17 @@ pub fn save_appearance(
     Ok(())
 }
 
-pub fn apply_widget_material(app:&tauri::AppHandle,enabled:bool){
+pub fn apply_widget_material(app:&tauri::AppHandle,_enabled:bool){
     #[cfg(windows)]
     {
-        use tauri::{Manager,utils::{WindowEffect,config::WindowEffectsConfig}};
+        use tauri::{Manager,utils::config::WindowEffectsConfig};
         if let Some(window)=app.get_webview_window(crate::widget::LABEL){
-            let effect=enabled.then_some(WindowEffectsConfig{effects:vec![WindowEffect::Acrylic],state:None,radius:None,color:None});
-            // CSS retains the material treatment when the OS lacks this effect.
-            let _=window.set_effects(effect);
+            // Acrylic paints the whole fixed HWND, including its transparent
+            // padding and collapsed hit region. Keep material inside the one
+            // clipped CSS surface so it cannot leave a second floating box.
+            let _=window.set_effects(None::<WindowEffectsConfig>);
         }
     }
     #[cfg(not(windows))]
-    let _=(app,enabled);
+    let _=app;
 }

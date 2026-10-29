@@ -50,10 +50,29 @@ fn fast_cycle(root:&Path){
  let mut settings=activity::options(&dir);settings.auto_collect=false;activity::save_options(&dir,&settings).unwrap();fs::write(&path,first+&response(t+4000,2,110,10,(350,50),false)).unwrap();
  assert_eq!(activity::collect_output_speed(&dir).unwrap(),0);assert_eq!(speed::report(&dir,"","",0,"").unwrap().summary.samples,1);
  settings.auto_collect=true;activity::save_options(&dir,&settings).unwrap();assert_eq!(activity::collect_output_speed(&dir).unwrap(),1);assert_eq!(activity::collect_output_speed(&dir).unwrap(),0);assert_eq!(activity::collect(&dir).unwrap(),0);
- let report=speed::report_window(&dir,"","",1,"",10,1).unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.summary.average,Some(120.));assert_eq!(report.collection_interval_seconds,10);assert!(report.collected_at.is_some());assert_eq!(activity::report(&dir,None,None,None).unwrap().totals.tokens.total,2350);
+ let report=speed::report_window(&dir,"","",1,"",10,1).unwrap();assert_eq!(report.summary.samples,2);assert_eq!(report.summary.average,Some(120.));assert_eq!(report.collection_interval_seconds,1);assert!(report.collected_at.is_some());assert_eq!(activity::report(&dir,None,None,None).unwrap().totals.tokens.total,2350);
  println!("PASS fast Codex collection, pause/resume, shared ledger deduplication, 10-second buckets and local calendar aggregation");
 }
+fn incremental(root:&Path){
+ use std::io::Write;
+ let dir=root.join("incremental");let home=root.join("incremental-logs");fs::create_dir_all(home.join("sessions")).unwrap();setup(&dir,&home,OWNER);
+ let t=chrono::Utc::now().timestamp_millis()-30_000;let path=home.join("sessions/fixture.jsonl");
+ fs::write(&path,envelope(t,"session_meta",json!({"id":"incremental"}))+&envelope(t+1,"turn_context",json!({"model":"fixture-model"}))+&envelope(t+2,"event_msg",json!({"type":"task_started"}))).unwrap();
+ let mut reader=activity::speed_live::LocalReader::default();assert_eq!(reader.tick(&dir).unwrap(),0);assert_eq!(activity::speed_live::status(&dir).active_requests,1);
+ let first=response(t+1000,1,240,40,(240,40),false);let split=first.rfind('\n').unwrap();let count_start=first[..split].rfind('\n').unwrap()+1;
+ let mut writer=fs::OpenOptions::new().append(true).open(&path).unwrap();writer.write_all(first[..count_start].as_bytes()).unwrap();
+ assert_eq!(reader.tick(&dir).unwrap(),0);assert_eq!(speed::report(&dir,"","",0,"").unwrap().summary.samples,0);
+ writer.write_all(first[count_start..split].as_bytes()).unwrap();assert_eq!(reader.tick(&dir).unwrap(),0);
+ writer.write_all(b"\n").unwrap();assert_eq!(reader.tick(&dir).unwrap(),1);assert_eq!(reader.tick(&dir).unwrap(),0);
+ let report=speed::report_minutes(&dir,"","",0,"",10,30).unwrap();assert_eq!(report.summary.average,Some(100.));assert_eq!(report.summary.duration_ms,2000);assert_eq!(report.recent[0].output_tokens,200);assert_eq!(report.recent[0].speed,100.);assert_eq!(report.by_model.len(),1);assert_eq!(report.coverage.output_records,1);assert_eq!(report.coverage.timed_records,1);
+ let mut settings=activity::options(&dir);settings.auto_collect=false;activity::save_options(&dir,&settings).unwrap();writer.write_all(response(t+10_000,2,110,10,(350,50),false).as_bytes()).unwrap();assert_eq!(reader.tick(&dir).unwrap(),0);
+ settings.auto_collect=true;activity::save_options(&dir,&settings).unwrap();assert_eq!(reader.tick(&dir).unwrap(),1);writer.write_all(envelope(t+20_000,"event_msg",json!({"type":"task_complete"})).as_bytes()).unwrap();reader.tick(&dir).unwrap();assert_eq!(activity::speed_live::status(&dir).active_requests,0);
+ assert_eq!(activity::collect(&dir).unwrap(),0);assert_eq!(activity::report(&dir,None,None,None).unwrap().totals.tokens.total,2350);
+ let report=speed::report_minutes(&dir,"","",0,"",10,30).unwrap();assert_eq!(report.summary.average,Some(120.));assert_eq!(report.points.iter().map(|p|p.output_tokens).sum::<u64>(),300);assert_eq!(report.summary.samples,2);assert_eq!(report.recent.len(),2);
+ let missing=root.join("missing-source");setup(&missing,&root.join("absent"),"00000000-0000-4000-8000-000000000008");let mut unavailable=activity::speed_live::LocalReader::default();unavailable.tick(&missing).unwrap();assert!(!activity::speed_live::status(&missing).errors.is_empty());unavailable.tick(&missing).unwrap();assert!(!activity::speed_live::status(&missing).errors.is_empty());
+ println!("PASS incremental tail, pending usage without invented speed, partial JSONL retry, raw-record reconciliation, weighted bins, pause/resume and shared-cursor replay");
+}
 fn main(){
-    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);
+    let root=std::env::current_dir().unwrap().join("../target/output-speed-checks").join(uuid::Uuid::new_v4().to_string());fs::create_dir_all(&root).unwrap();synthetic(&root);fast_cycle(&root);incremental(&root);
     if let Some(home)=std::env::args().nth(1){let dir=root.join("live-isolated");setup(&dir,Path::new(&home),OWNER);activity::collect(&dir).unwrap();let report=speed::report(&dir,"","codex",7,"").unwrap();println!("LIVE {}",serde_json::to_string(&report.summary).unwrap());fs::write(root.join("live-speed-report.json"),serde_json::to_vec(&report).unwrap()).unwrap();}
 }

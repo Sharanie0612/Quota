@@ -16,6 +16,11 @@ pub mod trae;
 pub mod ssh;
 #[path = "output_speed.rs"]
 pub mod speed;
+#[path = "output_speed_live.rs"]
+pub mod speed_live;
+// Serialise local cursor readers only. Remote collection and directory sync must
+// never hold this lock while the local incremental reader waits for new output.
+static LOCAL_CODEX_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn hash(text: &str) -> String { format!("{:x}", Sha256::digest(text.as_bytes())) }
 fn label(text: &str) -> String { text.chars().filter(|c| !c.is_control()).take(160).collect() }
@@ -165,6 +170,8 @@ fn database(dir:&Path) -> Result<Connection,String> {
     let has_fingerprint:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM pragma_table_info('receipts') WHERE name='fingerprint')",[],|r|r.get(0)).map_err(|_|"读取同步索引失败")?;
     if !has_fingerprint {db.execute_batch("ALTER TABLE receipts ADD COLUMN fingerprint TEXT;").map_err(|_|"升级同步索引失败")?;}
     db.execute_batch("CREATE INDEX IF NOT EXISTS harness_identity ON metrics(json_extract(body,'$.session'),COALESCE(json_extract(body,'$.harnessIdentity'),0)) WHERE json_extract(body,'$.source')='harness';").map_err(|_|"升级 Harness 统计索引失败")?;
+    db.execute_batch("CREATE INDEX IF NOT EXISTS output_speed_time ON metrics(json_extract(body,'$.speed.completedAt')) WHERE json_extract(body,'$.speed') IS NOT NULL;").map_err(|_|"建立输出速度索引失败")?;
+    db.execute_batch("CREATE INDEX IF NOT EXISTS codex_output_time ON metrics(json_extract(body,'$.timestamp')) WHERE json_extract(body,'$.source')='codex' AND json_extract(body,'$.kind')='tokens';").map_err(|_|"建立输出记录索引失败")?;
     Ok(db)
 }
 pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,String> {
@@ -261,6 +268,7 @@ fn collect_codex_file(db:&mut Connection,path:&Path,device:&str) -> Result<usize
     Ok(count)
 }
 fn collect_codex(db:&mut Connection,home:&Path,device:&str,errors:&mut Vec<String>) -> usize {
+    let Ok(_local)=LOCAL_CODEX_LOCK.lock() else {errors.push("本机采集锁不可用".into());return 0};
     // Empty paths intentionally disable a source (including isolated checks).
     if home.as_os_str().is_empty(){return 0}
     let mut paths=Vec::new();let mut found=false;

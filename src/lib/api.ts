@@ -19,7 +19,8 @@ import type {
 
 export const api = {
   getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
-  getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours}),
+  getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),
+  refreshOutputSpeed: () => invoke<number>('refresh_output_speed'),
   refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
   reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
   getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),

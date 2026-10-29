@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前分支为 1.0.3002**：人民币模型天梯、六维对比、Codex 输出速度和淡蓝主题。上方固定下载链接由公开发布页管理；本轮是本地交付，macOS 未验收，详见 [交付记录](docs/model-speed-1.0.3002.md)。
+**当前分支为 1.0.3003**：人民币模型天梯、六维对比、输出速度读取与界面重构，明确已完成输出、时间均值和记录核对。上方固定下载链接由公开发布页管理；本轮是本地交付，macOS 未验收，详见 [交付记录](docs/model-speed-1.0.3003.md)。
 
 ## 开始使用
 
@@ -55,7 +55,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 ### 输出速度
 
-按客户端实际输出片段计时，排除工具和思考等待；有效输出至少 64 Token、0.5 秒。后台每10秒采集，可按10秒至1天的时间粒度显示加权均值，支持模型和设备筛选，随原 Token 事件回填、去重与多设备同步。当前接入 Codex，其他 harness 通过相同测量接口扩展。[完整口径](docs/output-speed.md)。
+按客户端实际输出片段计时，排除工具和思考等待；有效输出至少 64 Token、0.5 秒。本机每秒增量读取，完整输出结束后记录速度。按时间范围与粒度显示加权均值，可切换逐条记录核对Token和耗时，支持模型、设备筛选与原账本去重同步。现有日志不提供逐Token计数，不将读取频率称为实时测速。当前接入 Codex，其他 harness 通过相同测量接口扩展。[完整口径](docs/output-speed.md)。
 
 ### Token 活动
 
@@ -88,27 +88,29 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-以下为 **1.0.3002** 真实前端组件的浏览器预览。账户与活动使用演示数据，模型分数来自本轮公开快照；不代表真实账户、账单或 SSH 查询结果，榜单会随来源更新。
+以下为 **1.0.3003** 真实前端组件的浏览器预览。账户与活动使用演示数据，模型分数来自本轮公开快照；不代表真实账户、账单或 SSH 查询结果，榜单会随来源更新。
 
-![人民币价格与公开配置能力天梯](assets/readme/ai-models-3002.png)
+![人民币价格与公开配置能力天梯](assets/readme/ai-models-3003.png)
 
 <details>
 <summary>六维对比、输出速度与 Token 占比</summary>
 
-![同一配置的六维能力对比](assets/readme/model-comparison-3002.png)
+![同一配置的六维能力对比](assets/readme/model-comparison-3003.png)
 
-![Codex 模型输出速度曲线](assets/readme/output-speed-3002.png)
+![Codex 模型输出速度曲线](assets/readme/output-speed-3003.png)
 
-![来源、模型和输入缓存的 Token 环形占比图](assets/readme/token-shares-3002.png)
+![逐条核对输出Token、耗时与速度](assets/readme/output-records-3003.png)
+
+![来源、模型和输入缓存的 Token 环形占比图](assets/readme/token-shares-3003.png)
 
 </details>
 
 <details>
 <summary>配色设置与 Windows 安装向导</summary>
 
-![Quota 默认淡蓝配色与明暗模式设置](assets/readme/appearance-3002.png)
+![Quota 默认淡蓝配色与明暗模式设置](assets/readme/appearance-3003.png)
 
-![Windows 安装向导支持语言与升级流程](assets/readme/installer-3002.png)
+![Windows 安装向导支持语言与升级流程](assets/readme/installer-3003.png)
 
 </details>
 
@@ -134,7 +136,7 @@ npm ci
 npm run tauri dev
 ```
 
-开发端口为 `1420`。尚未合并的功能请切换到对应功能分支；当前 1.0.3002 为 `codex/feat/model-ladder-output-speed`。
+开发端口为 `1420`。尚未合并的功能请切换到对应功能分支；当前 1.0.3003 为 `codex/feat/model-ladder-output-speed`。
 
 | 平台 | 构建入口 | 说明 |
 | --- | --- | --- |

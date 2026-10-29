@@ -92,6 +92,7 @@ pub fn run() {
             benchmarks::spawn(app.handle().clone());
             benchmarks::smoke_if_requested(app.handle().clone());
             activity::spawn(app.handle().clone());
+            activity::speed_live::spawn(app.handle().clone());
             account_sync::spawn(app.handle().clone());
             widget::smoke_if_requested(app.handle());
             window_frame::smoke_if_requested(app.handle());
@@ -145,6 +146,7 @@ pub fn run() {
             usage_fx::save_monthly_usage_fx,
             activity::get_activity,
             activity::speed::get_output_speed,
+            activity::speed_live::refresh_output_speed,
             activity::get_sync_overview,
             activity::sync_activity_now,
             activity::get_activity_options,

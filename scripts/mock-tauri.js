@@ -711,16 +711,25 @@
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
         case 'get_appearance': return window.demoAppearance ?? null;
+        case 'refresh_output_speed': emit('output-speed-updated',null);return 0;
         case 'get_output_speed': {
           if(window.demoSpeedReport)return window.demoSpeedReport;
           const models=['gpt-6.1-sol','gpt-6-astra'],now=Date.now();
-          const bucketSeconds=Number(args.bucketSeconds)||(args.lookbackHours?60:args.days===1?300:args.days===0?86400:args.days>=30?21600:3600);
-          const span=args.lookbackHours?3600000:args.days===1?86400000:args.days===0?90*86400000:args.days*86400000;
-          const empty=new URLSearchParams(location.search).get('speedCase')==='empty';
-          const raw=empty?[]:Array.from({length:96},(_,i)=>models.map((model,j)=>({timestamp:Math.floor((now-span*(95-i)/96)/(bucketSeconds*1000))*bucketSeconds*1000,model,outputTokens:Math.round((72+j*18+Math.sin(i/9+j)*12)*30),durationMs:30000,samples:3}))).flat().filter(p=>(!args.model||p.model===args.model)&&(!args.device||args.device!=='demo-b'||p.model==='gpt-6-astra'));
-          const groups=new Map();for(const point of raw){const key=point.timestamp+'|'+point.model;const previous=groups.get(key);if(previous){previous.outputTokens+=point.outputTokens;previous.durationMs+=point.durationMs;previous.samples+=point.samples;}else groups.set(key,{...point});}const points=[...groups.values()];
-          const duration=points.reduce((sum,p)=>sum+p.durationMs,0),outputTokens=points.reduce((sum,p)=>sum+p.outputTokens,0),rates=points.map(p=>p.outputTokens*1000/p.durationMs).sort((a,b)=>a-b);
-          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points,summary:{average:duration?outputTokens*1000/duration:null,median:rates.length?rates[Math.floor(rates.length/2)]:null,p95:rates.length?rates[Math.ceil(rates.length*.95)-1]:null,samples:points.reduce((sum,p)=>sum+p.samples,0),outputTokens},updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:10,collectionEnabled:true,collectedAt:now,errors:[],rangeStart:now-span,rangeEnd:now};
+          const bucketSeconds=Number(args.bucketSeconds)||3600;
+          const minutes=args.lookbackMinutes||args.lookbackHours*60;
+          const start=minutes?now-minutes*60000:args.days?new Date(new Date().setHours(0,0,0,0)).getTime()-(args.days-1)*86400000:now-90*86400000,span=now-start;
+          const test=new URLSearchParams(location.search).get('speedCase');
+          const all=['empty','untimed'].includes(test)?[]:Array.from({length:48},(_,i)=>models.map((model,j)=>{
+            const completedAt=now-span*(47-i)/48-3000-j*1000,durationMs=2000+(i%5)*800;
+            const outputTokens=Math.round((72+j*18+Math.sin(i/6+j)*12)*durationMs/1000);
+            return {id:`demo-${i}-${j}`,model,device:j?'demo-b':'demo-a',completedAt,startedAt:completedAt-durationMs,durationMs,outputTokens,speed:outputTokens*1000/durationMs};
+          })).flat().filter(row=>!args.device||args.device===row.device);
+          const summarize=rows=>{const durationMs=rows.reduce((n,r)=>n+r.durationMs,0),outputTokens=rows.reduce((n,r)=>n+r.outputTokens,0),rates=rows.map(r=>r.speed).sort((a,b)=>a-b);return {average:durationMs?outputTokens*1000/durationMs:null,median:rates[Math.floor(rates.length/2)]??null,p95:rates[Math.max(0,Math.ceil(rates.length*.95)-1)]??null,samples:rows.length,outputTokens,durationMs};};
+          const selected=all.filter(row=>!args.model||row.model===args.model),groups=new Map();
+          for(const row of selected){const timestamp=Math.floor(row.completedAt/(bucketSeconds*1000))*bucketSeconds*1000,key=timestamp+'|'+row.model;const point=groups.get(key)||{timestamp,model:row.model,outputTokens:0,durationMs:0,samples:0};point.outputTokens+=row.outputTokens;point.durationMs+=row.durationMs;point.samples++;groups.set(key,point);}
+          const byModel=models.map(model=>{const rows=all.filter(r=>r.model===model);return {model,summary:summarize(rows),latestAt:Math.max(0,...rows.map(r=>r.completedAt))};}).filter(row=>row.summary.samples);
+          const enabled=test!=='paused',localMonitoring=!args.device||args.device==='demo-a';
+          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,recent:selected.sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
         }
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_benchmarks':
@@ -740,7 +749,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3002',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'1.0.3003',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -1000,7 +1009,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3002",
+            version: "1.0.3003",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

@@ -32,7 +32,7 @@ pub fn benchmark_smoke_report(app:tauri::AppHandle,window:tauri::WebviewWindow,s
         if report["radar"].as_u64().unwrap_or(0)==0||report["libraryRemoved"]!=true||report["donutLegendsRemoved"]!=true{return Err("六维图或产品页面结构不符".into())}
         let speed=crate::activity::speed::report(state.store.dir(),"","codex",7,"")?;
         let displayed=report["speed"].as_array().ok_or("缺少输出速度界面值")?;
-        for (i,value) in [speed.summary.average,speed.summary.median,speed.summary.p95,Some(speed.summary.samples as f64)].into_iter().enumerate(){
+        for (i,value) in [speed.summary.average,Some(speed.summary.samples as f64),speed.recent.first().map(|row|row.speed)].into_iter().enumerate(){
             if let Some(value)=value{if displayed.get(i).and_then(Value::as_f64).is_none_or(|n|(n-value).abs()>0.051){return Err("输出速度界面与本机记录不符".into())}}
         }
         Ok(())
@@ -52,7 +52,7 @@ pub fn smoke_if_requested(app:tauri::AppHandle){
         if(step===1){if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='all'||!collect().length)return;report.all=collect();change('all30');step=2;return;}
         if(step===2){if(document.querySelector('.visual-model-page')?.dataset.evaluationScope!=='all30')return;report.recent=collect();button('六维对比')?.click();step=3;return;}
         if(step===3){const radar=document.querySelector('.visual-ability .ability-radar');if(!radar)return;report.radar=radar.querySelectorAll('circle').length;document.querySelector('nav button[aria-label="输出速度"]')?.click();step=4;return;}
-        if(step===4){if(!report.speedPeriod){button('7天')?.click();report.speedPeriod=true;return;}if(!document.querySelector('.speed-summary')||!document.querySelector('.speed-chart > svg'))return;report.speed=[...document.querySelectorAll('.speed-summary strong')].map(e=>Number(e.textContent.replaceAll(',','')));report.libraryRemoved=!document.querySelector('nav button[aria-label="模型库"]');document.querySelector('nav button[aria-label="Token 活动"]')?.click();step=5;return;}
+        if(step===4){if(!report.speedPeriod){button('7天')?.click();report.speedPeriod=true;return;}if(!document.querySelector('.speed-summary')||!document.querySelector('.speed-chart svg'))return;report.speed=['.speed-average-value','.speed-sample-value','.speed-latest-value'].map(selector=>Number(document.querySelector(selector).textContent.replaceAll(',','')));report.libraryRemoved=!document.querySelector('nav button[aria-label="模型库"]');document.querySelector('nav button[aria-label="Token 活动"]')?.click();step=5;return;}
         if(step===5){if(!document.querySelector('.activity-shares'))return;report.donutLegendsRemoved=!document.querySelector('.activity-share-legend')&&!document.getElementById('activity-details');clearInterval(timer);window.dispatchEvent(new CustomEvent('quota-benchmark-smoke-report',{detail:report}));}
       },300);})()"#;
     tauri::async_runtime::spawn(async move{for _ in 0..22{tokio::time::sleep(std::time::Duration::from_secs(2)).await;if app.state::<AppState>().store.dir().join("benchmark-ui-check.json").exists(){break}if let Some(window)=app.get_webview_window("main"){let _=window.eval(script);}}});

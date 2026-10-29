@@ -9,7 +9,15 @@ $taskUtf8=[Text.UTF8Encoding]::new($false)
 $taskConfig=@{version=1;accounts=@();settings=@{autoRefresh=$false;ladderAutoUpdate=$false;notifyLowBalance=$false;closeToTray=$false;refreshIntervalMinutes=30;defaultLowThreshold=20;notifyRecharge=$false;trayAlert=$false}}
 $taskOptions=@{deviceId=[guid]::NewGuid().ToString();deviceName='Product UI check';autoCollect=$false;syncAccounts=$false;syncDir='';codexHome='';zcodeHome='';harnessHome='';traeHome='';traeEnabled=$false;codexSshDevices=@()}
 foreach($taskEntry in @(@('config.json',$taskConfig),@('activity-settings.json',$taskOptions),@('usage-widget.json',@{enabled=$false;side='right';heightPercent=50}))){[IO.File]::WriteAllText((Join-Path $taskData $taskEntry[0]),($taskEntry[1]|ConvertTo-Json -Depth 8),$taskUtf8)}
-Copy-Item -LiteralPath $ActivityDb -Destination (Join-Path $taskData 'activity.sqlite')
+# Read-only SQLite backup includes committed WAL pages. A raw copy can silently
+# omit the new samples when the fixture's last open connection was a reader.
+$taskSnapshot=@'
+const {DatabaseSync,backup}=require('node:sqlite');
+const db=new DatabaseSync(process.argv[1],{readOnly:true});
+backup(db,process.argv[2]).then(()=>db.close()).catch(error=>{db.close();console.error(error.message);process.exitCode=1;});
+'@
+& node --no-warnings -e $taskSnapshot $ActivityDb (Join-Path $taskData 'activity.sqlite')
+if($LASTEXITCODE -ne 0){throw 'Could not snapshot the synthetic activity database'}
 $taskPreviousData=$env:QUOTA_DATA_DIR;$taskPreviousSmoke=$env:QUOTA_BENCHMARK_SMOKE;$taskPreviousWebView=$env:WEBVIEW2_USER_DATA_FOLDER
 try{
  $env:QUOTA_DATA_DIR=$taskData;$env:QUOTA_BENCHMARK_SMOKE='1';$env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $taskData 'WebViewProfile'

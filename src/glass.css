@@ -10,11 +10,17 @@ html[data-glass="on"][data-native-glass="on"],
 html[data-glass="on"][data-native-glass="on"] body,
 html[data-glass="on"][data-native-glass="on"] #root {background:transparent!important;}
 html[data-glass="on"] .app {background:transparent;}
-html[data-glass="on"] .app,html[data-glass="on"] .usage-widget {--text:var(--glass-text);--text-2:color-mix(in srgb,var(--text) 99%,var(--surface));--text-3:color-mix(in srgb,var(--text) 98%,var(--surface));color:var(--text);}
+html[data-glass="on"] .app,html[data-glass="on"] .usage-widget {--text:var(--glass-text);--text-2:color-mix(in srgb,var(--text) 99%,var(--surface));--text-3:color-mix(in srgb,var(--text) 98%,var(--surface));--glass-focus:color-mix(in srgb,var(--blue) 25%,var(--text));color:var(--text);}
 html[data-glass="on"] .app .btn-quiet,html[data-glass="on"] .app .seg button.active,html[data-glass="on"] .usage-kpis section:first-child strong,html[data-glass="on"] .app .speed-average-value,html[data-glass="on"] .sidebar .nav-item .count,html[data-glass="on"] .usage-widget .working .live-model-phase {color:var(--text);}
 html[data-glass="on"] .app .badge-red {color:color-mix(in srgb,var(--red) 92%,var(--text));}
 html[data-glass="on"] .app .scatter-badge {fill:var(--text);}
 html[data-glass="on"] .sidebar-alert {background:var(--surface);border-radius:6px;padding:3px 7px;width:fit-content;max-width:100%;}
+html[data-glass="on"] :is(.app,.usage-widget) :is(button,a,input,select,textarea,summary,div[tabindex],svg[tabindex]):focus-visible {outline:2px solid var(--glass-focus);outline-offset:2px;}
+html[data-glass="on"] .app .window-controls button:focus-visible {outline-color:currentColor;outline-offset:-4px;}
+html[data-glass="on"] .app :is(.workspace-tools button,.usage-vendor-link,.speed-legend button):hover {color:var(--text);}
+html[data-glass="on"] .app .usage-vendor-link:hover {text-decoration:underline;text-underline-offset:3px;}
+html[data-glass="on"] .app .speed-legend button {border-radius:7px;transition:background 160ms var(--motion-ease);}
+html[data-glass="on"] .app .speed-legend button:hover {background:color-mix(in srgb,var(--surface) 28%,transparent);}
 html[data-glass="on"] .glass-backdrop {background:linear-gradient(135deg,var(--bg),color-mix(in srgb,var(--surface) 82%,var(--blue-soft)));}
 html[data-glass="on"] .glass-backdrop i {opacity:.22;filter:blur(38px);}
 html[data-glass="on"][data-native-glass="on"] .glass-backdrop {background:color-mix(in srgb,var(--surface) 5%,transparent);}

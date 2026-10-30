@@ -191,6 +191,8 @@ cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_
 
 本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
+玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)，覆盖不同背景、收起、重新展开和页面可见性变化。
+
 ## 文档与贡献
 
 [活动统计](docs/activity-stats.md) · [模型资料库](docs/model-catalog.md) · [架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [Git 流程](docs/git-workflow.md)

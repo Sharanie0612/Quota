@@ -6,7 +6,7 @@ async function main(){
   const root=path.resolve(process.env.QUOTA_NATIVE_DATA||'');
   assert(process.env.QUOTA_NATIVE_DATA&&path.isAbsolute(process.env.QUOTA_NATIVE_DATA));
   const config=JSON.parse(fs.readFileSync(path.join(root,'config.json'),'utf8'));assert.equal(config.accounts.length,0);assert.equal(config.settings.ladderAutoUpdate,false);
-  const out=path.join(root,'visual');fs.mkdirSync(out,{recursive:true});
+  const out=path.join(root,'visual');fs.mkdirSync(out,{recursive:true});fs.rmSync(path.join(out,'evidence.json'),{force:true});
   const oldFiles=['vendor-costs.json','monthly-usage-fx.json'].map(file=>[file,fs.readFileSync(path.join(root,file),'utf8')]);
   const browser=await chromium.connectOverCDP(process.env.QUOTA_CDP_URL||'http://127.0.0.1:9237');
   let page,widget;
@@ -59,6 +59,27 @@ async function main(){
   const speed=await invoke('get_output_speed',{device:'',source:'codex',days:0,model:'',bucketSeconds:0,lookbackHours:0,lookbackMinutes:0});assert.equal(Number(await page.locator('.speed-plot').getAttribute('data-call-count')),speed.calls.length);assert.equal(speed.calls.length,speed.summary.samples);assert.equal(await page.locator('.speed-plot path').count(),0);assert.equal(await page.locator('.speed-average-value').evaluate(e=>getComputedStyle(e).color),await page.locator('.app').evaluate(e=>getComputedStyle(e).color));
   const speedAxis=await page.locator('[data-time-tick]').evaluateAll(rows=>rows.map(e=>{const r=e.getBoundingClientRect();return {at:Number(e.dataset.timeTick),label:e.textContent,left:r.left,right:r.right};}));assert(speedAxis.length>=2);assert.equal(new Set(speedAxis.map(r=>r.label)).size,speedAxis.length);assert(speedAxis.every((r,i)=>!i||r.left>=speedAxis[i-1].right+6));
   await page.locator('.speed-plot svg').focus();await page.keyboard.press('ArrowLeft');await page.getByRole('tooltip').waitFor();const sortedCalls=[...speed.calls].sort((a,b)=>a.completedAt-b.completedAt||a.id.localeCompare(b.id)),selectedCall=sortedCalls[Math.max(0,sortedCalls.length-2)],speedPrecision=await page.getByRole('tooltip').locator('b').innerText();assert.equal(speedPrecision,await page.evaluate(at=>new Date(at).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3,hourCycle:'h23'}),selectedCall.completedAt));await page.keyboard.press('Escape');await capture('speed-native');checks.push('all real completed calls rendered individually, distinct nonoverlapping time labels, exact millisecond tooltip, readable speed ink, no connected curve, keyboard access');
+  const speedDisplay=[],speedAppearance=await invoke('get_appearance'),displaySession=await page.context().newCDPSession(page),viewport=await page.evaluate(()=>({width:innerWidth,height:innerHeight,ratio:devicePixelRatio}));
+  const canvasState=()=>page.locator('.speed-call-canvas canvas').evaluate(canvas=>{
+    const rect=canvas.getBoundingClientRect(),source=canvas.getContext('2d'),pixelContext=document.createElement('canvas').getContext('2d');
+    const pixel=color=>{pixelContext.fillStyle=color;pixelContext.fillRect(0,0,1,1);return [...pixelContext.getImageData(0,0,1,1).data];},actual=pixel(source.strokeStyle),expected=pixel(getComputedStyle(canvas).color);
+    return {ratio:devicePixelRatio,width:canvas.width,height:canvas.height,cssWidth:Math.round(rect.width),cssHeight:Math.round(rect.height),inkDifference:Math.max(...actual.map((v,i)=>Math.abs(v-expected[i]))),actual,expected,calls:Number(document.querySelector('.speed-plot').dataset.callCount)};
+  });
+  const readyCanvas=async()=>{let state;for(let attempt=0;attempt<40;attempt++){state=await canvasState();if(state.inkDifference<=1&&Math.abs(state.width-Math.trunc(state.cssWidth*state.ratio))<=1&&Math.abs(state.height-Math.trunc(state.cssHeight*state.ratio))<=1){assert.equal(state.calls,speed.calls.length);return state;}await page.waitForTimeout(25);}assert.fail('Native speed canvas did not follow display change: '+JSON.stringify(state));};
+  await page.evaluate(()=>{window.nativeSpeedInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=function(name,...args){if(name==='get_output_speed')return new Promise(()=>{});return window.nativeSpeedInvoke.call(this,name,...args);};});
+  try{
+    await invoke('save_appearance',{preferences:{...speedAppearance,mode:'system',revision:Math.max(Date.now(),speedAppearance.revision+1)}});
+    for(const mode of ['dark','light']){
+      await page.emulateMedia({colorScheme:mode});await page.waitForFunction(mode=>document.documentElement.dataset.colorMode===mode,mode);speedDisplay.push({kind:'system-'+mode,state:await readyCanvas()});
+      for(const active of [true,false]){await page.emulateMedia({forcedColors:active?'active':'none'});await page.waitForFunction(active=>document.documentElement.dataset.nativeGlass===(active?'off':'on'),active);speedDisplay.push({kind:mode+'-contrast-'+active,state:await readyCanvas()});}
+    }
+    for(const ratio of [2,1.5,1.25,viewport.ratio]){
+      await displaySession.send('Emulation.setDeviceMetricsOverride',{width:viewport.width,height:viewport.height,deviceScaleFactor:ratio,mobile:false});await page.waitForFunction(ratio=>devicePixelRatio===ratio,ratio);await page.evaluate(()=>window.dispatchEvent(new Event('resize')));speedDisplay.push({kind:'emulated-DPR-resize',state:await readyCanvas()});
+    }
+  }finally{
+    await displaySession.send('Emulation.clearDeviceMetricsOverride');await page.evaluate(()=>{window.dispatchEvent(new Event('resize'));window.__TAURI_INTERNALS__.invoke=window.nativeSpeedInvoke;delete window.nativeSpeedInvoke;});await page.emulateMedia({forcedColors:'none',colorScheme:null});await invoke('save_appearance',{preferences:{...speedAppearance,revision:Date.now()+1}});await displaySession.detach();
+  }
+  await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.nativeGlass==='on');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
   await go('AI 模型');await page.locator('.scatter-point').first().waitFor();
   const nodes=await page.locator('.scatter-point').evaluateAll(elements=>elements.map(e=>({x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),members:JSON.parse(e.dataset.members)})));
   for(let i=0;i<nodes.length;i++)for(let j=0;j<i;j++)assert(Math.hypot(nodes[i].x-nodes[j].x,nodes[i].y-nodes[j].y)>=27.9);
@@ -75,7 +96,7 @@ async function main(){
   const elapsed=await widget.evaluate(async()=>{const data=await window.__TAURI_INTERNALS__.invoke('get_widget_speed'),text=document.querySelector('.task-row time').textContent,part=unit=>Number(text.match(new RegExp('(\\d+)'+unit))?.[1]||0);return {shown:part('\u65f6')*3600+part('\u5206')*60+part('\u79d2'),expected:Math.floor((Date.now()-data.tasks[0].startedAt)/1000),precision:text.includes('\u65f6')?60:1};});assert(Math.abs(elapsed.shown-elapsed.expected)<=elapsed.precision);
   await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();checks.push('native collapsed task text stays idle and opening refreshes the real elapsed time');
   for(const [file,contents] of oldFiles)assert.equal(fs.readFileSync(path.join(root,file),'utf8'),contents);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedDisplay,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
   console.log(checks.map(check=>'PASS '+check).join('\n'));await browser.close();
 }
 main().catch(error=>{console.error(error);process.exit(1);});

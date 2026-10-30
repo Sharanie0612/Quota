@@ -23,11 +23,20 @@ export function OutputSpeedChart({data,period,onSelectModel}:{data:OutputSpeedRe
   const timeTicks=useMemo(()=>speedTimeTicks(start,end,right-left,timeAxis.spacing).filter((at,i,rows)=>!i||timeAxis.format(at)!==timeAxis.format(rows[i-1])),[start,end,right,left,timeAxis]);
   useEffect(()=>{
     const element=canvas.current;if(!element)return;const context=element.getContext('2d');if(!context)return;
-    const ratio=window.devicePixelRatio||1;element.width=size.width*ratio;element.height=size.height*ratio;
-    context.scale(ratio,ratio);context.clearRect(0,0,size.width,size.height);
-    const styles=getComputedStyle(element),colors=new Map(data.models.map(model=>[model,styles.getPropertyValue(speedColor(model,data.models).slice(4,-1)).trim()]));
-    context.strokeStyle=styles.color;context.lineWidth=1.25;
-    for(const point of points){context.globalAlpha=.76;context.fillStyle=colors.get(point.call.model)||styles.getPropertyValue('--blue');context.beginPath();context.arc(point.x,point.y,3.2,0,Math.PI*2);context.fill();context.globalAlpha=1;context.stroke();}
+    const contrast=matchMedia('(forced-colors: active)');
+    const draw=()=>{
+      const ratio=window.devicePixelRatio||1;element.width=size.width*ratio;element.height=size.height*ratio;
+      context.scale(ratio,ratio);context.clearRect(0,0,size.width,size.height);
+      const styles=getComputedStyle(element),colors=new Map(data.models.map(model=>[model,styles.getPropertyValue(speedColor(model,data.models).slice(4,-1)).trim()]));
+      context.strokeStyle=contrast.matches?styles.color:styles.getPropertyValue('--text').trim()||styles.color;context.lineWidth=1.25;
+      for(const point of points){context.globalAlpha=.76;context.fillStyle=colors.get(point.call.model)||styles.getPropertyValue('--blue');context.beginPath();context.arc(point.x,point.y,3.2,0,Math.PI*2);context.fill();context.globalAlpha=1;context.stroke();}
+    };
+    // Media styles settle before painting; a new display needs a new ratio query.
+    let frame=0,resolution:MediaQueryList|undefined;
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;draw();});};
+    const watchRatio=()=>{resolution?.removeEventListener('change',watchRatio);resolution=matchMedia(`(resolution: ${window.devicePixelRatio||1}dppx)`);resolution.addEventListener('change',watchRatio);schedule();};
+    contrast.addEventListener('change',schedule);window.addEventListener('resize',schedule);watchRatio();
+    return()=>{if(frame)cancelAnimationFrame(frame);resolution?.removeEventListener('change',watchRatio);contrast.removeEventListener('change',schedule);window.removeEventListener('resize',schedule);};
   },[points,size.width,size.height,data.models,appearance]);
   return <div className="speed-plot" data-call-count={points.length} onMouseLeave={()=>setCursor(null)}>
     <div className="speed-call-canvas"><canvas ref={canvas} aria-hidden="true"/>

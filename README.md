@@ -111,7 +111,7 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-界面示例使用合成资料。清透材质为1.0.3400，采用合成背景核对透明层和文字可读性；功能布局保留此前1.0.3300的示例。安装版验证见交付记录。
+界面示例使用合成资料。清透材质为1.0.3400，主窗口采用合成背景核对透明层和文字可读性，任务窗来自隔离资料的安装版WebView图层；其余功能布局保留此前1.0.3300的示例。安装版验证见交付记录。
 
 ![清透材质与浅色内容](assets/readme/clear-liquid-light-3400.png)
 
@@ -128,7 +128,7 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ![每次调用的速度散点趋势](assets/readme/output-speed-3300.png)
 
-![贴边悬浮窗中的运行任务](assets/readme/live-widget-3300.png)
+![清透任务悬浮窗中的运行任务](assets/readme/clear-widget-3400.png)
 
 </details>
 

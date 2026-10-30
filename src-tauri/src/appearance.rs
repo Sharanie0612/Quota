@@ -1,6 +1,48 @@
 use crate::commands::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
+
+#[derive(Serialize)]
+pub struct MainMaterial {
+    active: bool,
+    revision: u64,
+}
+
+/// Only the primary renderer may enable desktop composition. The widget keeps
+/// its own clipped CSS surface and never receives a whole-window material.
+#[tauri::command]
+pub fn sync_main_material(
+    window: tauri::WebviewWindow,
+    state: State<'_, AppState>,
+    revision: u64,
+    dark: bool,
+    allowed: bool,
+) -> Result<MainMaterial, String> {
+    if window.label() != "main" { return Err("只能设置主窗口材质".into()); }
+    let current = state.appearance.lock().map_err(|_| "外观设置暂不可用")?;
+    let stored_revision = current.as_ref().map_or(0, |p| p.revision);
+    if stored_revision != revision { return Ok(MainMaterial {active:false,revision:stored_revision}); }
+    let enabled = current.as_ref().is_some_and(|p| p.glass) && allowed;
+    let dark = current.as_ref().map_or(dark, |p| match p.mode.as_str() {"dark"=>true,"light"=>false,_=>dark});
+    let mut applied=state.main_material.lock().map_err(|_| "主窗口材质暂不可用")?;
+    if let Some((previous_enabled,previous_dark,active))=*applied {
+        if previous_enabled==enabled && previous_dark==dark { return Ok(MainMaterial {active,revision:stored_revision}); }
+    }
+    #[cfg(windows)]
+    let active = {
+        let transparent = window.set_background_color(Some(tauri::webview::Color(0,0,0,0))).is_ok();
+        if enabled && transparent {
+            // The native floor preserves contrast on both black and white
+            // desktop backgrounds; the renderer adds only thin local tints.
+            let tint = if dark {(18,25,38,152)} else {(255,255,255,140)};
+            window_vibrancy::apply_acrylic(&window,Some(tint)).is_ok()
+        } else { let _=window_vibrancy::clear_acrylic(&window);false }
+    };
+    #[cfg(not(windows))]
+    let active = { let _=(enabled,dark);false };
+    if !enabled || active { *applied=Some((enabled,dark,active)); }
+    Ok(MainMaterial {active,revision:stored_revision})
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Preferences {

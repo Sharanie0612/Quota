@@ -18,6 +18,15 @@ const fallback:Appearance={theme:'quota',mode:'system',collapsed:false,glass:fal
 let snapshot=fallback;
 const listeners=new Set<()=>void>();
 let initialized=false;
+let materialRequest=0;
+async function syncNativeMaterial(){
+  if(new URLSearchParams(location.search).has('window'))return;
+  const request=++materialRequest;
+  try{
+    const result=await invoke<{active:boolean;revision:number}>('sync_main_material',{revision:snapshot.revision,dark:snapshot.resolved==='dark',allowed:!matchMedia('(forced-colors: active)').matches});
+    if(request===materialRequest&&result.revision===snapshot.revision)document.documentElement.dataset.nativeGlass=result.active?'on':'off';
+  }catch{if(request===materialRequest)document.documentElement.dataset.nativeGlass='off';}
+}
 function read():Appearance {
   try {const value=JSON.parse(localStorage.getItem(KEY)||'{}');return {...fallback,theme:THEMES.some(t=>t.id===value.theme)&&value.revision>0?value.theme:fallback.theme,mode:['system','light','dark'].includes(value.mode)?value.mode:'system',collapsed:value.collapsed===true,glass:value.glass===true,revision:Number.isSafeInteger(value.revision)&&value.revision>=0?value.revision:0};}catch{return {...fallback};}
 }
@@ -42,13 +51,22 @@ function apply() {
   document.documentElement.dataset.colorTheme=snapshot.theme;
   document.documentElement.dataset.colorMode=snapshot.resolved;
   document.documentElement.dataset.glass=snapshot.glass?'on':'off';
+  void syncNativeMaterial();
   listeners.forEach(listener=>listener());
 }
 export function initializeAppearance() {
   if(initialized||typeof window==='undefined')return;
   initialized=true;snapshot=read();apply();
-  let frame=0;document.addEventListener('pointermove',event=>{if(!snapshot.glass||frame||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg,.usage-kpis');if(!surface)return;const x=event.clientX,y=event.clientY;frame=requestAnimationFrame(()=>{frame=0;const rect=surface.getBoundingClientRect();surface.style.setProperty('--glass-x',`${x-rect.left}px`);surface.style.setProperty('--glass-y',`${y-rect.top}px`);});},{passive:true});
+  let frame=0,latest:{surface:HTMLElement;x:number;y:number}|null=null;
+  document.addEventListener('pointermove',event=>{
+    if(!snapshot.glass||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg');if(!surface)return;
+    latest={surface,x:event.clientX,y:event.clientY};if(frame)return;
+    frame=requestAnimationFrame(()=>{frame=0;if(!latest||!snapshot.glass||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const {surface,x,y}=latest,rect=surface.getBoundingClientRect();surface.style.setProperty('--glass-x',Math.max(0,Math.min(rect.width,x-rect.left))+'px');surface.style.setProperty('--glass-y',Math.max(0,Math.min(rect.height,y-rect.top))+'px');});
+  },{passive:true});
+  document.addEventListener('pointerout',event=>{const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg');if(surface&&!(event.relatedTarget instanceof Node&&surface.contains(event.relatedTarget))){surface.style.removeProperty('--glass-x');surface.style.removeProperty('--glass-y');if(latest?.surface===surface)latest=null;}},{passive:true});
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',apply);
+  matchMedia('(forced-colors: active)').addEventListener('change',()=>void syncNativeMaterial());
   window.addEventListener('storage',event=>{if(event.key===KEY){snapshot=read();apply();}});
   void listen<Appearance>('appearance-updated',event=>accept(event.payload)).then(()=>invoke<Appearance|null>('get_appearance')).then(accept).catch(()=>undefined);
 }
@@ -56,6 +74,6 @@ export function setAppearance(patch:Partial<Pick<Appearance,'theme'|'mode'|'coll
   snapshot={...snapshot,...patch,revision:Math.max(Date.now(),snapshot.revision+1)};
   try{localStorage.setItem(KEY,JSON.stringify({theme:snapshot.theme,mode:snapshot.mode,collapsed:snapshot.collapsed,glass:snapshot.glass,revision:snapshot.revision}));}catch{/* Keep the current session usable when storage is unavailable. */}
   apply();
-  void invoke('save_appearance',{preferences:{theme:snapshot.theme,mode:snapshot.mode,collapsed:snapshot.collapsed,glass:snapshot.glass,revision:snapshot.revision}}).catch(()=>undefined);
+  void invoke('save_appearance',{preferences:{theme:snapshot.theme,mode:snapshot.mode,collapsed:snapshot.collapsed,glass:snapshot.glass,revision:snapshot.revision}}).then(()=>syncNativeMaterial()).catch(()=>undefined);
 }
 export function useAppearance(){return useSyncExternalStore(listener=>{listeners.add(listener);return()=>listeners.delete(listener);},()=>snapshot,()=>fallback);}

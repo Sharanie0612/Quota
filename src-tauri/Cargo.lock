@@ -3331,7 +3331,7 @@ dependencies = [
 
 [[package]]
 name = "quota"
-version = "1.0.3300"
+version = "1.0.3400"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -3357,6 +3357,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tokio",
  "uuid",
+ "window-vibrancy",
  "windows-sys 0.61.2",
  "zip",
  "zstd",

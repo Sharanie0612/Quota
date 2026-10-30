@@ -1,4 +1,4 @@
-//! Shape the actual main window, including Windows 10, without a transparent WebView.
+//! Shape the actual main window, including the transparent material on Windows 10.
 use serde::Serialize;
 use tauri::{Emitter, Manager, Window};
 

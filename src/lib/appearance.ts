@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { initializeGlassMotion } from './glassMotion';
 
 export type ThemeId = 'codex' | 'claude' | 'vscode' | 'github' | 'quota';
 export type ColorMode = 'system' | 'light' | 'dark';
@@ -19,6 +20,7 @@ let snapshot=fallback;
 const listeners=new Set<()=>void>();
 let initialized=false;
 let materialRequest=0;
+let glassMotion:ReturnType<typeof initializeGlassMotion>|undefined;
 async function syncNativeMaterial(){
   if(new URLSearchParams(location.search).has('window'))return;
   const request=++materialRequest;
@@ -43,6 +45,8 @@ function apply() {
   const palette=THEMES.find(theme=>theme.id===snapshot.theme)![snapshot.resolved];
   const values:Record<string,string>={bg:palette.bg,'bg-sidebar':palette.sidebar,'bg-topbar':palette.workspace,surface:palette.surface,'surface-2':palette.workspace,'surface-3':palette.group,border:palette.border,'border-strong':palette.strong,text:palette.text,'text-2':palette.secondary,'text-3':palette.muted,blue:palette.accent,'blue-hover':palette.accent,'blue-press':palette.accent,'blue-soft':palette.soft,'on-blue':palette.onAccent,'seg-thumb':palette.surface,primary:palette.primary??palette.accent,'on-primary':snapshot.theme==='github'?'#ffffff':palette.onAccent,'brand-strong':palette.text,'seg-track':palette.group,fill:palette.group,'fill-strong':palette.border,'fill-press':palette.strong,'shadow-card':'0 1px 3px color-mix(in srgb, '+palette.text+' 4%, transparent)'};
   const dark=snapshot.resolved==='dark';
+  // Transparent material needs stronger ink, especially the muted editor theme.
+  values['glass-text']=dark?'color-mix(in srgb, '+palette.text+' 25%, #ffffff)':palette.text;
   const charts:Record<ThemeId,string[]>={quota:dark?['#7eb6ff','#bfd8ff','#63c4d1','#b6aaeb','#e0bc89','#91a7c4']:['#1478ec','#153e78','#389ca8','#8a7ac2','#bb9253','#a2b1c8'],codex:dark?['#eeeeee','#8ac1a7','#93b2ce','#c3b4a1','#b3a2c8','#879195']:['#303030','#438365','#6685a0','#a68e71','#8c799f','#a6ada9'],claude:dark?['#e4a183','#b6c79b','#caba8f','#a8bbc9','#d1a7b8','#a59f91']:['#b96043','#748764','#b1935b','#73899e','#b48392','#ada89b'],vscode:dark?['#4daafc','#4ec9b0','#c586c0','#dcdcaa','#ce9178','#8c9aa6']:['#007acc','#16856e','#a646aa','#9c831d','#aa5d36','#909da9'],github:dark?['#58a6ff','#3fb950','#bc8cff','#d29922','#ff7b72','#8b949e']:['#0969da','#1a7f37','#8250df','#9a6700','#cf222e','#8c959f']};
   charts[snapshot.theme].forEach((value,index)=>values[index===5?'chart-rest':`chart-${index+1}`]=value);
   Object.assign(values,{red:dark?'#ff938a':'#c4362f',amber:dark?'#f1c86a':'#8b5a00',green:dark?'#78cf9b':'#277943','switch-on':palette.primary??palette.accent,'red-soft':'color-mix(in srgb, var(--red) 12%, '+palette.surface+')','amber-soft':'color-mix(in srgb, var(--amber) 12%, '+palette.surface+')','green-soft':'color-mix(in srgb, var(--green) 12%, '+palette.surface+')','shadow-pop':dark?'0 18px 50px #00000070':'0 18px 50px #00000030'});
@@ -51,20 +55,13 @@ function apply() {
   document.documentElement.dataset.colorTheme=snapshot.theme;
   document.documentElement.dataset.colorMode=snapshot.resolved;
   document.documentElement.dataset.glass=snapshot.glass?'on':'off';
+  glassMotion?.refresh();
   void syncNativeMaterial();
   listeners.forEach(listener=>listener());
 }
 export function initializeAppearance() {
   if(initialized||typeof window==='undefined')return;
-  initialized=true;snapshot=read();apply();
-  let frame=0,latest:{surface:HTMLElement;x:number;y:number}|null=null;
-  document.addEventListener('pointermove',event=>{
-    if(!snapshot.glass||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg');if(!surface)return;
-    latest={surface,x:event.clientX,y:event.clientY};if(frame)return;
-    frame=requestAnimationFrame(()=>{frame=0;if(!latest||!snapshot.glass||matchMedia('(prefers-reduced-motion: reduce)').matches)return;const {surface,x,y}=latest,rect=surface.getBoundingClientRect();surface.style.setProperty('--glass-x',Math.max(0,Math.min(rect.width,x-rect.left))+'px');surface.style.setProperty('--glass-y',Math.max(0,Math.min(rect.height,y-rect.top))+'px');});
-  },{passive:true});
-  document.addEventListener('pointerout',event=>{const surface=(event.target as Element).closest<HTMLElement>('.sidebar,.workspace-toolbar,.seg');if(surface&&!(event.relatedTarget instanceof Node&&surface.contains(event.relatedTarget))){surface.style.removeProperty('--glass-x');surface.style.removeProperty('--glass-y');if(latest?.surface===surface)latest=null;}},{passive:true});
+  initialized=true;snapshot=read();glassMotion=initializeGlassMotion(()=>snapshot.glass);apply();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',apply);
   matchMedia('(forced-colors: active)').addEventListener('change',()=>void syncNativeMaterial());
   window.addEventListener('storage',event=>{if(event.key===KEY){snapshot=read();apply();}});

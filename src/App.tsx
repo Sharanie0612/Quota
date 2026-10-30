@@ -131,7 +131,7 @@ export default function App() {
 
         <div className="sidebar-foot">
           {lowCount > 0 ? (
-            <div style={{ color: "var(--red, #d70015)", marginBottom: 6 }}>
+            <div className="sidebar-alert" style={{ color: "var(--red, #d70015)", marginBottom: 6 }}>
               {lowCount} 个账户余额不足
             </div>
           ) : null}

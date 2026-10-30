@@ -1,6 +1,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),path=require('node:path');
 function load(name){const src=fs.readFileSync(path.resolve(__dirname,'../src/lib',name+'.ts'),'utf8'),out=ts.transpileModule(src,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const mod={exports:{}};new Function('require','module','exports',out)(require,mod,mod.exports);return mod.exports;}
 const {callLayout,nearestCall}=load('outputCalls'),{scatterClusters,plotPriceLabel}=load('scatterLayout');
+const {speedTimeAxis,speedTimeTicks}=load('outputSpeed');
+for(const width of [480,760,1400])for(const [start,end] of [[new Date(2026,9,29,23,24,5).getTime(),new Date(2026,9,29,23,24,45).getTime()],[new Date(2026,11,31,23,59,40).getTime(),new Date(2027,0,1,0,0,20).getTime()],[new Date(2024,0,1).getTime(),new Date(2026,9,31).getTime()]]){
+  const axis=speedTimeAxis(start,end,'all'),raw=speedTimeTicks(start,end,width,axis.spacing),ticks=raw.filter((at,i)=>!i||axis.format(at)!==axis.format(raw[i-1])),labels=ticks.map(axis.format);
+  assert.equal(new Set(labels).size,labels.length);assert(ticks.every((at,i)=>at>=start&&at<=end&&(!i||at>ticks[i-1])));assert(ticks.length>=2);
+}
 const rows=Array.from({length:10000},(_,i)=>({id:'call-'+i,completedAt:1000000+Math.floor(i/2)*1000,speed:i%2?50:100}));
 const layout=callLayout(rows,900,310);assert.equal(layout.points.length,10000);assert.equal(new Set(layout.points.map(p=>p.call.id)).size,10000);
 for(const p of layout.points){assert(p.x>=layout.left&&p.x<=layout.right);assert(p.y>=layout.top&&p.y<=layout.bottom);}

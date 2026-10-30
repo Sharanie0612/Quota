@@ -43,8 +43,8 @@ export function OutputSpeedChart({data,period,onSelectModel}:{data:OutputSpeedRe
     <svg ref={size.ref} viewBox={`0 0 ${size.width} ${size.height}`} role="img" tabIndex={0}
       aria-label={`${points.length} 次调用的输出速度，每点一次调用，左右方向键查看`}
       onMouseMove={event=>{const rect=event.currentTarget.getBoundingClientRect();setCursor(nearestCall(points,(event.clientX-rect.left)*size.width/rect.width,(event.clientY-rect.top)*size.height/rect.height)?.call.id??null);}}
-      onFocus={()=>setCursor(points[points.length-1]?.call.id??null)} onBlur={()=>setCursor(null)}
-      onKeyDown={event=>{if(event.key==='Escape'){setCursor(null);return;}if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();const index=Math.max(0,points.findIndex(point=>point.call.id===cursor));setCursor(points[Math.max(0,Math.min(points.length-1,index+(event.key==='ArrowLeft'?-1:1)))]?.call.id??null);}}>
+      onFocus={event=>{if(event.currentTarget.matches(':focus-visible'))setCursor(points[points.length-1]?.call.id??null);}} onBlur={()=>setCursor(null)}
+      onKeyDown={event=>{if(event.key==='Escape'){setCursor(null);return;}if(!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();const index=points.findIndex(point=>point.call.id===cursor),next=index<0?(event.key==='ArrowLeft'?points.length-1:0):Math.max(0,Math.min(points.length-1,index+(event.key==='ArrowLeft'?-1:1)));setCursor(points[next]?.call.id??null);}}>
       {ticks.map(value=><g key={value}><line x1={left} x2={right} y1={y(value)} y2={y(value)} className="speed-grid"/><text x={left-12} y={y(value)+5} textAnchor="end" className="speed-tick">{speedNumber(value)}</text></g>)}
       {timeTicks.map((at,i,rows)=><text key={at} data-time-tick={at} x={x(at)} y={size.height-10} textAnchor={i===0?'start':i===rows.length-1?'end':'middle'} className="speed-tick">{timeAxis.format(at)}</text>)}
       <text x={left} y={top-10} className="speed-tick">tokens/s</text>

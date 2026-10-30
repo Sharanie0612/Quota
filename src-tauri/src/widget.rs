@@ -147,13 +147,16 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
     if !config.accounts.is_empty() || config.settings.auto_refresh || isolated.as_deref()!=Some(state.store.dir()) {return;}
     drop(config);let app=app.clone();
     std::thread::spawn(move||{
-        let check=||->Result<(),String>{
+        let mut phase="frontend-ready";let mut checks=Vec::new();
+        let mut check=||->Result<(),String>{
             let win=app.get_webview_window(LABEL).ok_or("悬浮窗未创建")?;
             let main=app.get_webview_window("main").ok_or("主窗口未创建")?;
             let _=main.hide();
             let deadline=std::time::Instant::now()+std::time::Duration::from_secs(15);
             while !win.is_visible().unwrap_or(false) {if std::time::Instant::now()>deadline{return Err("前端未完成悬浮窗就绪握手".into());}std::thread::sleep(std::time::Duration::from_millis(100));}
+            checks.push(phase);phase="frameless-topmost";
             if win.is_decorated().unwrap_or(true)||win.is_resizable().unwrap_or(true)||!win.is_always_on_top().unwrap_or(false){return Err("悬浮窗属性不符".into());}
+            checks.push(phase);phase="repeat-expand-collapse";
             for expanded in [true,false,true,false]{
                 set_widget_expanded(app.clone(),win.clone(),expanded)?;std::thread::sleep(std::time::Duration::from_millis(150));
                 let monitor=win.current_monitor().map_err(|_|"无法读取屏幕")?.ok_or("无法读取屏幕")?;let area=monitor.work_area();
@@ -162,6 +165,9 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
                 if (pos.x,pos.y,size.width,size.height)!=(x,y,w,h){return Err(format!("窗口几何不符: {:?} != {:?}",(pos.x,pos.y,size.width,size.height),(x,y,w,h)));}
                 #[cfg(windows)] check_region(&win,expanded,false)?;
             }
+            checks.extend(["native-size-position",phase]);
+            #[cfg(windows)] checks.extend(["fixed-hover-viewport","collapsed-hit-region"]);
+            phase="glass-material-hit-region";
             for expanded in [false,true] {
                 set_widget_expanded(app.clone(),win.clone(),expanded)?;
                 for glass in [true,false] {
@@ -170,8 +176,10 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
                     #[cfg(windows)] check_region(&win,expanded,false)?;
                 }
             }
+            checks.push(phase);phase="window-identity";
             if set_widget_expanded(app.clone(),main.clone(),true).is_ok(){return Err("窗口身份保护失效".into());}
             if move_widget(app.clone(),main.clone(),0.0,0.0,true).is_ok(){return Err("移动窗口身份保护失效".into());}
+            checks.push(phase);phase="drag-save-collapse";
             set_widget_expanded(app.clone(),win.clone(),true)?;
             move_widget(app.clone(),win.clone(),-100.0,-120.0,false)?;
             move_widget(app.clone(),win.clone(),-100.0,-120.0,true)?;
@@ -179,6 +187,7 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
             if saved.height_percent==50{return Err("拖动位置未保存".into());}
             set_widget_expanded(app.clone(),win.clone(),false)?;
             if options(&app).height_percent!=saved.height_percent{return Err("收起后位置未保留".into());}
+            checks.push(phase);phase="left-right-docking";
             for side in ["left","right"]{
                 save_widget_options(app.clone(),main.clone(),Options{enabled:true,side:side.into(),height_percent:75})?;std::thread::sleep(std::time::Duration::from_millis(150));
                 let monitor=win.current_monitor().map_err(|_|"无法读取屏幕")?.ok_or("无法读取屏幕")?;let area=monitor.work_area();
@@ -186,22 +195,26 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
                 if(pos.x,pos.y)!=(x,y){return Err("左右停靠位置不符".into());}
                 #[cfg(windows)] check_region(&win,false,side=="left")?;
             }
+            checks.push(phase);phase="close-to-tray";
             app.state::<AppState>().config.lock().map_err(|_|"配置不可用")?.settings.close_to_tray=true;
             main.close().map_err(|_|"无法验证主窗口关闭")?;std::thread::sleep(std::time::Duration::from_millis(150));
             if app.get_webview_window("main").is_none()||main.is_visible().unwrap_or(true)||!win.is_visible().unwrap_or(false){return Err("关闭到托盘未保留悬浮窗".into());}
+            checks.push(phase);phase="single-instance-restore";
             let mut command=std::process::Command::new(std::env::current_exe().map_err(|_|"无法读取程序路径")?);
             #[cfg(windows)] {use std::os::windows::process::CommandExt;command.creation_flags(0x08000000);}
             let mut second=command.spawn().map_err(|_|"无法检查再次启动")?;
             let deadline=std::time::Instant::now()+std::time::Duration::from_secs(10);
             loop {if second.try_wait().map_err(|_|"无法读取第二进程")?.is_some(){break}if std::time::Instant::now()>deadline{let _=second.kill();return Err("再次启动未退出第二进程".into())}std::thread::sleep(std::time::Duration::from_millis(100));}
             if !main.is_visible().unwrap_or(false)||app.webview_windows().len()!=2{return Err("再次启动未恢复原主窗口".into());}
+            checks.push(phase);phase="disabled-hidden";
             save_widget_options(app.clone(),main.clone(),Options{enabled:false,..Default::default()})?;std::thread::sleep(std::time::Duration::from_millis(150));
             if win.is_visible().unwrap_or(true){return Err("关闭设置未隐藏悬浮窗".into());}
+            checks.push(phase);phase="ready-to-close-main";
             app.state::<AppState>().config.lock().map_err(|_|"配置不可用")?.settings.close_to_tray=false;
             Ok(())
         };
         let result=check();let ok=result.is_ok();
-        let evidence=serde_json::json!({"ok":ok,"error":result.err(),"checks":["frontend-ready","frameless-topmost","native-size-position","fixed-hover-viewport","collapsed-hit-region","repeat-expand-collapse","glass-material-hit-region","drag-save-collapse","left-right-docking","window-identity","close-to-tray","single-instance-restore","disabled-hidden"],"exitOnMainCloseExpected":true});
+        let evidence=serde_json::json!({"ok":ok,"error":result.err(),"phase":phase,"checks":checks,"exitOnMainCloseExpected":true});
         let state=app.state::<AppState>();let _=crate::storage::write_atomic(&state.store.dir().join("widget-native-check.json"),&evidence.to_string());
         if ok {if let Some(main)=app.get_webview_window("main"){let _=main.close();}else{app.exit(1);}}else{app.exit(1);}
     });
@@ -212,7 +225,8 @@ fn check_region(win:&tauri::WebviewWindow,expanded:bool,left:bool)->Result<(),St
     use windows_sys::Win32::Graphics::Gdi::{CreateRectRgn,DeleteObject,GetWindowRgn,GetRgnBox,PtInRegion};
     let hwnd=win.hwnd().map_err(|_|"无法读取窗口句柄")?;
     let size=win.inner_size().map_err(|_|"无法读取窗口大小")?;
-    let (l,t,r,b)=handle_region(size.width,size.height,win.scale_factor().map_err(|_|"无法读取缩放")?,left);
+    let scale=win.scale_factor().map_err(|_|"无法读取缩放")?;
+    let (l,t,r,b)=handle_region(size.width,size.height,scale,left);
     let region=unsafe{CreateRectRgn(0,0,0,0)};
     if region.is_null(){return Err("无法检查触发区域".into());}
     let kind=unsafe{GetWindowRgn(hwnd.0 as _,region)};
@@ -229,6 +243,9 @@ fn check_region(win:&tauri::WebviewWindow,expanded:bool,left:bool)->Result<(),St
         &&unsafe{PtInRegion(region,if left{size.width as i32-1}else{0},size.height as i32/2)}==0
     };
     unsafe{DeleteObject(region as _);}
-    if !valid{return Err("悬浮窗触发区域未匹配可见窄条".into());}
+    if !valid{
+        let expected=if expanded{(0,0,size.width as i32,size.height as i32)}else{(l,t,r,b)};
+        return Err(format!("悬浮窗触发区域未匹配可见窄条: expanded={expanded}, left={left}, kind={kind}, actual={:?}, expected={expected:?}, size={}x{}, scale={scale}",(rect.left,rect.top,rect.right,rect.bottom),size.width,size.height));
+    }
     Ok(())
 }

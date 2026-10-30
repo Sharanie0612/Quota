@@ -1,6 +1,7 @@
 .speed-page {display:flex;flex-direction:column;gap:20px;}
 .speed-call-canvas {position:relative;height:310px;margin-top:16px;}
 .speed-call-canvas>canvas,.speed-call-canvas>svg {position:absolute;inset:0;width:100%;height:100%;}
+.speed-call-canvas>svg {outline:none;}
 .speed-call-canvas>svg:focus-visible {outline:2px solid var(--blue);border-radius:9px;}
 .speed-plot .speed-legend i {width:7px;height:7px;border-radius:50%;}
 .speed-more {display:block;margin:16px auto 0;}

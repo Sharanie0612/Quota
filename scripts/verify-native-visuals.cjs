@@ -18,6 +18,7 @@ async function main(){
   assert(page&&widget,'native main and widget must finish opening');
   const errors=[],checks=[];page.on('pageerror',error=>errors.push(error.message));widget.on('pageerror',error=>errors.push(error.message));
   const invoke=(name,args)=>page.evaluate(([name,args])=>window.__TAURI_INTERNALS__.invoke(name,args),[name,args]);
+  const nativeInfo=await invoke('app_info');assert.equal(path.resolve(nativeInfo.configDir).toLowerCase(),root.toLowerCase(),'CDP must target the explicitly isolated profile before any UI action or capture');
   const go=async name=>{await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();await page.getByRole('heading',{name,level:1,exact:true}).waitFor();};
   const capture=async name=>{await page.screenshot({path:path.join(out,name+'.png'),animations:'disabled'});};
   await go('我的使用');await page.waitForFunction(()=>document.querySelector('.usage-kpis strong')?.textContent.startsWith('¥'));
@@ -70,8 +71,17 @@ async function main(){
     return {ratio:devicePixelRatio,width:canvas.width,height:canvas.height,cssWidth:Math.round(rect.width),cssHeight:Math.round(rect.height),inkDifference:Math.max(...actual.map((v,i)=>Math.abs(v-expected[i]))),actual,expected,calls:Number(document.querySelector('.speed-plot').dataset.callCount)};
   });
   const readyCanvas=async()=>{let state;for(let attempt=0;attempt<40;attempt++){state=await canvasState();if(state.inkDifference<=1&&Math.abs(state.width-Math.trunc(state.cssWidth*state.ratio))<=1&&Math.abs(state.height-Math.trunc(state.cssHeight*state.ratio))<=1){assert.equal(state.calls,speed.calls.length);return state;}await page.waitForTimeout(25);}assert.fail('Native speed canvas did not follow display change: '+JSON.stringify(state));};
-  await page.evaluate(()=>{window.nativeSpeedInvoke=window.__TAURI_INTERNALS__.invoke;window.__TAURI_INTERNALS__.invoke=function(name,...args){if(name==='get_output_speed')return new Promise(()=>{});return window.nativeSpeedInvoke.call(this,name,...args);};});
+  // Packaged Tauri makes invoke read-only. Delay the command's actual fetch
+  // transport and prove that the probe stays pending until explicit release.
+  let speedFreeze;
+  await page.evaluate(()=>{
+    const fetch=window.fetch,url=window.__TAURI_INTERNALS__.convertFileSrc('get_output_speed','ipc');
+    window.nativeSpeedFreeze={fetch,held:[],requests:0,completed:0};
+    window.fetch=function(...args){if(String(args[0])===url){window.nativeSpeedFreeze.requests++;return new Promise(resolve=>window.nativeSpeedFreeze.held.push(()=>resolve(fetch.apply(this,args))));}return fetch.apply(this,args);};
+    void window.__TAURI_INTERNALS__.invoke('get_output_speed',{device:'',source:'codex',days:0,model:'',bucketSeconds:0,lookbackHours:0,lookbackMinutes:0}).then(()=>window.nativeSpeedFreeze.completed++);
+  });
   try{
+    await page.waitForFunction(()=>window.nativeSpeedFreeze.requests>0&&window.nativeSpeedFreeze.completed===0);
     await invoke('save_appearance',{preferences:{...speedAppearance,mode:'system',revision:Math.max(Date.now(),speedAppearance.revision+1)}});
     for(const mode of ['dark','light']){
       await page.emulateMedia({colorScheme:mode});await page.waitForFunction(mode=>document.documentElement.dataset.colorMode===mode,mode);speedDisplay.push({kind:'system-'+mode,state:await readyCanvas()});
@@ -80,9 +90,11 @@ async function main(){
     for(const ratio of [2,1.5,1.25,viewport.ratio]){
       await displaySession.send('Emulation.setDeviceMetricsOverride',{width:viewport.width,height:viewport.height,deviceScaleFactor:ratio,mobile:false});await page.waitForFunction(ratio=>devicePixelRatio===ratio,ratio);await page.evaluate(()=>window.dispatchEvent(new Event('resize')));speedDisplay.push({kind:'emulated-DPR-resize',state:await readyCanvas()});
     }
+    speedFreeze=await page.evaluate(()=>({blockedRequests:window.nativeSpeedFreeze.requests,probeCompletedBeforeRelease:window.nativeSpeedFreeze.completed}));assert.equal(speedFreeze.probeCompletedBeforeRelease,0);
   }finally{
-    await displaySession.send('Emulation.clearDeviceMetricsOverride');await page.evaluate(()=>{window.dispatchEvent(new Event('resize'));window.__TAURI_INTERNALS__.invoke=window.nativeSpeedInvoke;delete window.nativeSpeedInvoke;});await page.emulateMedia({forcedColors:'none',colorScheme:null});await invoke('save_appearance',{preferences:{...speedAppearance,revision:Date.now()+1}});await displaySession.detach();
+    await displaySession.send('Emulation.clearDeviceMetricsOverride');await page.evaluate(()=>{window.dispatchEvent(new Event('resize'));const probe=window.nativeSpeedFreeze;window.fetch=probe.fetch;probe.held.splice(0).forEach(release=>release());});await page.emulateMedia({forcedColors:'none',colorScheme:null});await invoke('save_appearance',{preferences:{...speedAppearance,revision:Date.now()+1}});await displaySession.detach();
   }
+  await page.waitForFunction(()=>window.nativeSpeedFreeze.completed===1);speedFreeze.probeCompletedAfterRelease=1;
   await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.nativeGlass==='on');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
   await go('AI 模型');await page.locator('.scatter-point').first().waitFor();
   const nodes=await page.locator('.scatter-point').evaluateAll(elements=>elements.map(e=>({x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),members:JSON.parse(e.dataset.members)})));
@@ -100,7 +112,7 @@ async function main(){
   const elapsed=await widget.evaluate(async()=>{const data=await window.__TAURI_INTERNALS__.invoke('get_widget_speed'),text=document.querySelector('.task-row time').textContent,part=unit=>Number(text.match(new RegExp('(\\d+)'+unit))?.[1]||0);return {shown:part('\u65f6')*3600+part('\u5206')*60+part('\u79d2'),expected:Math.floor((Date.now()-data.tasks[0].startedAt)/1000),precision:text.includes('\u65f6')?60:1};});assert(Math.abs(elapsed.shown-elapsed.expected)<=elapsed.precision);
   await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();checks.push('native collapsed task text stays idle and opening refreshes the real elapsed time');
   for(const [file,contents] of oldFiles)assert.equal(fs.readFileSync(path.join(root,file),'utf8'),contents);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',profileConfirmed:true,expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,speedFreeze,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
   console.log(checks.map(check=>'PASS '+check).join('\n'));await browser.close();
 }
 main().catch(error=>{console.error(error);process.exit(1);});

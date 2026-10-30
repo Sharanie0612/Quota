@@ -36,6 +36,7 @@ export function UsageWidget() {
     return moving.current;
   };
   const desired=useRef(false);const working=useRef(false);const live=useRef(true);
+  const resetRevision=useRef(0);
   const interrupt=useRef<(()=>void)|null>(null);
   const settle=()=>new Promise<void>(resolve=>{
     const done=()=>{clearTimeout(timeout);interrupt.current=null;resolve();};
@@ -44,6 +45,7 @@ export function UsageWidget() {
     interrupt.current=done;
   });
   const expand=async(next:boolean)=>{
+    if(next&&!enabled.current)return;
     clearTimeout(timer.current);const changed=desired.current!==next;desired.current=next;
     // Reverse the CSS transition immediately; never queue a full collapse first.
     if(native.current){setExpanded(next);if(changed)interrupt.current?.();}
@@ -51,23 +53,30 @@ export function UsageWidget() {
     if(native.current===next)return;
     working.current=true;
     try {
-      let target:boolean;
-      do {
-        target=desired.current;
-        if(target){
-          if(!native.current)await api.setWidgetExpanded(true);
-          if(!live.current)break;
-          native.current=true;setNativeExpanded(true);
-          if(live.current)setExpanded(desired.current);
-        }else{
-          setExpanded(false);
-          await settle();
-          if(!live.current)break;
-          if(desired.current)continue;
-          await api.setWidgetExpanded(false);
-          if(live.current){native.current=false;setNativeExpanded(false);}
+      while(live.current){
+        const target=desired.current;
+        if(native.current===target){setExpanded(target);setNativeExpanded(target);break;}
+        const revision=resetRevision.current;
+        try{
+          if(target){
+            await api.setWidgetExpanded(true);
+            if(!live.current)break;
+            if(revision!==resetRevision.current)continue;
+            native.current=true;setNativeExpanded(true);setExpanded(desired.current);
+          }else{
+            setExpanded(false);
+            await settle();
+            if(!live.current)break;
+            if(desired.current||revision!==resetRevision.current)continue;
+            await api.setWidgetExpanded(false);
+            if(!live.current)break;
+            if(revision!==resetRevision.current)continue;
+            native.current=false;setNativeExpanded(false);
+          }
+        }catch(e){
+          if(revision===resetRevision.current)throw e;
         }
-      }while(live.current&&target!==desired.current);
+      }
     }
     catch(e){if(live.current)setError(errText(e));}
     finally{working.current=false;}
@@ -76,7 +85,7 @@ export function UsageWidget() {
   useEffect(()=>{
     live.current=true;let stopped=false;let loading=false;
     const load=async()=>{if(loading||!enabled.current)return;loading=true;try{const value=await api.getWidgetUsage();if(!stopped){setUsage(value);setError('');}}catch(e){if(!stopped)setError(errText(e));}finally{loading=false;}};
-    const un=listen<{expanded:boolean;side:string;enabled?:boolean}>('widget-state',e=>{if(!stopped){const resume=!enabled.current&&e.payload.enabled!==false;enabled.current=e.payload.enabled!==false;native.current=e.payload.expanded;setNativeExpanded(e.payload.expanded);if(!working.current){desired.current=e.payload.expanded;setExpanded(e.payload.expanded);}setSide(e.payload.side);if(resume)void load();}});
+    const un=listen<{expanded:boolean;side:string;enabled?:boolean;reset?:boolean}>('widget-state',e=>{if(!stopped){const resume=!enabled.current&&e.payload.enabled!==false;enabled.current=e.payload.enabled!==false;native.current=e.payload.expanded;setNativeExpanded(e.payload.expanded);if(e.payload.reset||!enabled.current){resetRevision.current++;clearTimeout(timer.current);hovered.current=false;focusValue.current=false;desired.current=false;setExpanded(false);interrupt.current?.();}else if(!working.current){desired.current=e.payload.expanded;setExpanded(e.payload.expanded);}setSide(e.payload.side);if(resume)void load();}});
     const activity=listen('activity-updated',()=>void load());
     let speedLoading=false;const loadSpeed=async()=>{if(speedLoading||!enabled.current)return;speedLoading=true;try{const next=await api.getWidgetSpeed();if(!stopped)setSpeed(next);}catch{/* Usage remains available if live metadata is unsupported. */}finally{speedLoading=false;}};
     const speedEvents=listen('output-speed-updated',()=>void loadSpeed());

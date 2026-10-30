@@ -92,7 +92,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 实现参考 [Apple材质指南](https://developer.apple.com/design/human-interface-guidelines/materials)，把光学效果集中在导航与交互层，避免多层磨砂叠加。
 
-侧栏收起时先完成布局，再做位移动画，减少图表反复重排。贴边弹窗使用固定画布展开，支持中途反向、拖动贴边及键盘收起。Windows 主窗口保留浮动圆角与最大化 / 分屏直角，安装器保留中文 / 英文向导。
+侧栏收起时先完成布局，再做位移动画，减少图表反复重排。贴边弹窗使用固定画布展开，支持中途反向、拖动贴边及键盘收起；更改停靠位置后保持收起，再次移入即可展开。Windows 主窗口保留浮动圆角与最大化 / 分屏直角，安装器保留中文 / 英文向导。
 
 ### 支持的账户
 
@@ -184,6 +184,7 @@ node scripts/verify-logic.cjs
 node scripts/verify-usage-analytics.cjs
 node scripts/verify-vendor-costs.cjs
 node scripts/verify-widget-motion.cjs
+node scripts/verify-widget-state.cjs
 cargo run --release --manifest-path src-tauri/Cargo.toml --example activity_checks
 cargo run --release --manifest-path src-tauri/Cargo.toml --example vendor_cost_checks
 cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_checks
@@ -191,7 +192,7 @@ cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_
 
 本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
-玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)，覆盖不同背景、收起、重新展开和页面可见性变化。
+玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)，覆盖不同背景、收起、重新展开和页面可见性变化。[安装版任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证设置切换与延迟响应。
 
 ## 文档与贡献
 

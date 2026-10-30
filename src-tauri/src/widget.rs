@@ -62,7 +62,9 @@ fn place(app: &tauri::AppHandle, expanded: bool, initial: bool) -> Result<(), St
         win.set_size(PhysicalSize::new(w,h)).map_err(|_| "无法调整悬浮窗大小")?;
         win.set_position(PhysicalPosition::new(x,y)).map_err(|_| "无法贴合屏幕边缘")?;
     }
-    win.emit("widget-state", serde_json::json!({"expanded":expanded,"side":o.side,"enabled":o.enabled})).map_err(|_| "无法更新悬浮窗")?;
+    // Settings/ready placement resets interaction; an older hover reply must
+    // not reopen the surface after it has moved or been disabled.
+    win.emit("widget-state", serde_json::json!({"expanded":expanded,"side":o.side,"enabled":o.enabled,"reset":initial})).map_err(|_| "无法更新悬浮窗")?;
     Ok(())
 }
 /// Collapsed handle in local physical coordinates of the fixed-size canvas.
@@ -95,7 +97,7 @@ pub fn save_widget_options(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     crate::storage::write_atomic(&state.store.dir().join("usage-widget.json"), &serde_json::to_string(&options).map_err(|_| "无法保存悬浮窗设置")?)?;
     let win = app.get_webview_window(LABEL).ok_or("用量悬浮窗尚未准备好")?;
     if options.enabled { place(&app,false,true)?;win.show().map_err(|_| "无法显示悬浮窗")?; }
-    else { win.hide().map_err(|_| "无法隐藏悬浮窗")?;win.emit("widget-state",serde_json::json!({"expanded":false,"side":options.side,"enabled":false})).map_err(|_|"无法更新悬浮窗")?; }
+    else { win.hide().map_err(|_| "无法隐藏悬浮窗")?;win.emit("widget-state",serde_json::json!({"expanded":false,"side":options.side,"enabled":false,"reset":true})).map_err(|_|"无法更新悬浮窗")?; }
     Ok(options)
 }
 #[tauri::command]

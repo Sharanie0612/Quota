@@ -10,7 +10,7 @@
   let setupAttempts=0;
   let windowMaximized = false;
   let widgetOptions = {enabled:true,side:'right',heightPercent:50};
-  function widgetState(expanded){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side}});}
+  function widgetState(expanded,reset=false){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side,enabled:widgetOptions.enabled,reset}});}
   const activityCase = new URLSearchParams(location.search).get("activityCase");
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
@@ -775,13 +775,13 @@
         }
         case 'setup_finish': window.demoSetupFinished=args.launch;return null;
         case 'get_widget_options': return {...widgetOptions};
-        case 'save_widget_options': widgetOptions={...args.options};return {...widgetOptions};
+        case 'save_widget_options': widgetOptions={...args.options};widgetState(false,true);return {...widgetOptions};
         case 'get_widget_usage': {
           const test=new URLSearchParams(location.search).get('widgetCase');
           if(test==='error')throw Error('演示：统计暂不可读');
           return {today:test==='empty'?0:1234567,total:test==='empty'?0:98765432,date:'2026-10-16',updatedAt:test==='empty'?null:Date.now(),partial:test==='partial'};
         }
-        case 'widget_ready': widgetState(false);return null;
+        case 'widget_ready': widgetState(false,true);return null;
         case 'set_widget_expanded': widgetState(args.expanded);return null;
         case 'move_widget': return null;
         case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'},...demoSshDevices.map(d=>({id:d.deviceId,name:'SSH · '+d.name}))],updatedAt:Date.now(),syncErrors:[]};

@@ -38,6 +38,7 @@ html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[dat
   box-shadow:inset 0 1px .5px var(--glass-rim),inset 0 -1px .5px var(--glass-shade),0 4px 16px color-mix(in srgb,var(--text) 4%,transparent);
 }
 html[data-glass="on"] .sidebar {border-radius:16px;box-shadow:none;}
+html[data-glass="on"] .workspace-toolbar {border-radius:inherit;}
 html[data-glass="on"] .sidebar .nav-item,html[data-glass="on"] .workspace-toolbar {color:var(--text);}
 html[data-glass="on"] .sidebar .nav-item.active {font-weight:600;}
 html[data-glass="on"] .sidebar::after,html[data-glass="on"] .workspace-toolbar::after,html[data-glass="on"] .app .seg::after {
@@ -51,6 +52,12 @@ html[data-glass="on"] .app .motion-highlight {background:color-mix(in srgb,var(-
 html[data-glass="on"] .app .seg {border:1px solid color-mix(in srgb,var(--surface) 42%,var(--border));}
 @supports(backdrop-filter:url(#quota-glass-refraction)) {
   html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .app .seg {backdrop-filter:url(#quota-glass-refraction) blur(3px) saturate(1.22);-webkit-backdrop-filter:url(#quota-glass-refraction) blur(3px) saturate(1.22);}
+}
+/* Acrylic already filters the desktop. A second WebView backdrop pass copies
+ * translucent page pixels over themselves, leaving a brighter rectangular tile.
+ * Keep the thin tint and rim; CSS refraction remains for the opaque fallback. */
+html[data-glass="on"][data-native-glass="on"] .app :is(.sidebar,.workspace-toolbar,.seg) {
+  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
 html[data-color-mode="dark"][data-glass="on"] {--glass-fill:color-mix(in srgb,var(--surface) 18%,transparent);--glass-content:color-mix(in srgb,var(--surface) 32%,transparent);--glass-rim:color-mix(in srgb,var(--text) 24%,transparent);}
 /* The widget retains its proven clipped surface, independent from main Acrylic. */

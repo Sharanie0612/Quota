@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前开发版本为 1.0.3400**：主窗口启用透明合成，导航使用清透折射与指针高光，内容卡片改为薄色层。保留人民币月均换算、实际 Token 单价、逐次调用速度散点与任务悬浮窗。本轮 Windows 本地候选已通过安装升级和界面验证；公开下载仍指向已发布版本。详见 [材质与验收记录](docs/liquid-glass-1.0.3400.md)。
+**当前开发版本为 1.0.3401**：主窗口使用透明合成与原生玻璃，修复重复背板产生的矩形色块，以及鼠标经过工具栏时的直角高光；高光与工作区圆角一致。保留人民币月均换算、实际 Token 单价、逐次调用速度散点与任务悬浮窗。本轮 Windows 本地修复已完成安装与隔离界面验收；公开下载仍指向已发布版本。首次任务窗检查失败及桌面截图限制见 [方框修复与验收记录](docs/glass-rectangles-1.0.3401.md)。
 
 ## 开始使用
 
@@ -88,7 +88,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 默认 Quota 使用白色内容区、淡蓝侧栏和深蓝强调色，与 Logo 保持一致。Codex、Claude、VS Code、GitHub 配色分别保留灰阶、暖色、编辑器分区与清晰边线的特点，均支持明暗和跟随系统。
 
-「设置 → 外观 → 液态玻璃」开启主窗口透明合成、边缘折射和指针高光，默认关闭。高光随交互渐入渐出，键盘焦点在缩放窗口、恢复动效后仍保持对齐。Windows使用系统材质透出模糊处理后的桌面背景，导航保持清透，内容使用薄色层；关闭开关恢复实底。高对比度关闭透明合成，减少动效时高光保持静止。任务悬浮窗保留独立的裁剪材质。
+「设置 → 外观 → 液态玻璃」开启主窗口透明合成、圆角边缘高光和指针交互，默认关闭。高光随交互渐入渐出，键盘焦点在缩放窗口、恢复动效后仍保持对齐。Windows使用系统材质，导航与工具栏使用单一薄色层，避免重复网页背板叠成方框；原生材质不可用时保留实底上的 CSS 折射。关闭开关恢复实底，高对比度关闭透明合成，减少动效时高光保持静止。任务悬浮窗保留独立的裁剪材质。
 
 实现参考 [Apple材质指南](https://developer.apple.com/design/human-interface-guidelines/materials)，把光学效果集中在导航与交互层，避免多层磨砂叠加。
 
@@ -111,11 +111,11 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-界面示例使用合成资料。清透材质与输出速度为1.0.3400，主窗口采用合成背景核对透明层和文字可读性，任务窗来自隔离资料的安装版WebView图层；其余功能布局保留此前1.0.3300的示例。安装版验证见交付记录。
+界面示例使用合成资料。玻璃材质图来自1.0.3401隔离安装版的WebView图层，叠加合成背景与模拟材质底色，用于核对透明层和圆角，**不是桌面截图**。输出速度保留1.0.3400示例，其余功能布局保留此前1.0.3300示例。安装版验证见交付记录。
 
-![清透材质与浅色内容](assets/readme/clear-liquid-light-3400.png)
+![浅色玻璃与圆角工具栏（合成背景）](assets/readme/glass-light-3401.png)
 
-![深色清透材质](assets/readme/clear-liquid-dark-3400.png)
+![深色玻璃与圆角工具栏（合成背景）](assets/readme/glass-dark-3401.png)
 
 ![人民币总支出、用量和实际单价](assets/readme/usage-overview-3300.png)
 
@@ -192,7 +192,7 @@ cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_
 
 本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
-玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)、[焦点恢复检查](scripts/verify-glass-resume.cjs)、[缩放定位检查](scripts/verify-glass-anchor.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)。[安装版焦点恢复](scripts/verify-native-glass-resume.cjs)和[任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证缩放对齐、设置恢复、窗口可见状态及延迟响应。
+玻璃交互另有[透明合成与圆角像素检查](scripts/verify-glass-composition.cjs)、[悬停与聚焦检查](scripts/verify-glass-controls.cjs)、[焦点恢复检查](scripts/verify-glass-resume.cjs)、[缩放定位检查](scripts/verify-glass-anchor.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)。[安装版焦点恢复](scripts/verify-native-glass-resume.cjs)和[任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证缩放对齐、设置恢复、窗口可见状态及延迟响应。
 
 ## 文档与贡献
 

@@ -1,7 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$ExePath,
   [Parameter(Mandatory=$true)][string]$DataDir,
-  [switch]$Glass
+  [switch]$Frosted
 )
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\') + '\'
@@ -20,7 +20,7 @@ $previousData = $env:QUOTA_DATA_DIR
 $previousFrame = $env:QUOTA_FRAME_SMOKE
 $previousWidget = $env:QUOTA_WIDGET_SMOKE
 $previousWebView = $env:WEBVIEW2_USER_DATA_FOLDER
-if ($Glass) {
+if ($Frosted) {
   $preferences=@{theme='quota';mode='light';collapsed=$false;glass=$true;revision=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
   [IO.File]::WriteAllText((Join-Path $data 'appearance.json'),($preferences | ConvertTo-Json),$utf8)
 }

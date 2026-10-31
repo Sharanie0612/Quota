@@ -1,0 +1,22 @@
+:root {
+  --workspace-surface:var(--surface-2);
+  --sidebar-surface:var(--bg-sidebar);
+  --toolbar-surface:var(--surface);
+  --surface-filter:none;
+}
+html[data-material="frosted"] .app {
+  --workspace-surface:color-mix(in srgb,var(--surface) 88%,transparent);
+  --sidebar-surface:color-mix(in srgb,var(--bg-sidebar) 84%,transparent);
+  --toolbar-surface:transparent;
+  --surface-filter:blur(22px) saturate(1.08);
+  background:radial-gradient(ellipse at 0% 0%,var(--blue-soft),transparent 65%),linear-gradient(145deg,var(--bg),var(--surface-2));
+}
+:where(button,input,select,textarea,summary,[tabindex]):focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
+.window-controls button:focus-visible,.sidebar-toggle:focus-visible {outline-offset:-3px;}
+.sidebar-toggle:focus-visible {background:var(--surface);}
+@media(forced-colors:active) {
+  .app {--workspace-surface:Canvas;--sidebar-surface:Canvas;--toolbar-surface:Canvas;--surface-filter:none;background:Canvas;}
+  .card,.modal,.btn,.seg {background:Canvas;color:CanvasText;border-color:ButtonText;box-shadow:none;}
+  .motion-highlight {border:1px solid Highlight;background:Canvas;box-shadow:none;}
+  :where(button,input,select,textarea,summary,[tabindex]):focus-visible {outline-color:Highlight;}
+}

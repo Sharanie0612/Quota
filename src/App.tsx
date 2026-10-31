@@ -1,5 +1,4 @@
 import {listen} from '@tauri-apps/api/event';
-import {GlassBackdrop} from './components/GlassBackdrop';
 import { useEffect, useRef, useState } from "react";
 import { AccountSheet } from "./components/AccountSheet";
 import { IconChart, IconClock, IconGear, IconSpeed, IconPlus, IconRefresh, IconSpark, IconWallet } from "./components/icons";
@@ -91,7 +90,6 @@ export default function App() {
 
   return (
     <div className={`app${appearance.collapsed?' sidebar-collapsed':''}`}>
-      <GlassBackdrop/>
       <LaunchAnimation/>
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>

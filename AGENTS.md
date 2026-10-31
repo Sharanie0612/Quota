@@ -51,7 +51,7 @@ npm run build
 rm -rf dist-mock && mkdir -p dist-mock && cp -r dist/assets dist-mock/
 node -e "const fs=require('fs');const h=fs.readFileSync('dist/index.html','utf8');fs.writeFileSync('dist-mock/index.html',h.replace('<head>','<head><script>'+fs.readFileSync('scripts/mock-tauri.js','utf8')+'</script>'))"
 node scripts/preview-server.cjs 4174
-# 主面板 http://127.0.0.1:4174/ ；悬浮卡 http://127.0.0.1:4174/?window=tray（浏览器调窄到 364px）
+# 主面板 http://127.0.0.1:4174/ ；悬浮卡 http://127.0.0.1:4174/?window=usage-widget（浏览器调窄到 364px）
 ```
 
 ---
@@ -92,7 +92,7 @@ node scripts/preview-server.cjs 4174
 - 加一个供应商：`providers.rs` 的 `provider_defs()` 加定义（含余额探测与模型列表能力）；如默认隐藏，把 id 加进 `HIDDEN`。
 - 供应商接口挂了怎么办：查询失败要显示可读错误 + 三个动作（重试 / 打开官网 / 改手动余额）。任何供应商都要能退化到「手动余额」参与低余额通知。
 - 前端 `src/main.tsx` 统一渲染 `App`。小米官方登录窗口 `mimo-login` 不授予 Quota IPC 权限。
-- 设计系统全在 `src/styles.css`（浅色中性底/毛玻璃/大圆角/系统蓝，跟随系统深色模式），新组件复用其中的 CSS 变量，不要引入新色值。
+- 设计系统由 `src/styles.css` 统一导入 `src/styles/` 六个职责层，配色在 `src/lib/appearance/themes.ts`，圆角在 `src-tauri/data/ui-geometry.json`（浅色中性底/毛玻璃/大圆角/系统蓝，跟随系统深色模式），新组件复用其中的 CSS 变量，不要引入新色值。
 - 数据文件：`%APPDATA%\Quota\config.json`（账户+设置）、`catalog_overrides.json`（资料本地覆盖）、`hidden_models.json`（用户手动隐藏的模型）。首次启动逐个复制旧目录中缺失的文件；旧目录不删除。
 - 为延续旧安装的升级关系，Tauri identifier `com.agentprice.desktop` 暂时保留（legacy compatibility）。更改它必须先验证安装器升级与卸载行为。
 
@@ -214,6 +214,7 @@ node scripts/preview-server.cjs 4174
 | 2026-10-31 修复玻璃重复合成色块与鼠标直角高光（Windows 本地修复；完整覆盖复核通过，首次任务窗失败记录保留，见 docs/glass-rectangles-1.0.3401.md） | `1.0.3401` | `1.0.3401` |
 | 2026-10-31 主窗口系统标题栏与直角外框的原生重绘保护（Windows 本地修复；覆盖升级及数据保留通过，桌面目视待核对，见 docs/native-frame-1.0.3402.md） | `1.0.3402` | `1.0.3402` |
 | 2026-11-01 清透窗口材质、凸面透镜轮廓与可打断的液态选择/按压交互（优化既有玻璃效果，本地验收见 docs/liquid-lens-1.0.3403.md） | `1.0.3403` | `1.0.3403` |
+| 2026-11-01 应用内毛玻璃、统一圆角与外观分层，清理失效页面及效果检查（本地验收见 docs/frosted-architecture-1.0.3404.md） | `1.0.3404` | `1.0.3404` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 
@@ -266,11 +267,11 @@ node scripts/preview-server.cjs 4174
 
 - 1.0.3300：输出速度使用每次已完成调用的真实时间与速度散点，不连线、不把时间桶均值当调用；保留加权汇总。天梯按屏幕邻近分组，分组锚点取真实成员，全部原始价格、分数和坐标保存在成员数据中，验收逐成员对账。悬浮窗不使用整窗 Acrylic，以免在透明画布留下矩形材质。运行 `verify-visual-polish.cjs`、`verify-ladder-plot.cjs` 和原生 WebView 检查。
 
-- 1.0.3400：主窗口可用透明 WebView 和原生 Acrylic，只有主窗口可按已保存外观修订同步材质。根层仅在原生材质成功后清空，失败保留可读回退；卡片不叠加多层磨砂。主窗口材质不能施加到任务悬浮窗。验证透明像素、开关恢复、高对比度、减少动效、深浅主题和原生窗口几何。任务窗设置/就绪事件显式重置交互，过期展开/收起响应不能覆盖新状态；运行 `verify-widget-state.cjs`、`verify-widget-motion.cjs` 和隔离安装版 `verify-native-widget-state.cjs`。
-- 高光恢复只跟随当前 `:focus-visible` 控件，不重放旧指针坐标；文档报告未激活、关闭玻璃或受系统偏好限制时保持静止。运行 `verify-glass-resume.cjs` 与隔离资料 `verify-native-glass-resume.cjs`。WebView2 隐藏窗口时可能保留 DOM 焦点与可见状态，原生可见性和文档事件须分别验收，不能假定隐藏会产生 DOM blur。
-- 原生玻璃成功后，主窗口导航、工具栏和分段控件不能再叠加 WebView `backdrop-filter`，以免半透明像素被重复合成成矩形色块；保留薄色层和边缘高光，原生不可用时仍允许实底上的 CSS 折射。运行 `verify-glass-composition.cjs`，隔离安装版须以真实 Rust 命令和透明像素复核，不能把 WebView 截图当作桌面合成验收。
-- 1.0.3402：Windows 主窗口在首次显示前安装原生边框重绘保护，拦截非客户区及主题标题栏绘制，激活消息保留默认处理并禁止重画；最小化和其他消息正常转发。保留 `WS_CAPTION` / `WS_THICKFRAME`，不要为隐藏标题栏破坏缩放与 Snap。区域更新及原生区域验收只在窗口线程执行，缓存命中仍须核对实际区域；最大化的矩形工作区裁剪不能误判为圆角。保护不可用时不启用主窗口 Acrylic；不施加到任务窗。安装向导显式保持可见。运行 `verify-native-chrome.cjs` 及带原生重绘探针的 `check-window-frame.ps1`；计数、几何和 WebView 像素均不等同于桌面图像验收。
-- 窗口缩放后的焦点高光定位按帧合并，换焦点、失焦与外观限制必须取消待执行帧；运行 `verify-glass-anchor.cjs`。原生恢复检查还须核对浮动、最大化及还原时的高光中心与真实焦点坐标。
-- 1.0.3403：主窗口优先使用清透原生 Blur，Acrylic 只作兼容回退；关闭时清理两者，不施加到任务窗。保留原生边框保护及单次网页合成，透镜轮廓用受圆角约束的光层。液态选择只变形光学胶囊，连续打断从实际可见位置衔接；失焦/关闭/减少动效/高对比度取消动画，空闲不循环。运行 `verify-liquid-lens.cjs`、透明合成与文字/控件对比度检查。`check-window-frame.ps1 -Glass` 使用独立 WebView 资料检查开启配置下的几何，不复用个人浏览器资料。
-- 深色反光与深色表面分开，核对真实边缘像素，不能把仅有 CSS 渐变声明当作反光验收；亮边附近的键盘焦点应有独立清晰底面。隔离任务窗 smoke 的原生变更与区域读取逐步调度到窗口线程并核对线程身份，等待留在工作线程；正常同步命令行为不变。覆盖检查还须保留 `monthly-average-fx.json` 的哈希证据。
-- 可见键盘焦点仍在时，同一表面的指针更新不得覆盖焦点光斑；缩放/还原检查须主动加入该输入场景。原生切换后按实际稳定状态验收，保留淡出期间观察，不能把动画中尚保留的坐标误判为残留。
+### 当前外观与窗口维护（1.0.3404）
+
+- 主窗口是不透明 WebView，毛玻璃只作用于应用内的导航和工作区。不得重新引入整窗 Blur/Acrylic、桌面透出、SVG 折射或指针光斑。内容卡片与常规控件保持实底；常规按钮的透明变体使用 quiet，导航和窗口按钮沿用各自样式。
+- 配色、偏好校验与外观同步分别由 `src/lib/appearance/` 下的三个模块负责；持久化保留旧 `glass` 布尔字段。`appearance.rs` 只负责校验、原子保存和广播，不操作窗口材质。高对比度临时回退实底；减少动效停用过渡，保存选择不丢失。
+- 圆角共用 `src-tauri/data/ui-geometry.json`：窗口/面板16，普通控件10，分段内层8。浮动原生窗口按同一尺寸裁剪，最大化和分屏保持方角。保留原生标题栏重绘保护、Snap/缩放能力和关闭到托盘行为。
+- 任务窗仍独立透明，不复用主窗口的背景和模糊。设置/就绪事件重置交互，过期展开/收起响应不能覆盖新状态。原生 smoke 的窗口操作和区域读取必须在窗口线程执行。
+- 运行 `npm run verify`、`npm run verify:ui`；界面检查覆盖五种配色、深浅/系统模式、开关、透明度、圆角、高对比度、减少动效、1024px 和表单。安装版使用隔离合成资料运行 `verify-native-visuals.cjs`、`verify-native-chrome.cjs` 与 `verify-native-widget-state.cjs`，并执行 `check-window-frame.ps1 -Frosted` 和 `check-widget.ps1`。WebView 像素、原生几何、桌面截图和真实鼠标拖动分别记录，不以其中一个替代其余。
+- 历史交付文档保留当时结果；已退役的液态高光、透镜与透明合成脚本不再维护。数据迁移、旧账本兼容和有效业务回归不能按文件年龄删除。覆盖升级继续核对 `monthly-average-fx.json` 等个人数据文件哈希。

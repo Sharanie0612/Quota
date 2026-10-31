@@ -25,7 +25,7 @@
 .usage-line { stroke:var(--blue); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round; fill:none; }
 .usage-dot { fill:var(--blue); }
 .activity-model-selector { display:flex; gap:8px; flex-wrap:wrap; padding:16px; max-height:210px; overflow:auto; }
-.activity-model-selector button { display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); padding:8px 12px; color:var(--text); cursor:pointer; min-width:0; max-width:100%; }
+.activity-model-selector button { display:flex; align-items:center; gap:8px; border:1px solid var(--border); border-radius:var(--radius-control); background:var(--surface); padding:8px 12px; color:var(--text); cursor:pointer; min-width:0; max-width:100%; }
 .activity-model-selector button span { overflow-wrap:anywhere; }
 .activity-model-selector button[aria-pressed="true"] { border-color:var(--blue); background:var(--blue-soft); }
 .activity-model-selector button:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }

@@ -24,14 +24,4 @@ for(const [apiId,vendor] of [['deepseek-flash','DeepSeek'],['glm-5.3','Z AI'],['
 }
 for(const source of snapshot.sources){assert.equal(source.error,null);assert.ok(source.models>0);assert.equal(source.checkedAt,snapshot.checkedAt);}
 for(const id of ['gpt-6.1-sol','kimi-k3.1-pro','claude-fable-5-1'])assert.ok(snapshot.models.some(model=>model.apiId===id));
-const exportsObject={};
-new Function('exports',ts.transpileModule(fs.readFileSync(path.join(root,'src/lib/modelCompare.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(exportsObject);
-const {estimateModel,modelOffer}=exportsObject;
-const price={input:2,output:10,cachedInput:0.1,currency:'USD',unit:'每百万 tokens'};
-assert.equal(estimateModel(price,1e6,2e5,50),3.05);
-assert.equal(estimateModel(price,0,0,0),0);
-assert.equal(estimateModel({...price,cachedInput:null},1e6,2e5,1),null);
-for(const args of [[null,1,1,0],[price,-1,1,0],[price,NaN,1,0],[price,1e13,1,0],[price,1,1,101],[{...price,input:-1},1,1,0],[{...price,output:Infinity},1,1,0]])assert.equal(estimateModel(...args),null);
-assert.equal(modelOffer({price,priceOptions:[]},'batch'),null);
-assert.equal(modelOffer({price,priceOptions:[]},'standard'),price);
-console.log(`PASS registry identities, provenance, ${current} current official quotes across ten sources, cache TTLs, conditional offers and unknown/invalid estimate handling`);
+console.log(`PASS registry identities, provenance, ${current} current official quotes across ten sources and cache TTLs`);

@@ -1,8 +1,9 @@
-// Development-only CDP access to an explicitly isolated installed Quota.
+// Development-only CDP access to an explicitly isolated packaged Quota.
 // Uses the real Rust commands and bundled frontend; no mocked Tauri responses.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require(process.env.QUOTA_PLAYWRIGHT_MODULE||'playwright');
-const ts=require('typescript'),callModule={exports:{}};new Function('exports',ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/lib/outputCalls.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(callModule.exports);
+const callModule={exports:require('./lib/source-loader.cjs').createSourceLoader()(path.join(__dirname,'../src/lib/outputCalls'))};
+const {assertSurfaces,assertInkContrast}=require('./lib/appearance-checks.cjs');
 async function main(){
   const root=path.resolve(process.env.QUOTA_NATIVE_DATA||'');
   assert(process.env.QUOTA_NATIVE_DATA&&path.isAbsolute(process.env.QUOTA_NATIVE_DATA));
@@ -27,39 +28,29 @@ async function main(){
   const expected='¥'+(100+20*fx.rates[0].cnyPerUsd).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});assert.equal(await page.locator('.usage-kpis strong').first().innerText(),expected);await capture('usage-native');
   await page.getByRole('tab',{name:'消费记录',exact:true}).click();assert.equal(await page.locator('.usage-history tbody tr').count(),2);await capture('history-native');
   await page.getByRole('tab',{name:'实际单价',exact:true}).click();assert(await page.locator('.vendor-cost-card').count()>0);checks.push('real monthly-average FX, unified RMB, expense history and actual-price view');
-  await go('设置');const glass=page.getByRole('button',{name:'液态玻璃',exact:true});if(await glass.getAttribute('aria-pressed')==='true')await glass.click();await glass.click();
-  await widget.waitForFunction(()=>document.documentElement.dataset.glass==='on');await page.waitForFunction(()=>document.documentElement.dataset.glass==='on');
-  await go('我的使用');await page.waitForFunction(()=>document.querySelector('.usage-kpis strong')?.textContent.startsWith('¥'));await page.waitForFunction(()=>document.documentElement.dataset.nativeGlass==='on'&&getComputedStyle(document.body).backgroundColor==='rgba(0, 0, 0, 0)');assert.equal(await page.locator('.usage-kpis').evaluate(e=>getComputedStyle(e).backdropFilter),'none');const preferences=await invoke('get_appearance');const material=await invoke('sync_main_material',{revision:preferences.revision,dark:false,allowed:true});assert.equal(material.active,true);const stale=await invoke('sync_main_material',{revision:preferences.revision-1,dark:false,allowed:true});assert.equal(stale.active,false);assert.equal(await widget.evaluate(args=>window.__TAURI_INTERNALS__.invoke('sync_main_material',args).then(()=>false,()=>true),{revision:preferences.revision,dark:false,allowed:true}),true);await page.emulateMedia({forcedColors:'active'});await page.waitForFunction(()=>document.documentElement.dataset.nativeGlass==='off');await page.emulateMedia({forcedColors:'none'});await page.waitForFunction(()=>document.documentElement.dataset.nativeGlass==='on');const glassLayer=await page.screenshot({omitBackground:true});const clearCorner=await page.evaluate(async data=>{const img=await createImageBitmap(new Blob([Uint8Array.from(atob(data),c=>c.charCodeAt(0))],{type:'image/png'})),canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0);return ctx.getImageData(3,3,1,1).data[3];},glassLayer.toString('base64'));assert.equal(clearCorner,0);await page.getByRole('button',{name:'最大化窗口',exact:true}).click();await page.getByRole('button',{name:'还原窗口',exact:true}).waitFor();assert((await invoke('get_main_window_state')).square);await page.getByRole('button',{name:'还原窗口',exact:true}).click();await page.getByRole('button',{name:'最大化窗口',exact:true}).waitFor();assert(!(await invoke('get_main_window_state')).square);await capture('glass-native');
-  await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.glass==='on');checks.push('real clear native material, transparent root, revision guard, widget isolation, high-contrast restore and persisted setting');
-  await go('\u8bbe\u7f6e');
+  await go('设置');const glass=page.getByRole('button',{name:'毛玻璃',exact:true});
+  if(await glass.getAttribute('aria-pressed')==='true')await glass.click();await assertSurfaces(page,false);await glass.click();
+  await page.waitForFunction(()=>document.documentElement.dataset.material==='frosted');await widget.waitForFunction(()=>document.documentElement.dataset.material==='frosted');await assertSurfaces(page,true);
+  const preferences=await invoke('get_appearance');await invoke('save_appearance',{preferences:{...preferences,glass:false,revision:preferences.revision-1}});assert.equal((await invoke('get_appearance')).glass,true);
+  assert(await widget.evaluate(p=>window.__TAURI_INTERNALS__.invoke('save_appearance',{preferences:p}).then(()=>false,()=>true),preferences),'task window cannot save appearance');
+  await page.emulateMedia({forcedColors:'active'});await page.waitForFunction(()=>document.documentElement.dataset.material==='solid');await page.emulateMedia({forcedColors:'none'});await page.waitForFunction(()=>document.documentElement.dataset.material==='frosted');
+  const rendered=await page.screenshot({omitBackground:true});const alpha=await page.evaluate(async data=>{const image=await createImageBitmap(new Blob([Uint8Array.from(atob(data),c=>c.charCodeAt(0))],{type:'image/png'})),canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return ctx.getImageData(3,3,1,1).data[3];},rendered.toString('base64'));assert.equal(alpha,255,'opaque WebView backing, rounded Win32 region verified separately');
+  await page.getByRole('button',{name:'最大化窗口',exact:true}).click();await page.getByRole('button',{name:'还原窗口',exact:true}).waitFor();assert((await invoke('get_main_window_state')).square);await page.getByRole('button',{name:'还原窗口',exact:true}).click();await page.getByRole('button',{name:'最大化窗口',exact:true}).waitFor();assert(!(await invoke('get_main_window_state')).square);
+  await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.material==='frosted');checks.push('opaque frosted main, shared radii/solid controls, stale revision guard, task isolation, high-contrast restore, max/restore and saved setting');
+  await go('设置');
   for(const [name,id] of [['Codex','codex'],['Claude','claude'],['VS Code','vscode'],['GitHub','github'],['Quota','quota']]){
     await page.locator('.appearance-settings').getByRole('button',{name:new RegExp('^'+name)}).click();
-    for(const [label,mode] of [['\u6df1\u8272','dark'],['\u6d45\u8272','light']]){
+    for(const [label,mode] of [['深色','dark'],['浅色','light']]){
       await page.locator('.appearance-settings').getByRole('tab',{name:label,exact:true}).click();
-      await page.waitForFunction(([id,mode])=>document.documentElement.dataset.colorTheme===id&&document.documentElement.dataset.colorMode===mode&&document.documentElement.dataset.nativeGlass==='on',[id,mode]);
-      await widget.waitForFunction(([id,mode])=>document.documentElement.dataset.colorTheme===id&&document.documentElement.dataset.colorMode===mode&&document.documentElement.dataset.glass==='on',[id,mode]);
-      const saved=await invoke('get_appearance');assert.equal(saved.theme,id);assert.equal(saved.mode,mode);
+      for(const context of [page,widget])await context.waitForFunction(([id,mode])=>document.documentElement.dataset.colorTheme===id&&document.documentElement.dataset.colorMode===mode&&document.documentElement.dataset.material==='frosted',[id,mode]);
+      await assertSurfaces(page,true);const saved=await invoke('get_appearance');assert.equal(saved.theme,id);assert.equal(saved.mode,mode);
     }
   }
-  checks.push('five native themes in both modes preserve active material, saved choice and task-window appearance synchronization');
-  await page.emulateMedia({reducedMotion:'no-preference'});
-  await page.waitForFunction(()=>document.documentElement.dataset.nativeGlass==='on');
-  await page.locator('.launch-screen').waitFor({state:'detached'});
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  const toolbar=page.locator('.workspace-toolbar'),toolbarRect=await toolbar.boundingBox();
-  await page.mouse.move(toolbarRect.x+60,toolbarRect.y+toolbarRect.height+60);
-  await page.mouse.move(toolbarRect.x+60,toolbarRect.y+20);
-  await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.workspace-toolbar'),'::after').opacity)>.98);
-  const lightPosition=await toolbar.evaluate(e=>e.style.getPropertyValue('--glass-x'));
-  await page.mouse.move(toolbarRect.x+60,toolbarRect.y+toolbarRect.height+60);
-  assert.equal(await toolbar.evaluate(e=>e.style.getPropertyValue('--glass-x')),lightPosition);
-  await page.waitForFunction(()=>!document.querySelector('.workspace-toolbar').style.getPropertyValue('--glass-x'));
-  await page.keyboard.press('Tab');await toolbar.locator('button').first().focus();
-  await page.waitForFunction(()=>document.querySelector('.workspace-toolbar').style.getPropertyValue('--glass-glow')==='1');
-  assert(await toolbar.locator('button').first().evaluate(e=>e.matches(':focus-visible')));
-  checks.push('installed WebView rim fade retains its last position and keyboard focus activates the light');
+  await page.locator('.launch-screen').waitFor({state:'detached'});await capture('appearance-native');
+  const choice=page.locator('.theme-option[aria-pressed="true"]');await choice.hover();await choice.click();assert.equal(await choice.evaluate(e=>getComputedStyle(e,'::after').content),'none');await page.keyboard.press('Tab');assert(await page.locator(':focus-visible').count()>0);
+  checks.push('ten native palettes, task-window synchronization, normal pointer/keyboard behavior without dynamic glow layers');
   await go('输出速度');await page.getByRole('tab',{name:'全部',exact:true}).click();await page.waitForFunction(()=>Number(document.querySelector('.speed-plot')?.dataset.callCount)>0);
-  const speed=await invoke('get_output_speed',{device:'',source:'codex',days:0,model:'',bucketSeconds:0,lookbackHours:0,lookbackMinutes:0});assert.equal(Number(await page.locator('.speed-plot').getAttribute('data-call-count')),speed.calls.length);assert.equal(speed.calls.length,speed.summary.samples);assert.equal(await page.locator('.speed-plot path').count(),0);assert.equal(await page.locator('.speed-average-value').evaluate(e=>getComputedStyle(e).color),await page.locator('.app').evaluate(e=>getComputedStyle(e).color));
+  const speed=await invoke('get_output_speed',{device:'',source:'codex',days:0,model:'',bucketSeconds:0,lookbackHours:0,lookbackMinutes:0});assert.equal(Number(await page.locator('.speed-plot').getAttribute('data-call-count')),speed.calls.length);assert.equal(speed.calls.length,speed.summary.samples);assert.equal(await page.locator('.speed-plot path').count(),0);const speedInk=await assertInkContrast(page,'.speed-average-value');
   const speedAxis=await page.locator('[data-time-tick]').evaluateAll(rows=>rows.map(e=>{const r=e.getBoundingClientRect();return {at:Number(e.dataset.timeTick),label:e.textContent,left:r.left,right:r.right};}));assert(speedAxis.length>=2);assert.equal(new Set(speedAxis.map(r=>r.label)).size,speedAxis.length);assert(speedAxis.every((r,i)=>!i||r.left>=speedAxis[i-1].right+6));
   const speedSvg=page.locator('.speed-call-canvas svg'),focusState=()=>speedSvg.evaluate(e=>({focused:document.activeElement===e,visible:e.matches(':focus-visible'),outline:getComputedStyle(e).outlineStyle,width:parseFloat(getComputedStyle(e).outlineWidth)}));
   const speedSize=await speedSvg.evaluate(e=>({width:e.viewBox.baseVal.width,height:e.viewBox.baseVal.height})),firstCall=callModule.exports.callLayout(speed.calls,speedSize.width,speedSize.height).points[0],expectedPointerTime=await page.evaluate(at=>new Date(at).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3,hourCycle:'h23'}),firstCall.call.completedAt);await speedSvg.hover({position:{x:firstCall.x,y:firstCall.y}});await page.getByRole('tooltip').waitFor();const speedHovered=await page.getByRole('tooltip').locator('b').innerText();assert.equal(speedHovered,expectedPointerTime);await speedSvg.click({position:{x:firstCall.x,y:firstCall.y}});const speedClicked=await page.getByRole('tooltip').locator('b').innerText();assert.equal(speedClicked,expectedPointerTime);
@@ -86,7 +77,7 @@ async function main(){
     await invoke('save_appearance',{preferences:{...speedAppearance,mode:'system',revision:Math.max(Date.now(),speedAppearance.revision+1)}});
     for(const mode of ['dark','light']){
       await page.emulateMedia({colorScheme:mode});await page.waitForFunction(mode=>document.documentElement.dataset.colorMode===mode,mode);speedDisplay.push({kind:'system-'+mode,state:await readyCanvas()});
-      for(const active of [true,false]){await page.emulateMedia({forcedColors:active?'active':'none'});await page.waitForFunction(active=>document.documentElement.dataset.nativeGlass===(active?'off':'on'),active);speedDisplay.push({kind:mode+'-contrast-'+active,state:await readyCanvas()});}
+      for(const active of [true,false]){await page.emulateMedia({forcedColors:active?'active':'none'});await page.waitForFunction(active=>document.documentElement.dataset.material===(active?'solid':'frosted'),active);speedDisplay.push({kind:mode+'-contrast-'+active,state:await readyCanvas()});}
     }
     for(const ratio of [2,1.5,1.25,viewport.ratio]){
       await displaySession.send('Emulation.setDeviceMetricsOverride',{width:viewport.width,height:viewport.height,deviceScaleFactor:ratio,mobile:false});await page.waitForFunction(ratio=>devicePixelRatio===ratio,ratio);await page.evaluate(()=>window.dispatchEvent(new Event('resize')));speedDisplay.push({kind:'emulated-DPR-resize',state:await readyCanvas()});
@@ -96,7 +87,7 @@ async function main(){
     await displaySession.send('Emulation.clearDeviceMetricsOverride');await page.evaluate(()=>{window.dispatchEvent(new Event('resize'));const probe=window.nativeSpeedFreeze;window.fetch=probe.fetch;probe.held.splice(0).forEach(release=>release());});await page.emulateMedia({forcedColors:'none',colorScheme:null});await invoke('save_appearance',{preferences:{...speedAppearance,revision:Date.now()+1}});await displaySession.detach();
   }
   await page.waitForFunction(()=>window.nativeSpeedFreeze.completed===1);speedFreeze.probeCompletedAfterRelease=1;
-  await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.nativeGlass==='on');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
+  await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.material==='frosted');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
   await go('AI 模型');await page.locator('.scatter-point').first().waitFor();
   const nodes=await page.locator('.scatter-point').evaluateAll(elements=>elements.map(e=>({x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),members:JSON.parse(e.dataset.members)})));
   for(let i=0;i<nodes.length;i++)for(let j=0;j<i;j++)assert(Math.hypot(nodes[i].x-nodes[j].x,nodes[i].y-nodes[j].y)>=27.9);
@@ -105,15 +96,15 @@ async function main(){
   await page.getByRole('button',{name:'展开图表',exact:true}).click();await page.getByRole('dialog',{name:'放大的模型天梯'}).waitFor();await page.keyboard.press('Escape');checks.push('native model points do not overlap; group and expanded view work');
   await widget.mouse.move(-10,-10);await widget.locator('.widget-handle').hover();await widget.locator('.usage-widget.is-expanded').waitFor();await widget.waitForFunction(()=>document.querySelectorAll('.task-row').length===2);
   assert(!/tokens\/s|片段/.test(await widget.locator('.widget-panel').innerText()));assert(await widget.locator('.widget-panel').evaluate(e=>e.scrollHeight<=e.clientHeight&&e.scrollWidth<=e.clientWidth));await widget.screenshot({path:path.join(out,'widget-native.png'),omitBackground:true,animations:'disabled'});
-  assert.equal(await widget.locator('.live-model-phase').evaluate(e=>getComputedStyle(e).color),await widget.locator('.usage-widget').evaluate(e=>getComputedStyle(e).color));
-  await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();await widget.screenshot({path:path.join(out,'widget-collapsed-native.png'),omitBackground:true,animations:'disabled'});checks.push('two live fixture tasks from real collector, glass widget expansion/collapse and no content overflow');
+  const taskInk=await assertInkContrast(widget,'.live-model-phase');
+  await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();await widget.screenshot({path:path.join(out,'widget-collapsed-native.png'),omitBackground:true,animations:'disabled'});checks.push('two live fixture tasks from real collector, task widget expansion/collapse and no content overflow');
   await widget.evaluate(()=>{window.nativeClockChanges=0;window.nativeClockObserver=new MutationObserver(rows=>window.nativeClockChanges+=rows.length);document.querySelectorAll('.task-row time').forEach(el=>window.nativeClockObserver.observe(el,{subtree:true,characterData:true,childList:true}));});
   await widget.waitForTimeout(2200);const clockChanges=await widget.evaluate(()=>{window.nativeClockObserver.disconnect();return window.nativeClockChanges;});assert.equal(clockChanges,0);
   await widget.mouse.move(-10,-10);await widget.locator('.widget-handle').hover();await widget.locator('.is-expanded').waitFor();await widget.waitForFunction(()=>document.querySelectorAll('.task-row').length===2);
   const elapsed=await widget.evaluate(async()=>{const data=await window.__TAURI_INTERNALS__.invoke('get_widget_speed'),text=document.querySelector('.task-row time').textContent,part=unit=>Number(text.match(new RegExp('(\\d+)'+unit))?.[1]||0);return {shown:part('\u65f6')*3600+part('\u5206')*60+part('\u79d2'),expected:Math.floor((Date.now()-data.tasks[0].startedAt)/1000),precision:text.includes('\u65f6')?60:1};});assert(Math.abs(elapsed.shown-elapsed.expected)<=elapsed.precision);
   await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();checks.push('native collapsed task text stays idle and opening refreshes the real elapsed time');
   for(const [file,contents] of oldFiles)assert.equal(fs.readFileSync(path.join(root,file),'utf8'),contents);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',profileConfirmed:true,expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,speedFreeze,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',profileConfirmed:true,expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedInk,taskInk,speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,speedFreeze,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
   console.log(checks.map(check=>'PASS '+check).join('\n'));await browser.close();
 }
 main().catch(error=>{console.error(error);process.exit(1);});

@@ -742,7 +742,6 @@
           const enabled=test!=='paused',localMonitoring=!args.device||args.device==='demo-a';
           return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,calls:[...selected].sort((a,b)=>b.completedAt-a.completedAt),recent:[...selected].sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
         }
-        case 'sync_main_material': return {active:window.demoNativeGlass===true&&window.demoAppearance?.glass===true&&args.allowed===true,revision:window.demoAppearance?.revision??0};
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_benchmarks':
         case 'refresh_benchmarks': {
@@ -761,7 +760,7 @@
           }
           return result;
         }
-        case 'setup_info': return {version:'1.0.3400',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_info': return {version:'__QUOTA_VERSION__',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
         case 'setup_status': return setupProgress;
         case 'setup_ready': return null;
         case 'setup_install': {
@@ -1021,7 +1020,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.3400",
+            version: "__QUOTA_VERSION__",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

@@ -128,7 +128,6 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             appearance::get_appearance,
-            appearance::sync_main_material,
             appearance::save_appearance,
             ai_models::get_ai_models,
             ai_models::refresh_ai_models,

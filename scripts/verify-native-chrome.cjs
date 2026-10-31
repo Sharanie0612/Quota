@@ -16,7 +16,7 @@ async function main(){
   if((await invoke('get_main_window_state')).maximized)await invoke('plugin:window|toggle_maximize',{label:'main'});
   for(const glass of [false,true])for(const mode of ['light','dark']){
    await invoke('save_appearance',{preferences:{...original,glass,mode,revision:Date.now()+1}});
-   await page.waitForFunction(([glass,mode])=>document.documentElement.dataset.nativeGlass===(glass?'on':'off')&&document.documentElement.dataset.colorMode===mode,[glass,mode]);
+   await page.waitForFunction(([glass,mode])=>document.documentElement.dataset.material===(glass?'frosted':'solid')&&document.documentElement.dataset.colorMode===mode,[glass,mode]);
    await invoke('plugin:window|hide',{label:'main'});assert.equal(await invoke('plugin:window|is_visible',{label:'main'}),false);
    await invoke('show_main_window',{});assert.equal(await invoke('plugin:window|is_visible',{label:'main'}),true);
    await invoke('plugin:window|minimize',{label:'main'});assert.equal(await invoke('plugin:window|is_minimized',{label:'main'}),true);

@@ -1,0 +1,10 @@
+:root { --motion-ease:cubic-bezier(.2,.8,.2,1); --motion-spring:cubic-bezier(.2,.8,.2,1); }
+@keyframes view-arrive {from {opacity:0;}to {opacity:1;}}
+.motion-seg,.sidebar-nav { position:relative;isolation:isolate; }
+.motion-highlight { position:absolute;z-index:0;left:0;top:0;width:var(--highlight-width,0);height:var(--highlight-height,0);transform:translate(var(--highlight-x,0),var(--highlight-y,0));border-radius:var(--radius-inset);background:var(--surface);box-shadow:var(--shadow-card);pointer-events:none;transition:transform 180ms var(--motion-ease),width 180ms var(--motion-ease),height 180ms var(--motion-ease); }
+.sidebar-nav .motion-highlight {border-radius:var(--radius-control);}
+.motion-seg button,.sidebar-nav .nav-item { position:relative;z-index:1; }
+.sidebar-nav .nav-item.active { background:transparent; }
+.nav-label { display:block;white-space:nowrap;opacity:1;transition:opacity 140ms ease; }
+.sidebar-collapsed .nav-item .nav-label { width:0;max-width:0;opacity:0;overflow:hidden; }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after {animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important;} }

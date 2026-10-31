@@ -27,7 +27,6 @@ pub fn get_main_window_chrome(window: tauri::WebviewWindow) -> Result<crate::win
 pub struct AppState {
     pub benchmarks: crate::benchmarks::Cache,
     pub appearance:Mutex<Option<crate::appearance::Preferences>>,
-    pub main_material:Mutex<Option<(bool,bool,bool)>>,
     pub ai_models: Mutex<crate::ai_models::Snapshot>,
     pub ai_models_refreshing: tokio::sync::Mutex<()>,
     pub billing_lock: Mutex<()>,
@@ -92,7 +91,6 @@ impl AppState {
         Self {
             benchmarks:crate::benchmarks::Cache{dataset:Mutex::new(benchmarks),refreshing:tokio::sync::Mutex::new(())},
             appearance:Mutex::new(appearance),
-            main_material:Mutex::new(None),
             ai_models:Mutex::new(ai_models),
             ai_models_refreshing:tokio::sync::Mutex::new(()),
             billing_lock: Mutex::new(()),

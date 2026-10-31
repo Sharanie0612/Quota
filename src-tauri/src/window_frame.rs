@@ -1,4 +1,4 @@
-//! Shape the actual main window, including the transparent material on Windows 10.
+//! Own the native main-window frame and its rounded/square geometry.
 use serde::Serialize;
 use tauri::{Emitter, Manager, Window};
 
@@ -262,7 +262,11 @@ fn state(window: &Window) -> Result<(u32, u32, u32, State), String> {
                 scale,
             )
         });
-    let radius = (14.0 * scale).round().max(1.0) as u32;
+    static LOGICAL_RADIUS:std::sync::LazyLock<f64>=std::sync::LazyLock::new(||{
+        let geometry:serde_json::Value=serde_json::from_str(include_str!("../data/ui-geometry.json")).expect("embedded UI geometry must be valid");
+        geometry["window"].as_f64().filter(|r|r.is_finite()&&(8.0..=40.0).contains(r)).expect("embedded window radius must be valid")
+    });
+    let radius = (*LOGICAL_RADIUS * scale).round().max(1.0) as u32;
     Ok((
         size.width,
         size.height,

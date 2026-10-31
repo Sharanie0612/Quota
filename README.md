@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前开发版本为 1.0.3403**：液态玻璃采用更清透的窗口底材，导航与工具栏增加凸面透镜轮廓，选中胶囊可拉伸、回弹并连续打断，按压时浮起光层。文字和图表保持稳定；保留原生边框保护、人民币月均换算、实际 Token 单价、逐次调用速度散点与任务悬浮窗。公开下载仍指向已发布版本；本地验证范围见 [清透材质与液态动效记录](docs/liquid-lens-1.0.3403.md)。
+**当前开发版本为 1.0.3404**：改用应用内毛玻璃，统一窗口、面板和按钮圆角，移除原生透明材质及随鼠标移动的光层。外观偏好、样式和公共控件按职责整理，清理已废弃页面与效果测试。保留人民币月均换算、实际 Token 单价、模型对比、逐次调用散点和任务窗。公开下载仍指向已发布版本；本地验证见 [毛玻璃与架构整理记录](docs/frosted-architecture-1.0.3404.md)。
 
 ## 开始使用
 
@@ -42,7 +42,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 | **AI 模型** | 人民币价格 × 公开配置能力天梯，当前主力、近30天更新测评及六维对比 |
 | **Token 活动** | Codex、ZCode、Harness、可选 Trae 的趋势与环形占比，按来源、模型和设备筛选 |
 | **输出速度** | 每次调用的速度散点，按时间、模型、设备筛选；悬浮窗显示运行任务 |
-| **设置** | 配色、明暗、液态玻璃、采集频率、通知、悬浮窗、备份和跨设备同步 |
+| **设置** | 配色、明暗、毛玻璃、采集频率、通知、悬浮窗、备份和跨设备同步 |
 
 ### 我的使用
 
@@ -88,11 +88,11 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 默认 Quota 使用白色内容区、淡蓝侧栏和深蓝强调色，与 Logo 保持一致。Codex、Claude、VS Code、GitHub 配色分别保留灰阶、暖色、编辑器分区与清晰边线的特点，均支持明暗和跟随系统。
 
-「设置 → 外观 → 液态玻璃」开启主窗口透明合成，默认关闭。Windows 优先使用清透 Blur，保留 Acrylic 兼容回退；导航与工具栏增加凸面边缘高光，选中胶囊拉伸回弹，连续切换可中途衔接。文字、图表和点击区域保持稳定，不叠加多层网页磨砂。关闭恢复实底，高对比度关闭透明合成，减少动效停止液态形变。任务悬浮窗保留独立的裁剪材质。
+「设置 → 外观 → 毛玻璃」提供应用内的柔和磨砂层，默认关闭。窗口始终使用不透明底色；开启后只在导航与工作区做轻微模糊，内容卡片、表单和常规按钮保持实底。旧版开关选择会保留。
 
-实现参考 [Apple材质指南](https://developer.apple.com/design/human-interface-guidelines/materials)，把光学效果集中在导航与交互层，避免多层磨砂叠加。
+窗口和面板使用 16px 圆角，常规控件使用 10px，分段控件内层使用 8px；开关、圆点等按各自形状显示。五种配色共用同一套尺寸。高对比度恢复实底，减少动效关闭过渡；选中项使用可连续切换的平移动画。
 
-侧栏收起时先完成布局，再做位移动画，减少图表反复重排。贴边弹窗使用固定画布展开，支持中途反向、拖动贴边及键盘收起；更改停靠位置后保持收起，再次移入即可展开。Windows 主窗口保留浮动圆角与最大化 / 分屏直角，安装器保留中文 / 英文向导。
+任务悬浮窗保持独立的透明画布与命中区域，支持反向展开、拖动贴边和键盘收起；主窗口保留浮动圆角与最大化 / 分屏直角。
 
 ### 支持的账户
 
@@ -111,37 +111,26 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-界面示例使用合成资料。玻璃材质图来自 1.0.3403 隔离安装版的 WebView 图层，叠加合成背景与模拟材质底色，用于呈现透明层、透镜高光和圆角，**不是桌面截图**。输出速度保留 1.0.3400 示例，其余功能布局保留此前 1.0.3300 示例。安装版验证见交付记录。
+以下均为 1.0.3404 的合成资料界面，不叠加桌面背景。浅深外观与任务窗来自隔离安装版 WebView，费用和模型等示例来自同一构建的浏览器预览。桌面窗口的验证范围另记在交付记录中。
 
-![浅色玻璃与透镜高光（合成背景）](assets/readme/glass-light-3403.png)
+![毛玻璃外观与统一控件](assets/readme/frosted-light-3404.png)
 
-![深色玻璃与透镜高光（合成背景）](assets/readme/glass-dark-3403.png)
+![深色毛玻璃](assets/readme/frosted-dark-3404.png)
 
-![人民币总支出、用量和实际单价](assets/readme/usage-overview-3300.png)
-
-<details>
-<summary>消费历史与模型工作状态</summary>
-
-![统一人民币的消费记录](assets/readme/spending-history-3300.png)
-
-![填写厂商、金额和费用日期即可记录支出](assets/readme/record-expense-3300.png)
-
-![每次调用的速度散点趋势](assets/readme/output-speed-3400.png)
-
-![清透任务悬浮窗中的运行任务](assets/readme/clear-widget-3400.png)
-
-</details>
+![人民币支出与实际单价](assets/readme/usage-overview-3404.png)
 
 <details>
-<summary>保留的模型对比与外观设置</summary>
+<summary>消费记录、模型对比与任务窗</summary>
 
-![模型天梯的相近型号分组](assets/readme/model-ladder-3300.png)
+![统一人民币的消费记录](assets/readme/spending-history-3404.png)
 
-![同一配置的六维能力对比](assets/readme/model-comparison-3300.png)
+![模型天梯的相近型号分组](assets/readme/model-ladder-3404.png)
 
-![可见的玻璃材质与背景光层](assets/readme/usage-glass-3300.png)
+![同一配置的六维能力对比](assets/readme/model-comparison-3404.png)
 
-![Quota 深色外观与玻璃设置](assets/readme/appearance-dark-3300.png)
+![逐次调用速度散点](assets/readme/output-speed-3404.png)
+
+![运行任务悬浮窗](assets/readme/task-widget-3404.png)
 
 </details>
 
@@ -167,7 +156,7 @@ npm ci
 npm run tauri dev
 ```
 
-开发端口为 `1420`。本轮本地工作分支为 `codex/feat/usage-live-polish`，尚未推送；不要假定远程仓库已有当前开发版。
+开发端口为 `1420`。本轮本地工作分支为 `codex/fix/frosted-architecture`，尚未推送；不要假定远程仓库已有当前开发版。
 
 | 平台 | 构建入口 | 说明 |
 | --- | --- | --- |
@@ -176,23 +165,30 @@ npm run tauri dev
 
 Windows 详细环境见 [构建指南](docs/build-windows.md)。macOS 构建工作流的产物通过 GitHub Actions 保存；发布页中的文件才是公开安装包。
 
+项目按入口、视图、公共组件、业务计算和桌面服务分层：
+
+```text
+src/main.tsx + window.ts  窗口入口
+src/views/               六个业务页面与安装向导
+src/components/          公共控件、图表与任务窗
+src/lib/appearance/      配色、偏好校验、状态与同步
+src/lib/                 API 封装与纯业务计算
+src/styles/              基础、布局、控件、页面、动效、材质
+src-tauri/src/           命令、业务服务、存储与原生窗口
+src-tauri/data/          官方资料种子与共享圆角配置
+scripts/lib/             验收共用的加载器、合成数据与表面检查
+```
+
 ```bash
 npm run typecheck
 npm run build
+npm run verify
 cargo check --examples --locked --manifest-path src-tauri/Cargo.toml
-node scripts/verify-logic.cjs
-node scripts/verify-usage-analytics.cjs
-node scripts/verify-vendor-costs.cjs
-node scripts/verify-widget-motion.cjs
-node scripts/verify-widget-state.cjs
-cargo run --release --manifest-path src-tauri/Cargo.toml --example activity_checks
-cargo run --release --manifest-path src-tauri/Cargo.toml --example vendor_cost_checks
-cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_checks
 ```
 
-本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
+界面检查先运行 `npm run preview:ui`，再在另一终端运行 `npm run verify:ui`。需要可用的 Playwright / Edge；可通过 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。检查覆盖外观组合、1024px 布局、账务交互、模型图、速度与任务窗，安装版仍需单独验收。
 
-玻璃交互另有[透明合成与圆角像素检查](scripts/verify-glass-composition.cjs)、[液态形变与按压检查](scripts/verify-liquid-lens.cjs)、[悬停与聚焦检查](scripts/verify-glass-controls.cjs)、[焦点恢复检查](scripts/verify-glass-resume.cjs)、[缩放定位检查](scripts/verify-glass-anchor.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)。[安装版焦点恢复](scripts/verify-native-glass-resume.cjs)和[任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证缩放对齐、设置恢复、窗口可见状态及延迟响应。
+本机 Windows GNU 的 `cargo test` 存在 WinRT DLL 加载限制，运行逻辑使用对应的 Rust example。账户、账务、统计和同步兼容代码及有效回归继续保留，已移除的旧页面与液态效果检查不再作为当前验收入口。分层边界、扩展方式与验证命令见 [架构](docs/architecture.md)、[开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
 ## 文档与贡献
 

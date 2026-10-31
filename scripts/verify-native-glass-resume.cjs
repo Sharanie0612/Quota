@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require(process.env.QUOTA_PLAYWRIGHT_MODULE||'playwright');
 async function main(){
  const root=process.env.QUOTA_NATIVE_DATA;assert(root&&path.isAbsolute(root));const config=JSON.parse(fs.readFileSync(path.join(root,'config.json'),'utf8'));assert.equal(config.accounts.length,0);assert.equal(config.settings.ladderAutoUpdate,false);
- const output=path.join(root,'glass-resume-evidence.json');fs.rmSync(output,{force:true});const cases=[],anchors=[];
+ const output=path.join(root,'glass-resume-evidence.json');fs.rmSync(output,{force:true});const cases=[],anchors=[],pointerPriority=[];
  const browser=await chromium.connectOverCDP(process.env.QUOTA_CDP_URL||'http://127.0.0.1:9237');let invoke,original,isolated=false;
  try{
   let page;for(let n=0;n<100;n++){page=browser.contexts().flatMap(c=>c.pages()).find(p=>/^http:\/\/tauri.localhost\/$/.test(p.url()));if(page)break;await new Promise(resolve=>setTimeout(resolve,50));}assert(page);
@@ -25,20 +25,24 @@ async function main(){
    if(kind==='reduced-motion')await page.emulateMedia({reducedMotion:'no-preference'});
    if(kind==='forced-colors')await page.emulateMedia({forcedColors:'none'});
    if(kind==='saved-glass-toggle')await save(true);
-   await page.waitForTimeout(300);const resumed=await state(),retained=resumed.focused&&resumed.keyboard;
+   await page.waitForTimeout(300);const observed=await state();
+   // Native material changes can move focus after the IPC reply. A fading
+   // rim intentionally retains its last coordinate; sample its settled state.
+   const resumed=await wait(s=>s.focused&&s.keyboard?s.glow==='1'&&s.opacity>.98&&Math.abs(parseFloat(s.x)-s.expectedX)<1:s.x===''),retained=resumed.focused&&resumed.keyboard;
    const correct=retained?resumed.glow==='1'&&resumed.opacity>.98&&Math.abs(parseFloat(resumed.x)-resumed.expectedX)<1:resumed.x==='';
-   cases.push({kind,before,paused,resumed,focusRetained:retained,nativeVisibilityVerified:kind==='native-hide-show',webviewPauseObserved:paused.x==='',correct});
+   cases.push({kind,before,paused,observed,resumed,focusRetained:retained,nativeVisibilityVerified:kind==='native-hide-show',webviewPauseObserved:paused.x==='',correct});
   }
   const originalMaximized=(await invoke('get_main_window_state')).maximized;
   try{
    if(originalMaximized)await invoke('plugin:window|toggle_maximize',{label:'main'});
    await page.waitForTimeout(300);await page.getByRole('navigation').getByRole('button').first().focus();await page.keyboard.press('Tab');await button.focus();
+   const surface=await page.locator('.workspace-toolbar').boundingBox();await page.mouse.move(surface.x+130,surface.y+surface.height/2);await page.waitForTimeout(100);const pointed=await state(),pointerError=Math.abs(parseFloat(pointed.x)-pointed.expectedX);pointerPriority.push({state:pointed,error:pointerError,correct:pointed.focused&&pointed.keyboard&&pointerError<1});
    for(const mode of ['floating','maximized','restored']){
     if(mode!=='floating')await invoke('plugin:window|toggle_maximize',{label:'main'});
     await page.waitForTimeout(350);const current=await state(),error=Math.abs(parseFloat(current.x)-current.expectedX);anchors.push({mode,window:await invoke('get_main_window_state'),state:current,error,correct:current.focused&&current.keyboard&&error<1});
    }
   }finally{if((await invoke('get_main_window_state')).maximized!==originalMaximized)await invoke('plugin:window|toggle_maximize',{label:'main'});}
-  const result={passed:cases.every(row=>row.correct)&&anchors.every(row=>row.correct),kind:'native-window-IPC-and-WebView-media-focus-recovery',profileConfirmed:true,desktopCapture:false,manualWindowInput:false,cases,anchors};fs.writeFileSync(output,JSON.stringify(result,null,2));console.log(JSON.stringify({passed:result.passed,cases:cases.map(row=>({kind:row.kind,focusRetained:row.focusRetained,correct:row.correct})),anchors:anchors.map(row=>({mode:row.mode,error:row.error,correct:row.correct}))},null,2));
+  const result={passed:cases.every(row=>row.correct)&&anchors.every(row=>row.correct)&&pointerPriority.every(row=>row.correct),kind:'native-window-IPC-and-WebView-media-focus-recovery',profileConfirmed:true,desktopCapture:false,manualWindowInput:false,cases,anchors,pointerPriority};fs.writeFileSync(output,JSON.stringify(result,null,2));console.log(JSON.stringify({passed:result.passed,cases:cases.map(row=>({kind:row.kind,focusRetained:row.focusRetained,correct:row.correct})),anchors:anchors.map(row=>({mode:row.mode,error:row.error,correct:row.correct})),pointerPriority},null,2));
   if(process.env.QUOTA_GLASS_RESUME_AUDIT_ONLY!=='1')assert(result.passed,'native retained keyboard focus must regain its light');
  }catch(error){if(!fs.existsSync(output))fs.writeFileSync(output,JSON.stringify({passed:false,error:String(error),cases},null,2));throw error;}
  finally{if(isolated&&invoke&&original){await invoke('show_main_window',{}).catch(()=>{});await invoke('save_appearance',{preferences:{...original,revision:Date.now()+2}}).catch(()=>{});}await browser.close();}

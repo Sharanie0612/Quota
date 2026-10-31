@@ -1,12 +1,15 @@
+import {cancelLiquidLenses} from './liquidLens';
 // A transient rim on the navigation layer. No animation loop runs while idle.
 export function initializeGlassMotion(isEnabled:()=>boolean) {
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   const contrast=matchMedia('(forced-colors: active)');
   const surfaces=new Map<HTMLElement,ReturnType<typeof setTimeout>|null>();
   let pointer:HTMLElement|null=null,focus:HTMLElement|null=null;
+  let pressed:HTMLElement|null=null;
   let frame=0,layoutFrame=0,latest:{surface:HTMLElement;x:number;y:number}|null=null;
   const allowed=()=>isEnabled()&&!reduced.matches&&!contrast.matches&&!document.hidden;
-  const surfaceFor=(target:EventTarget|null)=>target instanceof Element?target.closest<HTMLElement>('.app .sidebar,.app .workspace-toolbar,.app .seg'):null;
+  const surfaceFor=(target:EventTarget|null)=>target instanceof Element?target.closest<HTMLElement>('.app .sidebar,.app .workspace-toolbar,.app .seg,.overlay .modal'):null;
+  const release=()=>{pressed?.removeAttribute('data-glass-pressed');pressed=null;};
   const reset=(surface:HTMLElement)=>{
     const timer=surfaces.get(surface);if(timer)clearTimeout(timer);
     surfaces.delete(surface);
@@ -26,6 +29,7 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     }
     if(frame)cancelAnimationFrame(frame);
     frame=0;latest=null;pointer=null;focus=null;
+    release();cancelLiquidLenses();
     for(const surface of surfaces.keys())reset(surface);
   };
   const show=(surface:HTMLElement,x:number,y:number)=>{
@@ -56,9 +60,22 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     latest={surface,x:event.clientX,y:event.clientY};if(frame)return;
     frame=requestAnimationFrame(()=>{
       frame=0;const point=latest;latest=null;
-      if(point&&point.surface===pointer&&point.surface.isConnected&&allowed())show(point.surface,point.x,point.y);
+      if(point&&point.surface===pointer&&point.surface.isConnected&&allowed()){
+        const element=document.activeElement;
+        if(point.surface===focus&&element instanceof HTMLElement&&element.matches(':focus-visible'))showFocus();
+        else show(point.surface,point.x,point.y);
+      }
     });
   },{passive:true});
+  document.addEventListener('pointerdown',event=>{
+    if(!allowed()||!event.isPrimary||event.button!==0||!(event.target instanceof Element))return;
+    release();
+    pressed=event.target.closest<HTMLElement>('.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn:not(.btn-primary):not(.btn-danger)');
+    if(pressed instanceof HTMLButtonElement&&pressed.disabled){pressed=null;return;}
+    pressed?.setAttribute('data-glass-pressed','true');
+  },{passive:true});
+  document.addEventListener('pointerup',release,{passive:true});
+  document.addEventListener('pointercancel',release,{passive:true});
   document.addEventListener('pointerout',event=>{
     const surface=surfaceFor(event.target);
     if(surface===pointer&&surface&&!(event.relatedTarget instanceof Node&&surface.contains(event.relatedTarget))){pointer=null;fade(surface);}
@@ -82,6 +99,7 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     cancelLayout();
     if(frame)cancelAnimationFrame(frame);
     frame=0;latest=null;pointer=null;focus=null;
+    release();cancelLiquidLenses();
     for(const surface of surfaces.keys())reset(surface);
   };
   window.addEventListener('blur',clear);

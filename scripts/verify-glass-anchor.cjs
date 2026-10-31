@@ -17,6 +17,11 @@ async function main(){
    }
   }
   fs.writeFileSync(path.join(out,'measurements.json'),JSON.stringify({kind:'viewport-anchors-only',passed:rows.every(row=>row.focused&&row.keyboard&&row.error<1),rows},null,2));
+  const pointerPriority=[];
+  for(const width of [1024,1280]){
+   await page.setViewportSize({width,height:900});const rect=await toolbar.boundingBox();await page.mouse.move(rect.x+20,rect.y+rect.height+80);await focus();await page.mouse.move(rect.x+130,rect.y+rect.height/2);await page.waitForTimeout(100);pointerPriority.push({width,...await state()});
+  }
+  checks.push('retained keyboard anchor wins over pointer movement on the same surface');
   await focus();await page.evaluate(()=>{
    const target=document.querySelector('.workspace-toolbar').style,original=CSSStyleDeclaration.prototype.setProperty;window.anchorProbe={writes:0,original};CSSStyleDeclaration.prototype.setProperty=function(name,...args){if(this===target&&name==='--glass-x')window.anchorProbe.writes++;return original.call(this,name,...args);};
   });
@@ -25,7 +30,7 @@ async function main(){
   await page.evaluate(()=>{window.anchorProbe.writes=0;window.dispatchEvent(new Event('resize'));window.dispatchEvent(new Event('blur'));});await settle();assert.equal(await page.evaluate(()=>window.anchorProbe.writes),0);assert.equal(await toolbar.evaluate(e=>e.style.getPropertyValue('--glass-x')),'');checks.push('blur cancels pending layout work');
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await focus();await page.evaluate(()=>{window.anchorProbe.writes=0;window.dispatchEvent(new Event('resize'));document.querySelector('.sidebar-toggle').focus();});await settle();assert.equal(await page.evaluate(()=>window.anchorProbe.writes),0);await page.keyboard.press('Space');await page.waitForTimeout(320);assert.equal(await toolbar.evaluate(e=>e.style.getPropertyValue('--glass-x')),'');assert.equal(await page.locator('.sidebar-toggle').getAttribute('aria-expanded'),'false');checks.push('focus change cancels stale geometry; keyboard sidebar collapse clears old light');
   await page.evaluate(()=>{CSSStyleDeclaration.prototype.setProperty=window.anchorProbe.original;});assert.deepEqual(errors,[]);
-  const passed=rows.every(row=>row.focused&&row.keyboard&&row.error<1);fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed,kind:'built-renderer-retained-keyboard-focus-resize',nativeWindowInput:false,rows,burstFocusUpdates:burst,checks,errors},null,2));assert(passed,'retained focus light must remain centered');console.log('PASS '+rows.length+' light/dark viewport anchors; '+checks.join('; '));
+  const passed=[...rows,...pointerPriority].every(row=>row.focused&&row.keyboard&&row.error<1);fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed,kind:'built-renderer-retained-keyboard-focus-resize',nativeWindowInput:false,rows,pointerPriority,burstFocusUpdates:burst,checks,errors},null,2));assert(passed,'retained focus light must remain centered');console.log('PASS '+rows.length+' light/dark viewport anchors; '+checks.join('; '));
  }finally{await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

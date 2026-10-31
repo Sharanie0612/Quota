@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory=$true)][string]$ExePath,
-  [Parameter(Mandatory=$true)][string]$DataDir
+  [Parameter(Mandatory=$true)][string]$DataDir,
+  [switch]$Glass
 )
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\') + '\'
@@ -18,8 +19,14 @@ foreach ($entry in @(@('config.json',$config),@('activity-settings.json',$option
 $previousData = $env:QUOTA_DATA_DIR
 $previousFrame = $env:QUOTA_FRAME_SMOKE
 $previousWidget = $env:QUOTA_WIDGET_SMOKE
+$previousWebView = $env:WEBVIEW2_USER_DATA_FOLDER
+if ($Glass) {
+  $preferences=@{theme='quota';mode='light';collapsed=$false;glass=$true;revision=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
+  [IO.File]::WriteAllText((Join-Path $data 'appearance.json'),($preferences | ConvertTo-Json),$utf8)
+}
 try {
   $env:QUOTA_DATA_DIR=$data
+  $env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $data 'WebViewProfile'
   $env:QUOTA_FRAME_SMOKE='1'
   $env:QUOTA_WIDGET_SMOKE=$null
   $process=Start-Process -FilePath $exe -PassThru -WindowStyle Hidden
@@ -33,4 +40,5 @@ try {
   $env:QUOTA_DATA_DIR=$previousData
   $env:QUOTA_FRAME_SMOKE=$previousFrame
   $env:QUOTA_WIDGET_SMOKE=$previousWidget
+  $env:WEBVIEW2_USER_DATA_FOLDER=$previousWebView
 }

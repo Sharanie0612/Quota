@@ -62,6 +62,10 @@ async function main(){
     }
     // Hover/click must light only the rounded rim, without painting a box in
     // the clear centre or the area outside the top-left corner's curve.
+    await page.emulateMedia({reducedMotion:'no-preference',forcedColors:'none'});
+    if(native)await invoke('show_main_window',{});
+    await page.waitForFunction(()=>document.hasFocus()&&!document.hidden);
+    evidence.pointerContext=await page.evaluate(()=>({focused:document.hasFocus(),hidden:document.hidden,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,theme:document.documentElement.dataset.colorTheme,mode:document.documentElement.dataset.colorMode}));
     const toolbar=page.locator('.workspace-toolbar');
     const points=await toolbar.evaluate(e=>{const r=e.getBoundingClientRect();return {centre:{x:r.left+r.width*.45,y:r.top+r.height*.5},corners:[{x:r.left+1,y:r.top+1},{x:r.right-2,y:r.top+1},{x:r.left+1,y:r.bottom-2},{x:r.right-2,y:r.bottom-2}],away:{x:r.left+r.width*.45,y:r.bottom+70}};});
     await page.mouse.move(points.away.x,points.away.y);await pause(300);
@@ -73,6 +77,7 @@ async function main(){
       if(state==='click')await page.mouse.click(points.centre.x,points.centre.y);
       if(state==='leave')await page.mouse.move(points.away.x,points.away.y);
       await pause(300);
+      await page.waitForFunction(state=>{const opacity=Number(getComputedStyle(document.querySelector('.workspace-toolbar'),'::after').opacity);return state==='leave'?opacity===0:opacity>.99;},state);
       const centre=await pixels(page,points.centre),corners=[];
       for(const point of points.corners)corners.push((await pixels(page,point)).rgba);
       const delta=(a,b)=>Math.max(...a.map((value,i)=>Math.abs(value-b[i])));

@@ -20,7 +20,7 @@ const backgrounds={black:'#000',white:'#fff',blue:'#163b69',mixed:'linear-gradie
 async function main(){
  fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({executablePath:process.env.QUOTA_BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true}),rows=[],errors=[];
  try{
-  for(const theme of ['quota','codex','claude','vscode','github'])for(const mode of ['light','dark']){
+  for(const theme of ['quota','codex','claude','vscode','github'].filter(t=>!process.env.QUOTA_CONTROLS_THEME||t===process.env.QUOTA_CONTROLS_THEME))for(const mode of ['light','dark'].filter(m=>!process.env.QUOTA_CONTROLS_MODE||m===process.env.QUOTA_CONTROLS_MODE)){
    const page=await browser.newPage({viewport:{width:1360,height:1000},locale:'zh-CN',timezoneId:'Asia/Shanghai',colorScheme:mode,reducedMotion:'reduce'});page.on('pageerror',e=>errors.push(e.message));
    await page.addInitScript('('+fixtures+')();window.demoNativeGlass=true;window.demoAppearance='+JSON.stringify({theme,mode,glass:true,collapsed:false,revision:Date.now()})+';localStorage.setItem("quota.appearance.v1",JSON.stringify(window.demoAppearance));');await page.goto(base);await page.addStyleTag({content:'*,*::before,*::after{transition:none!important;animation:none!important}'});await page.waitForFunction(()=>document.documentElement.dataset.nativeGlass==='on');await page.locator('.workspace-usage strong').filter({hasNotText:'\u2014'}).waitFor();
    await page.evaluate(()=>{const el=document.createElement('div');el.id='controls-backdrop';el.style.cssText='position:fixed;inset:0;z-index:-1;pointer-events:none';document.body.prepend(el);});
@@ -28,7 +28,7 @@ async function main(){
     await page.getByRole('navigation',{name:'\u4e3b\u5bfc\u822a'}).getByRole('button',{name:label,exact:true}).click();await page.locator(ready).first().waitFor();
     for(const [background,css] of Object.entries(backgrounds)){
      const [r,g,b,a]=native[mode==='dark'?1:2].split(',').map(Number);await page.locator('#controls-backdrop').evaluate((el,background)=>el.style.background=background,`linear-gradient(rgba(${r},${g},${b},${a/255}),rgba(${r},${g},${b},${a/255})),${css}`);
-     for(const [name,selector,state] of cases){
+     for(const [name,selector,state] of cases.filter(([name])=>!process.env.QUOTA_CONTROLS_NAME||name===process.env.QUOTA_CONTROLS_NAME)){
       const el=page.locator(selector).first();await page.evaluate(()=>document.activeElement?.blur());await page.mouse.move(-10,-10);await el.scrollIntoViewIfNeeded();
       if(state==='focus'){await page.keyboard.press('Tab');await el.focus();assert(await el.evaluate(e=>e.matches(':focus-visible')));}else await el.hover();
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));

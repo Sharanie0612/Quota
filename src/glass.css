@@ -4,6 +4,7 @@ html[data-glass="on"] {
   --glass-content:color-mix(in srgb,var(--surface) 25%,transparent);
   --glass-rim:color-mix(in srgb,var(--surface) 64%,transparent);
   --glass-shade:color-mix(in srgb,var(--text) 10%,transparent);
+  --glass-reflection:var(--surface);
 }
 /* The WebView must be clear all the way to the native compositor. */
 html[data-glass="on"][data-native-glass="on"],
@@ -17,6 +18,7 @@ html[data-glass="on"] .app .scatter-badge {fill:var(--text);}
 html[data-glass="on"] .sidebar-alert {background:var(--surface);border-radius:6px;padding:3px 7px;width:fit-content;max-width:100%;}
 html[data-glass="on"] :is(.app,.usage-widget) :is(button,a,input,select,textarea,summary,div[tabindex],svg[tabindex]):focus-visible {outline:2px solid var(--glass-focus);outline-offset:2px;}
 html[data-glass="on"] .app .window-controls button:focus-visible {outline-color:currentColor;outline-offset:-4px;}
+html[data-glass="on"] .app button.sidebar-toggle:focus-visible {outline-offset:-3px;background:var(--surface);}
 html[data-glass="on"] .app :is(.workspace-tools button,.usage-vendor-link,.speed-legend button):hover {color:var(--text);}
 html[data-glass="on"] .app .usage-vendor-link:hover {text-decoration:underline;text-underline-offset:3px;}
 html[data-glass="on"] .app .speed-legend button {border-radius:7px;transition:background 160ms var(--motion-ease);}
@@ -37,7 +39,7 @@ html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[dat
   backdrop-filter:blur(7px) saturate(1.22);-webkit-backdrop-filter:blur(7px) saturate(1.22);
   box-shadow:inset 0 1px .5px var(--glass-rim),inset 0 -1px .5px var(--glass-shade),0 4px 16px color-mix(in srgb,var(--text) 4%,transparent);
 }
-html[data-glass="on"] .sidebar {border-radius:16px;box-shadow:none;}
+html[data-glass="on"] .sidebar {border-radius:20px;}
 html[data-glass="on"] .workspace-toolbar {border-radius:inherit;}
 html[data-glass="on"] .sidebar .nav-item,html[data-glass="on"] .workspace-toolbar {color:var(--text);}
 html[data-glass="on"] .sidebar .nav-item.active {font-weight:600;}
@@ -53,24 +55,75 @@ html[data-glass="on"] .app .seg {border:1px solid color-mix(in srgb,var(--surfac
 @supports(backdrop-filter:url(#quota-glass-refraction)) {
   html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .app .seg {backdrop-filter:url(#quota-glass-refraction) blur(3px) saturate(1.22);-webkit-backdrop-filter:url(#quota-glass-refraction) blur(3px) saturate(1.22);}
 }
-/* Acrylic already filters the desktop. A second WebView backdrop pass copies
+/* The native material already filters the desktop. A second WebView pass copies
  * translucent page pixels over themselves, leaving a brighter rectangular tile.
  * Keep the thin tint and rim; CSS refraction remains for the opaque fallback. */
 html[data-glass="on"][data-native-glass="on"] .app :is(.sidebar,.workspace-toolbar,.seg) {
   backdrop-filter:none;-webkit-backdrop-filter:none;
 }
-html[data-color-mode="dark"][data-glass="on"] {--glass-fill:color-mix(in srgb,var(--surface) 18%,transparent);--glass-content:color-mix(in srgb,var(--surface) 32%,transparent);--glass-rim:color-mix(in srgb,var(--text) 24%,transparent);}
-/* The widget retains its proven clipped surface, independent from main Acrylic. */
+html[data-color-mode="dark"][data-glass="on"] {--glass-fill:color-mix(in srgb,var(--surface) 18%,transparent);--glass-content:color-mix(in srgb,var(--surface) 32%,transparent);--glass-rim:color-mix(in srgb,var(--text) 24%,transparent);--glass-reflection:color-mix(in srgb,var(--text) 60%,transparent);}
+/* The widget retains its proven clipped surface, independent from main material. */
 html[data-glass="on"] .widget-panel::before {
   background:radial-gradient(ellipse at 5% 0%,color-mix(in srgb,var(--surface) 94%,transparent),transparent 62%),linear-gradient(140deg,color-mix(in srgb,var(--surface) 80%,transparent),color-mix(in srgb,var(--blue-soft) 68%,transparent));
   border-color:var(--glass-rim);backdrop-filter:blur(14px) saturate(1.5);-webkit-backdrop-filter:blur(14px) saturate(1.5);
   box-shadow:inset 1.5px 1.5px 1px var(--glass-rim),inset 0 -1.5px 1px color-mix(in srgb,var(--surface) 65%,transparent);
 }
 html[data-color-mode="dark"][data-glass="on"] .widget-panel::before {background:linear-gradient(140deg,color-mix(in srgb,var(--surface) 92%,transparent),color-mix(in srgb,var(--surface) 80%,transparent));border-color:var(--border-strong);}
+
+/* A convex optical edge, drawn only inside the rounded shape. It doesn't copy
+ * the WebView backdrop or bend the labels and charts underneath it. */
+html[data-glass="on"] .app :is(.sidebar,.workspace-toolbar,.seg),
+html[data-glass="on"] .overlay .modal {
+  border-color:transparent;
+  box-shadow:inset 0 1px 1px color-mix(in srgb,var(--glass-reflection) 48%,transparent),inset 0 -1px 1.5px var(--glass-shade),0 5px 18px color-mix(in srgb,var(--text) 7%,transparent);
+}
+html[data-glass="on"] :is(.app .sidebar,.app .workspace-toolbar,.app .seg,.app .motion-highlight,.overlay .modal)::before {
+  content:"";position:absolute;inset:0;padding:1.5px;border-radius:inherit;pointer-events:none;
+  background:conic-gradient(from 140deg at 50% 50%,color-mix(in srgb,var(--text) 18%,transparent),color-mix(in srgb,var(--glass-reflection) 82%,transparent) 12%,transparent 23%,color-mix(in srgb,var(--glass-reflection) 24%,transparent) 35%,color-mix(in srgb,var(--glass-reflection) 94%,transparent) 49%,transparent 62%,color-mix(in srgb,var(--blue) 18%,transparent) 75%,color-mix(in srgb,var(--glass-reflection) 70%,transparent) 88%,color-mix(in srgb,var(--text) 18%,transparent));
+  mask:linear-gradient(var(--surface) 0 0) content-box,linear-gradient(var(--surface) 0 0);mask-composite:exclude;
+  -webkit-mask:linear-gradient(var(--surface) 0 0) content-box,linear-gradient(var(--surface) 0 0);-webkit-mask-composite:xor;
+}
+html[data-glass="on"] :is(.app .sidebar,.app .workspace-toolbar,.app .seg,.overlay .modal)::after {
+  padding:2.5px;
+  background:radial-gradient(ellipse at var(--glass-x,30%) var(--glass-y,0%),color-mix(in srgb,var(--glass-reflection) 98%,transparent),transparent 68%);
+}
+html[data-glass="on"] .app .motion-highlight {
+  border-color:transparent;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--surface) 48%,transparent),color-mix(in srgb,var(--surface) 12%,transparent) 55%,color-mix(in srgb,var(--blue-soft) 22%,transparent));
+  box-shadow:inset 0 1px 2px color-mix(in srgb,var(--glass-reflection) 64%,transparent),inset 0 -1px 1.5px color-mix(in srgb,var(--text) 12%,transparent),0 3px 9px color-mix(in srgb,var(--text) 8%,transparent);
+}
+html[data-glass="on"] .app .motion-highlight::after {
+  content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(ellipse 100% 55% at 45% 0%,color-mix(in srgb,var(--glass-reflection) 38%,transparent),transparent 72%);
+}
+html[data-glass="on"] :is(.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn) {position:relative;isolation:isolate;}
+html[data-glass="on"] :is(.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn)::before {
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;border-radius:inherit;opacity:0;transform:scale(.96,.88);
+  background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--surface) 46%,transparent),color-mix(in srgb,var(--surface) 10%,transparent));
+  box-shadow:inset 0 1px 1px var(--glass-rim),inset 0 -1px 1px var(--glass-shade);
+  transition:transform 300ms var(--motion-spring),opacity 220ms var(--motion-ease);
+}
+html[data-glass="on"] :is(.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn)[data-glass-pressed="true"]::before {opacity:1;transform:scale(.99,.95);transition-duration:70ms;}
+html[data-glass="on"] .overlay .modal {position:relative;background:color-mix(in srgb,var(--surface) 82%,transparent);}
+html[data-glass="on"] .app .theme-option {background:color-mix(in srgb,var(--surface) 14%,transparent);}
+html[data-glass="on"] .app .theme-option:hover {background:color-mix(in srgb,var(--surface) 26%,transparent);}
+html[data-glass="on"] .overlay .modal::after {
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:var(--glass-glow,0);transition:opacity 180ms var(--motion-ease);
+  mask:linear-gradient(var(--surface) 0 0) content-box,linear-gradient(var(--surface) 0 0);mask-composite:exclude;
+  -webkit-mask:linear-gradient(var(--surface) 0 0) content-box,linear-gradient(var(--surface) 0 0);-webkit-mask-composite:xor;
+}
+@media(prefers-reduced-motion:reduce) {
+  html[data-glass="on"] :is(.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn)::before {transition:none;transform:none;}
+  html[data-glass="on"] .overlay .modal::after {opacity:0;transition:none;}
+}
 @media(prefers-reduced-motion:reduce) {html[data-glass="on"] .sidebar::after,html[data-glass="on"] .workspace-toolbar::after,html[data-glass="on"] .app .seg::after {opacity:1;transition:none;background:linear-gradient(145deg,var(--glass-rim),transparent 50%,var(--glass-shade));}}
 @media(forced-colors:active) {
   html[data-glass="on"][data-window="main"],html[data-glass="on"][data-window="main"] body,html[data-glass="on"][data-window="main"] #root {background:var(--bg)!important;}
   html[data-glass="on"] .glass-backdrop {display:none;}
   html[data-glass="on"] .main,html[data-glass="on"] .sidebar,html[data-glass="on"] .workspace-toolbar,html[data-glass="on"] .app .card,html[data-glass="on"] .usage-kpis,html[data-glass="on"] .app .seg,html[data-glass="on"] .app .motion-highlight,html[data-glass="on"] .widget-panel::before {background:var(--surface)!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important;}
   html[data-glass="on"] .sidebar::after,html[data-glass="on"] .workspace-toolbar::after,html[data-glass="on"] .app .seg::after {display:none;}
+  html[data-glass="on"] :is(.app .sidebar,.app .workspace-toolbar,.app .seg,.app .motion-highlight,.overlay .modal)::before,
+  html[data-glass="on"] .app .motion-highlight::after,html[data-glass="on"] .overlay .modal::after,
+  html[data-glass="on"] :is(.app .nav-item,.app .seg button,.app .workspace-toolbar button,.overlay .modal .btn)::before {display:none;}
+  html[data-glass="on"] .overlay .modal {background:var(--surface);box-shadow:none;}
 }

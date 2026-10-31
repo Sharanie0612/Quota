@@ -34,11 +34,13 @@ pub fn sync_main_material(
     let active = {
         let transparent = window.set_background_color(Some(tauri::webview::Color(0,0,0,0))).is_ok();
         if enabled && transparent && crate::window_frame::chrome_ready(window.app_handle()) {
-            // The native floor preserves contrast on both black and white
-            // desktop backgrounds; the renderer adds only thin local tints.
-            let tint = if dark {(18,25,38,152)} else {(255,255,255,140)};
-            window_vibrancy::apply_acrylic(&window,Some(tint)).is_ok()
-        } else { let _=window_vibrancy::clear_acrylic(&window);false }
+            // Clear blur keeps the desktop's colour and shape without Acrylic's
+            // milky noise layer. Local surfaces carry contrast and optical rims.
+            let tint = if dark {(18,25,38,144)} else {(255,255,255,116)};
+            let _=window_vibrancy::clear_acrylic(&window);
+            window_vibrancy::apply_blur(&window,Some(tint)).is_ok()
+                || window_vibrancy::apply_acrylic(&window,Some(tint)).is_ok()
+        } else { let _=window_vibrancy::clear_blur(&window);let _=window_vibrancy::clear_acrylic(&window);false }
     };
     #[cfg(not(windows))]
     let active = { let _=(enabled,dark);false };

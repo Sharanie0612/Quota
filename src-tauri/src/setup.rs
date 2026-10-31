@@ -508,6 +508,7 @@ pub fn run(installer: PathBuf) -> Result<(), String> {
     let mut context = tauri::generate_context!();
     let window = &mut context.config_mut().app.windows[0];
     window.label = "setup".into();
+    window.visible = true;
     window.title = "Quota 安装".into();
     window.url = tauri::WebviewUrl::App("index.html?window=setup".into());
     window.width = 720.;

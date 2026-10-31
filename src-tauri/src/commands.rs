@@ -18,6 +18,12 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
+#[tauri::command]
+pub fn get_main_window_chrome(window: tauri::WebviewWindow) -> Result<crate::window_frame::ChromeStatus, String> {
+    if window.label() != "main" { return Err("只能读取主窗口边框状态".into()); }
+    Ok(crate::window_frame::chrome_status(window.app_handle()))
+}
+
 pub struct AppState {
     pub benchmarks: crate::benchmarks::Cache,
     pub appearance:Mutex<Option<crate::appearance::Preferences>>,

@@ -26,6 +26,7 @@ try {
   if (-not $process.WaitForExit(40000)) { throw 'Window frame check timed out' }
   $evidence=Get-Content -LiteralPath (Join-Path $data 'window-frame-check.json') -Raw | ConvertFrom-Json
   if ($process.ExitCode -ne 0 -or -not $evidence.passed) { throw ('Window frame check failed: '+$evidence.error) }
+  if (-not $evidence.chrome.installed -or $evidence.chrome.blockedFramePaints -lt 12 -or $evidence.chrome.blockedThemedPaints -lt 24 -or $evidence.chrome.safeActivationForwards -lt 24) { throw 'Native caption/frame repaint guard was not exercised' }
   Write-Output ($evidence | ConvertTo-Json -Depth 8)
 } finally {
   if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }

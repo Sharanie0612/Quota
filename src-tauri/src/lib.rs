@@ -137,6 +137,7 @@ pub fn run() {
             benchmarks::smoke::benchmark_smoke_report,
             window_frame::get_main_window_state,
             widget::get_widget_options,
+            commands::get_main_window_chrome,
             widget::save_widget_options,
             widget::get_widget_usage,
             widget::get_widget_speed,

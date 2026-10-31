@@ -18,6 +18,7 @@ import type {
 } from "./types";
 
 export const api = {
+  getMainWindowChrome: () => invoke<{installed:boolean;blockedFramePaints:number;blockedThemedPaints:number;safeActivationForwards:number}>('get_main_window_chrome'),
   getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
   getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),
   refreshOutputSpeed: () => invoke<number>('refresh_output_speed'),

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Quota",
-  "version": "1.0.3401",
+  "version": "1.0.3402",
   "identifier": "com.agentprice.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,6 +19,7 @@
         "minWidth": 1024,
         "minHeight": 600,
         "center": true,
+        "visible": false,
         "resizable": true,
         "decorations": false,
         "shadow": false,

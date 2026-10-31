@@ -1,6 +1,8 @@
 use crate::commands::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, State};
+#[cfg(windows)]
+use tauri::Manager;
 
 #[derive(Serialize)]
 pub struct MainMaterial {
@@ -31,7 +33,7 @@ pub fn sync_main_material(
     #[cfg(windows)]
     let active = {
         let transparent = window.set_background_color(Some(tauri::webview::Color(0,0,0,0))).is_ok();
-        if enabled && transparent {
+        if enabled && transparent && crate::window_frame::chrome_ready(window.app_handle()) {
             // The native floor preserves contrast on both black and white
             // desktop backgrounds; the renderer adds only thin local tints.
             let tint = if dark {(18,25,38,152)} else {(255,255,255,140)};

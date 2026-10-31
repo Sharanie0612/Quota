@@ -4,7 +4,7 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
   const contrast=matchMedia('(forced-colors: active)');
   const surfaces=new Map<HTMLElement,ReturnType<typeof setTimeout>|null>();
   let pointer:HTMLElement|null=null,focus:HTMLElement|null=null;
-  let frame=0,latest:{surface:HTMLElement;x:number;y:number}|null=null;
+  let frame=0,layoutFrame=0,latest:{surface:HTMLElement;x:number;y:number}|null=null;
   const allowed=()=>isEnabled()&&!reduced.matches&&!contrast.matches&&!document.hidden;
   const surfaceFor=(target:EventTarget|null)=>target instanceof Element?target.closest<HTMLElement>('.app .sidebar,.app .workspace-toolbar,.app .seg'):null;
   const reset=(surface:HTMLElement)=>{
@@ -12,7 +12,9 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     surfaces.delete(surface);
     for(const name of ['--glass-x','--glass-y','--glass-glow'])surface.style.removeProperty(name);
   };
+  const cancelLayout=()=>{if(layoutFrame)cancelAnimationFrame(layoutFrame);layoutFrame=0;};
   const refresh=()=>{
+    cancelLayout();
     if(allowed()){
       // Focus can remain on the same control while its window or effects were
       // paused, so recovery does not necessarily produce another focusin.
@@ -62,6 +64,7 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     if(surface===pointer&&surface&&!(event.relatedTarget instanceof Node&&surface.contains(event.relatedTarget))){pointer=null;fade(surface);}
   },{passive:true});
   document.addEventListener('focusin',event=>{
+    cancelLayout();
     const element=event.target,previous=focus;
     focus=allowed()&&element instanceof Element&&element.matches(':focus-visible')?surfaceFor(element):null;
     if(previous!==focus&&previous!==pointer)fade(previous);
@@ -72,16 +75,22 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
       if(!focus)return;
       const active=document.activeElement;
       if(active instanceof Element&&focus.contains(active)&&active.matches(':focus-visible'))return;
-      const previous=focus;focus=null;if(previous!==pointer)fade(previous);
+      const previous=focus;focus=null;cancelLayout();if(previous!==pointer)fade(previous);
     });
   });
   const clear=()=>{
+    cancelLayout();
     if(frame)cancelAnimationFrame(frame);
     frame=0;latest=null;pointer=null;focus=null;
     for(const surface of surfaces.keys())reset(surface);
   };
   window.addEventListener('blur',clear);
   window.addEventListener('focus',refresh);
+  window.addEventListener('resize',()=>{
+    if(layoutFrame||!focus||!allowed()||!document.hasFocus())return;
+    // Keep retained keyboard light on its control as the window changes size.
+    layoutFrame=requestAnimationFrame(()=>{layoutFrame=0;refresh();});
+  },{passive:true});
   document.addEventListener('visibilitychange',refresh);
   reduced.addEventListener('change',refresh);contrast.addEventListener('change',refresh);
   return {refresh};

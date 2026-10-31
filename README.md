@@ -88,7 +88,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 默认 Quota 使用白色内容区、淡蓝侧栏和深蓝强调色，与 Logo 保持一致。Codex、Claude、VS Code、GitHub 配色分别保留灰阶、暖色、编辑器分区与清晰边线的特点，均支持明暗和跟随系统。
 
-「设置 → 外观 → 液态玻璃」开启主窗口透明合成、边缘折射和指针高光，默认关闭。高光随交互渐入渐出，键盘聚焦也有对应反馈，恢复动效后继续跟随保留的焦点。Windows使用系统材质透出模糊处理后的桌面背景，导航保持清透，内容使用薄色层；关闭开关恢复实底。高对比度关闭透明合成，减少动效时高光保持静止。任务悬浮窗保留独立的裁剪材质。
+「设置 → 外观 → 液态玻璃」开启主窗口透明合成、边缘折射和指针高光，默认关闭。高光随交互渐入渐出，键盘焦点在缩放窗口、恢复动效后仍保持对齐。Windows使用系统材质透出模糊处理后的桌面背景，导航保持清透，内容使用薄色层；关闭开关恢复实底。高对比度关闭透明合成，减少动效时高光保持静止。任务悬浮窗保留独立的裁剪材质。
 
 实现参考 [Apple材质指南](https://developer.apple.com/design/human-interface-guidelines/materials)，把光学效果集中在导航与交互层，避免多层磨砂叠加。
 
@@ -192,7 +192,7 @@ cargo run --release --manifest-path src-tauri/Cargo.toml --example output_speed_
 
 本机 Windows GNU 环境使用 Rust example 验证运行逻辑，`cargo test` 存在 WinRT DLL 加载限制。界面检查使用 `prepare-preview.cjs`、`preview-server.cjs` 与 `verify-usage-workbench.cjs`；需可用的 Playwright / Edge，可用 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。安装包需另做启动、增量采集和覆盖升级验证。更多检查见 [开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
 
-玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)、[焦点恢复检查](scripts/verify-glass-resume.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)，覆盖不同背景、收起、重新展开和页面可见性变化。[安装版焦点恢复](scripts/verify-native-glass-resume.cjs)和[任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证设置恢复、窗口可见状态及延迟响应。
+玻璃交互另有[悬停与聚焦检查](scripts/verify-glass-controls.cjs)、[焦点恢复检查](scripts/verify-glass-resume.cjs)、[缩放定位检查](scripts/verify-glass-anchor.cjs)及[任务计时检查](scripts/verify-widget-clock.cjs)。[安装版焦点恢复](scripts/verify-native-glass-resume.cjs)和[任务窗状态检查](scripts/verify-native-widget-state.cjs)使用隔离资料与真实Rust命令，验证缩放对齐、设置恢复、窗口可见状态及延迟响应。
 
 ## 文档与贡献
 

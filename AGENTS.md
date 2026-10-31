@@ -265,3 +265,4 @@ node scripts/preview-server.cjs 4174
 
 - 1.0.3400：主窗口可用透明 WebView 和原生 Acrylic，只有主窗口可按已保存外观修订同步材质。根层仅在原生材质成功后清空，失败保留可读回退；卡片不叠加多层磨砂。主窗口材质不能施加到任务悬浮窗。验证透明像素、开关恢复、高对比度、减少动效、深浅主题和原生窗口几何。任务窗设置/就绪事件显式重置交互，过期展开/收起响应不能覆盖新状态；运行 `verify-widget-state.cjs`、`verify-widget-motion.cjs` 和隔离安装版 `verify-native-widget-state.cjs`。
 - 高光恢复只跟随当前 `:focus-visible` 控件，不重放旧指针坐标；文档报告未激活、关闭玻璃或受系统偏好限制时保持静止。运行 `verify-glass-resume.cjs` 与隔离资料 `verify-native-glass-resume.cjs`。WebView2 隐藏窗口时可能保留 DOM 焦点与可见状态，原生可见性和文档事件须分别验收，不能假定隐藏会产生 DOM blur。
+- 窗口缩放后的焦点高光定位按帧合并，换焦点、失焦与外观限制必须取消待执行帧；运行 `verify-glass-anchor.cjs`。原生恢复检查还须核对浮动、最大化及还原时的高光中心与真实焦点坐标。

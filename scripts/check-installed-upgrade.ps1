@@ -43,7 +43,7 @@ $previousWebView=$env:WEBVIEW2_USER_DATA_FOLDER
 try {
   foreach ($instance in $resume) { Stop-Process -Id $instance.Id }
   $env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $testPath 'WebViewProfile'
-  foreach ($name in @('config.json','vendor-costs.json','monthly-usage-fx.json','activity-settings.json','activity.sqlite','activity.sqlite-wal')) {
+  foreach ($name in @('config.json','vendor-costs.json','monthly-usage-fx.json','activity-settings.json','activity.sqlite','activity.sqlite-wal','appearance.json','usage-widget.json')) {
     $file = Join-Path (Join-Path $env:APPDATA 'Quota') $name
     if (Test-Path -LiteralPath $file) { $personalHashes[$file] = (Get-FileHash -LiteralPath $file).Hash }
   }

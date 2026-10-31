@@ -13,7 +13,15 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     for(const name of ['--glass-x','--glass-y','--glass-glow'])surface.style.removeProperty(name);
   };
   const refresh=()=>{
-    if(allowed())return;
+    if(allowed()){
+      // Focus can remain on the same control while its window or effects were
+      // paused, so recovery does not necessarily produce another focusin.
+      const element=document.activeElement;
+      if(document.hasFocus()&&element instanceof HTMLElement&&element.matches(':focus-visible')){
+        const surface=surfaceFor(element);if(surface){focus=surface;showFocus();}
+      }
+      return;
+    }
     if(frame)cancelAnimationFrame(frame);
     frame=0;latest=null;pointer=null;focus=null;
     for(const surface of surfaces.keys())reset(surface);
@@ -73,6 +81,7 @@ export function initializeGlassMotion(isEnabled:()=>boolean) {
     for(const surface of surfaces.keys())reset(surface);
   };
   window.addEventListener('blur',clear);
+  window.addEventListener('focus',refresh);
   document.addEventListener('visibilitychange',refresh);
   reduced.addEventListener('change',refresh);contrast.addEventListener('change',refresh);
   return {refresh};

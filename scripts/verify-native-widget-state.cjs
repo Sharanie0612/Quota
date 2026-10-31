@@ -10,7 +10,8 @@ async function main(){
  try{
   const pages=browser.contexts().flatMap(c=>c.pages()),main=pages.find(p=>/^http:\/\/tauri.localhost\/$/.test(p.url())),widget=pages.find(p=>p.url().includes('window=usage-widget'));assert(main&&widget);
   invoke=(name,args)=>main.evaluate(([name,args])=>window.__TAURI_INTERNALS__.invoke(name,args),[name,args]);
-  const info=await invoke('app_info');assert.equal(path.resolve(info.configDir).toLowerCase(),path.resolve(root).toLowerCase(),'CDP must target the explicitly isolated profile');isolated=true;
+  const info=await invoke('app_info');assert.equal(path.resolve(info.configDir).toLowerCase(),path.resolve(root).toLowerCase(),'CDP must target the explicitly isolated profile');
+  const widgetInfo=await widget.evaluate(()=>window.__TAURI_INTERNALS__.invoke('app_info'));assert.equal(path.resolve(widgetInfo.configDir).toLowerCase(),path.resolve(root).toLowerCase(),'task context must belong to the same isolated profile');isolated=true;
   const state=()=>widget.locator('.usage-widget').evaluate(e=>({expanded:e.classList.contains('is-expanded'),nativeExpanded:e.classList.contains('native-expanded'),left:e.classList.contains('side-left')}));
   for(const kind of ['disable','side-change','position-change','new-hover']){
    await invoke('save_widget_options',{options:{enabled:true,side:'right',heightPercent:50}});await widget.reload();await widget.locator('.widget-handle').waitFor();await widget.waitForTimeout(250);

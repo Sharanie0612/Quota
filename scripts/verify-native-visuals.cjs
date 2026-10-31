@@ -19,6 +19,7 @@ async function main(){
   const errors=[],checks=[];page.on('pageerror',error=>errors.push(error.message));widget.on('pageerror',error=>errors.push(error.message));
   const invoke=(name,args)=>page.evaluate(([name,args])=>window.__TAURI_INTERNALS__.invoke(name,args),[name,args]);
   const nativeInfo=await invoke('app_info');assert.equal(path.resolve(nativeInfo.configDir).toLowerCase(),root.toLowerCase(),'CDP must target the explicitly isolated profile before any UI action or capture');
+  const widgetInfo=await widget.evaluate(()=>window.__TAURI_INTERNALS__.invoke('app_info'));assert.equal(path.resolve(widgetInfo.configDir).toLowerCase(),root.toLowerCase(),'task context must belong to the same isolated profile');
   const go=async name=>{await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();await page.getByRole('heading',{name,level:1,exact:true}).waitFor();};
   const capture=async name=>{await page.screenshot({path:path.join(out,name+'.png'),animations:'disabled'});};
   await go('我的使用');await page.waitForFunction(()=>document.querySelector('.usage-kpis strong')?.textContent.startsWith('¥'));

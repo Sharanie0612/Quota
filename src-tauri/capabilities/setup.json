@@ -1,0 +1,1 @@
+{"identifier":"setup","description":"隔离安装窗口，只注册安装命令，不加载账户或凭据","windows":["setup"],"permissions":["core:default","core:event:default","core:window:allow-minimize","core:window:allow-close","core:window:allow-start-dragging","dialog:allow-open"]}

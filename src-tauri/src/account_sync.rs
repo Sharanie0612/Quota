@@ -344,6 +344,48 @@ struct Packet {
     device: String,
     records: Vec<Record>,
 }
+fn packet_valid(packet:&Packet, now:i64)->bool {
+    packet.schema==1 && uuid::Uuid::parse_str(&packet.device).is_ok() && packet.records.len()<=1000
+        && packet.records.iter().all(|remote|remote.profile.valid() && uuid::Uuid::parse_str(&remote.device).is_ok()
+            && remote.edited>=0 && remote.edited<=now+24*3600*1000 && remote.snapshot.as_ref().is_none_or(Snapshot::valid))
+}
+/// iCloud may retain UUID(1).json / UUID 2.json alongside the original packet.
+/// An empty copy is redundant only after a fully validated sibling proves its owner.
+fn packet_filename_owner(path:&Path)->Option<String> {
+    let stem=path.file_stem()?.to_str()?;
+    let id=stem.get(..36)?;
+    uuid::Uuid::parse_str(id).ok()?;
+    let suffix=&stem[36..];
+    if !suffix.chars().all(|c|c.is_ascii_digit()||matches!(c,' '| '(' | ')')) {return None}
+    Some(id.to_string())
+}
+fn account_packets(root:&Path,now:i64)->Result<Vec<Packet>,String>{
+    let mut packets=Vec::new();let mut empty=Vec::new();let mut count=0;
+    for entry in fs::read_dir(root).map_err(|_|"共享目录暂不可用")? {
+        let entry=entry.map_err(|_|"共享目录暂不可用")?;
+        if entry.path().extension().is_none_or(|e|e!="json")||!entry.file_type().is_ok_and(|t|t.is_file()){continue}
+        count+=1;if count>100{return Err("账户同步设备文件过多".into())}
+        if entry.metadata().is_ok_and(|m|m.len()==0) {
+            empty.push(packet_filename_owner(&entry.path()));continue
+        }
+        let packet:Packet=read(&entry.path())?;
+        if !packet_valid(&packet,now){return Err("账户同步记录无效，未采用该设备的数据".into())}
+        packets.push(packet);
+    }
+    for owner in empty {
+        if owner.as_ref().is_none_or(|id|!packets.iter().any(|p|&p.device==id)) {
+            return Err("账户同步文件尚未下载完整，未采用空文件；请等待云盘完成下载后重试".into())
+        }
+    }
+    Ok(packets)
+}
+/// Read-only diagnostics: validate real cloud packets without exchanging data,
+/// touching the local ledger, reading credentials or printing account contents.
+pub fn inspect_shared_packets(shared:&Path)->Result<usize,String>{
+    let root=shared.join("quota-accounts-v1");
+    if fs::symlink_metadata(&root).is_ok_and(|m|m.file_type().is_symlink()){return Err("不读取符号链接的账户目录".into())}
+    account_packets(&root,chrono::Utc::now().timestamp_millis()).map(|packets|packets.len())
+}
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatus {
@@ -754,19 +796,7 @@ fn exchange(state: &AppState) -> Result<(), String> {
         .retain(|a| !local.shared_links.contains_key(&a.id));
     // Persist observed local edits before network-directory IO; retry never loses them.
     write(&path, &local)?;
-    let mut files = 0;
-    for entry in fs::read_dir(&root).map_err(|_| "共享目录暂不可用")? {
-        let entry = entry.map_err(|_| "共享目录暂不可用")?;
-        if entry.path().extension().is_none_or(|e| e != "json")
-            || !entry.file_type().is_ok_and(|t| t.is_file())
-        {
-            continue;
-        }
-        files += 1;
-        if files > 100 {
-            return Err("账户同步设备文件过多".into());
-        }
-        let packet: Packet = read(&entry.path())?;
+    for packet in account_packets(&root,now)? {
         if packet.schema != 1
             || uuid::Uuid::parse_str(&packet.device).is_err()
             || packet.records.len() > 1000

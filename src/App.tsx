@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {listen} from '@tauri-apps/api/event';
+import { useEffect, useRef, useState } from "react";
 import { AccountSheet } from "./components/AccountSheet";
-import { IconChart, IconClock, IconGear, IconLayers, IconPlus, IconRefresh, IconSpark, IconWallet } from "./components/icons";
-import { Button, EmptyState, Notice } from "./components/ui";
+import { IconChart, IconClock, IconGear, IconSpeed, IconPlus, IconRefresh, IconSpark, IconWallet } from "./components/icons";
+import { Button, Notice } from "./components/ui";
 import { api, events } from "./lib/api";
 import { money } from "./lib/format";
 import { overviewState } from "./lib/accountOverview";
@@ -9,23 +10,32 @@ import { toast, useAccounts, useSettings } from "./lib/store";
 import { ToastStack } from "./components/ToastStack";
 import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
-import { ModelsView } from "./views/ModelsView";
+import { OutputSpeedView } from "./views/OutputSpeedView";
 import { SettingsView } from "./views/SettingsView";
-import { LadderView } from "./views/LadderView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
+import {useMaterialLight} from './lib/useMaterialLight';
+import {GlassMaterial} from './components/GlassMaterial';
+import {useSidebarMotion} from './lib/useSidebarMotion';
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
+import { WorkspaceToolbar } from "./components/WorkspaceToolbar";
+import { setAppearance, useAppearance } from './lib/appearance';
+import { AiModelsHub } from './views/AiModelsHub';
 import { LaunchAnimation } from './components/LaunchAnimation';
 import appIcon from "../src-tauri/icons/128x128.png";
 
-type View = "accounts" | "models" | "ladder" | "activity" | "costs" | "settings";
+type View = "accounts" | "output-speed" | "activity" | "costs" | "settings" | "ai-models";
 
 export default function App() {
+  const appearance=useAppearance();
+  const sidebarMotion=useSidebarMotion(appearance.collapsed,appearance.reducedMotion,appearance.glass&&appearance.reduceEffects);
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
 
   const [view, setView] = useState<View>("accounts");
+  useEffect(()=>{const un=listen<string>('navigate-main',event=>{if(['costs','output-speed','activity','settings'].includes(event.payload))setView(event.payload as View);});return()=>{void un.then(stop=>stop());};},[]);
+  const light=useMaterialLight(appearance.material==='liquid'&&!appearance.reducedMotion,view+':'+appearance.collapsed);
   const nav = useSlidingHighlight<HTMLElement>(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
@@ -33,8 +43,12 @@ export default function App() {
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [sheetFor, setSheetFor] = useState<{ account: AccountView | null; mode?: "manual" } | null>(null);
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
-  const [providerFilter, setProviderFilter] = useState("all");
-  const [modelCount, setModelCount] = useState(0);
+
+  useEffect(() => {
+    const report=(event:Event)=>void api.reportBenchmarkSmoke((event as CustomEvent).detail).catch(()=>undefined);
+    window.addEventListener('quota-benchmark-smoke-report',report);
+    return()=>window.removeEventListener('quota-benchmark-smoke-report',report);
+  },[]);
 
   useEffect(() => {
     api.listProviders().then(setProviders).catch((e) => console.error(e));
@@ -66,73 +80,62 @@ export default function App() {
   }, [pendingFocus, accounts]);
 
   const { low: lowCount, failed: failedCount, pending: pendingCount } = overviewState(accounts);
-  const onCount = useCallback((n: number) => setModelCount(n), []);
 
-  const openModels = (provider: string) => {
-    setProviderFilter(provider || "all");
-    setView("models");
-  };
 
   const title =
-    view === "accounts" ? "账户总览" : view === "models" ? "模型库" : view === "ladder" ? "AI 模型天梯" : view === "activity" ? "Token 活动" : view === "costs" ? "我的使用" : "设置";
+    view === "ai-models" ? "AI 模型" : view === "accounts" ? "账户总览" : view === "output-speed" ? "输出速度" : view === "activity" ? "Token 活动" : view === "costs" ? "我的使用" : "设置";
   const sub =
     view === "accounts"
       ? accounts.length === 0
         ? "还没有添加账户"
         : `${accounts.length} 个账户${lowCount > 0 ? ` · ${lowCount} 个额度不足` : ""}${failedCount > 0 ? ` · ${failedCount} 个同步异常` : ""}${pendingCount > 0 ? ` · ${pendingCount} 个待查询` : ""}${!lowCount && !failedCount && !pendingCount ? " · 状态正常" : ""}`
-      : view === "models"
-        ? `${modelCount} 个可用模型`
-        : view === "ladder" ? "能力与价格，一起比较" : view === "activity" ? "每一次使用，都有记录" : view === "costs" ? "用量、支出与订阅" : "让 Quota 按你的习惯工作";
+      : '';
 
   return (
-    <div className="app">
+    <div ref={light} className={`app${appearance.collapsed?' sidebar-collapsed':''}`}>
       <LaunchAnimation/>
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>
-      <aside className="sidebar">
+      <aside className="sidebar material-plane" id="main-sidebar">
+        <GlassMaterial/>
+        <div className="sidebar-header">
         <div className="brand" data-tauri-drag-region>
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
             <span className="brand-title">Quota</span>
-            <span className="brand-sub">你的 AI 用量空间</span>
           </div>
+        </div>
+          <button type="button" className="sidebar-toggle" aria-label={appearance.collapsed?'展开侧边栏':'收起侧边栏'} aria-expanded={!appearance.collapsed} aria-controls="main-sidebar" title={appearance.collapsed?'展开侧边栏':'收起侧边栏'} onClick={()=>{sidebarMotion.capture();setAppearance({collapsed:!appearance.collapsed});}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>{appearance.collapsed?<path d="m12 9 3 3-3 3"/>:<path d="m16 9-3 3 3 3"/>}</svg></button>
         </div>
 
         <nav className="sidebar-nav" ref={nav} aria-label="主导航">
         <span className="motion-highlight" aria-hidden="true"/>
         <button data-motion-active={view === "accounts"}
+          aria-label="账户总览" title="账户总览"
           className={`nav-item${view === "accounts" ? " active" : ""}`}
           onClick={() => setView("accounts")}
         >
           <IconWallet size={16} />
-          账户总览
+          <span className="nav-label">账户总览</span>
           <span className="count">{accounts.length || ""}</span>
         </button>
-        <button data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconChart size={17}/>我的使用</button>
-        <button data-motion-active={view === "models"}
-          className={`nav-item${view === "models" ? " active" : ""}`}
-          onClick={() => setView("models")}
-        >
-          <IconLayers size={16} />
-          模型库
-          <span className="count">{modelCount || ""}</span>
-        </button>
-        <button data-motion-active={view === "ladder"} className={`nav-item${view === "ladder" ? " active" : ""}`} onClick={() => setView("ladder")}>
-          <IconSpark size={17} />AI 模型天梯
-        </button>
-        <button data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/>Token 活动</button>
+        <button aria-label="我的使用" title="我的使用" data-motion-active={view === "costs"} className={`nav-item${view === "costs" ? " active" : ""}`} onClick={() => setView("costs")}><IconChart size={17}/><span className="nav-label">我的使用</span></button>
+        <button aria-label="AI 模型" data-motion-active={view === 'ai-models'} className={`nav-item${view === 'ai-models'?' active':''}`} onClick={()=>setView('ai-models')} title="AI 模型"><IconSpark size={17}/><span className="nav-label">AI 模型</span></button>
+        <button aria-label="Token 活动" title="Token 活动" data-motion-active={view === "activity"} className={`nav-item${view === "activity" ? " active" : ""}`} onClick={() => setView("activity")}><IconClock size={17}/><span className="nav-label">Token 活动</span></button>
+        <button aria-label="输出速度" title="输出速度" data-motion-active={view === "output-speed"} className={`nav-item${view === "output-speed" ? " active" : ""}`} onClick={() => setView("output-speed")}><IconSpeed size={17}/><span className="nav-label">输出速度</span></button>
         <button data-motion-active={view === "settings"}
+          aria-label="设置" title="设置"
           className={`nav-item${view === "settings" ? " active" : ""}`}
           onClick={() => setView("settings")}
         >
           <IconGear size={16} />
-          设置
+          <span className="nav-label">设置</span>
         </button>
         </nav>
 
         <div className="sidebar-foot">
           {lowCount > 0 ? (
-            <div style={{ color: "var(--red, #d70015)", marginBottom: 6 }}>
+            <div className="sidebar-alert" style={{ color: "var(--red, #d70015)", marginBottom: 6 }}>
               {lowCount} 个账户余额不足
             </div>
           ) : null}
@@ -140,13 +143,14 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main">
+      <main ref={sidebarMotion.ref} className={`main${view==='ai-models'||view==='output-speed'||view==='costs'?' main-wide':''}`}>
+        <WorkspaceToolbar onUsage={() => setView('costs')} onSync={() => setView('settings')}/>
         <div className="content" ref={contentRef}>
           <div className="view-transition" key={view}>
-        <header className="page-heading content-inner">
-          <div className="page-heading-text"><h1>{title}</h1><p>{sub}</p></div>
+        {view!=='ai-models'&&view!=='output-speed'&&view!=='costs'&&<header className="page-heading content-inner">
+          <div className="page-heading-text"><h1>{title}</h1>{sub&&<p>{sub}</p>}</div>
           <div className="page-actions">
-          {view === "accounts" || view === "models" ? (
+          {view === "accounts" ? (
             <Button
               size="sm"
               onClick={() => void refreshAll()}
@@ -156,12 +160,12 @@ export default function App() {
               {refreshing ? "刷新中…" : "刷新全部"}
             </Button>
           ) : null}
-          {view === "accounts" || view === "models" ? <Button size="sm" variant="primary" onClick={() => setSheetFor({ account: null })}>
+          {view === "accounts" ? <Button size="sm" variant="primary" onClick={() => setSheetFor({ account: null })}>
             <IconPlus size={13} />
             添加账户
           </Button> : null}
           </div>
-        </header>
+        </header>}
           {info?.storageIssues?.length ? (
             <div className="content-inner" style={{ paddingBottom: 0 }}>
               <Notice tone="error" actions={<Button size="sm" onClick={() => setView("settings")}>查看配置目录</Button>}>
@@ -178,39 +182,12 @@ export default function App() {
               onRefreshOne={(id) => void refreshOne(id)}
               onAdd={() => setSheetFor({ account: null })}
               onEdit={(account, mode) => setSheetFor({ account, mode })}
-              onOpenModels={openModels}
             />
           ) : null}
 
-          {view === "models" ? (
-            accounts.length === 0 && providers.length > 0 ? (
-              <div className="content-inner">
-                <EmptyState
-                  icon={<IconLayers size={26} />}
-                  title="模型库还空着"
-                  desc="添加账户后即可同步可用模型。"
-                  action={
-                    <Button variant="primary" onClick={() => setSheetFor({ account: null })}>
-                      添加模型账户
-                    </Button>
-                  }
-                />
-              </div>
-            ) : (
-              <ModelsView
-                accounts={accounts}
-                providers={providers}
-                providerFilter={providerFilter}
-                setProviderFilter={setProviderFilter}
-                onCount={onCount}
-                onAddAccount={() => setSheetFor({ account: null })}
-                onRefreshAll={refreshAll}
-              />
-            )
-          ) : null}
-
-          {view === "ladder" ? <LadderView autoUpdate={settings?.ladderAutoUpdate ?? false} /> : null}
+          {view === 'ai-models' ? <AiModelsHub/> : null}
           {view === "activity" ? <ActivityView onOpenSyncSettings={()=>setView('settings')} /> : null}
+          {view === "output-speed" ? <OutputSpeedView onOpenSyncSettings={()=>setView("settings")}/> : null}
           {view === "costs" ? <UsageCostsView /> : null}
           {view === "settings" ? (
             <SettingsView settings={settings} onUpdate={(s) => void update(s)} info={info} />
@@ -226,12 +203,9 @@ export default function App() {
           initialBalanceMode={sheetFor.mode}
           defaultThreshold={settings?.defaultLowThreshold ?? 20}
           onClose={() => setSheetFor(null)}
-          onSaved={(view) => {
+          onSaved={() => {
             setSheetFor(null);
             void reload();
-            if (view.provider && providerFilter !== "all" && providerFilter !== view.provider) {
-              setProviderFilter("all");
-            }
           }}
           onDeleted={() => {
             setSheetFor(null);

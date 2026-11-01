@@ -65,9 +65,8 @@ async function main() {
   const checks = await Promise.allSettled([
     run('TypeScript', process.execPath, [npmCli, 'run', 'typecheck']),
     run('Rust 类型检查', 'cargo', ['check', '--locked'], path.join(root, 'src-tauri')),
-    run('纯逻辑', process.execPath, ['scripts/verify-logic.cjs']),
-    run('组件渲染', process.execPath, ['scripts/verify-ui-render.cjs']),
-    run('悬浮窗过渡', process.execPath, ['scripts/verify-widget-motion.cjs']),
+    run('逻辑、外观与组件', process.execPath, [npmCli, 'run', 'verify']),
+    run('SSH 来源与同步客户端分类', process.execPath, ['scripts/verify-sync-devices.cjs']),
   ]);
   const failures = checks.filter(check => check.status === 'rejected');
   if (failures.length) throw Error(failures.map(check => check.reason.message).join('\n'));

@@ -11,13 +11,28 @@ fn token(input:u64)->String {line("event_msg",json!({"type":"token_count","info"
 fn projection(python:&str,logs:&Path,db:&Connection,host:&str)->Vec<u8>{
     projection_mode(python,logs,db,host,"")
 }
+fn snapshot(root:&Path)->BTreeMap<String,Vec<u8>> {
+    fn scan(root:&Path,dir:&Path,files:&mut BTreeMap<String,Vec<u8>>) {
+        if !dir.exists(){return}
+        for entry in fs::read_dir(dir).unwrap() {
+            let entry=entry.unwrap();let path=entry.path();
+            let key=path.strip_prefix(root).unwrap().to_string_lossy().into_owned();
+            if entry.file_type().unwrap().is_dir(){files.insert(format!("{key}/"),vec![]);scan(root,&path,files);}
+            else {files.insert(key,fs::read(path).unwrap());}
+        }
+    }
+    let mut files=BTreeMap::new();scan(root,root,&mut files);files
+}
 fn projection_mode(python:&str,logs:&Path,db:&Connection,host:&str,mode:&str)->Vec<u8>{
+    let before=snapshot(logs);
     let prefix=format!("ssh:{:x}:",Sha256::digest(format!("{host}\n/home/check").as_bytes()));
     let mut offsets=BTreeMap::new();let mut query=db.prepare("SELECT path,body FROM cursors").unwrap();
     for row in query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).unwrap(){let(path,body)=row.unwrap();if let Some(path)=path.strip_prefix(&prefix){offsets.insert(path.to_string(),serde_json::from_str::<Cursor>(&body).unwrap().offset);}}
     let mut child=Command::new(python).arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/codex-ssh-metrics.py")).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     child.stdin.take().unwrap().write_all(json!({"format":"quota-codex-ssh-v1","home":logs,"offsets":offsets,"mode":mode}).to_string().as_bytes()).unwrap();
     let result=child.wait_with_output().unwrap();assert!(result.status.success(),"projection failed");assert!(result.stderr.is_empty());
+    assert_eq!(snapshot(logs),before,"identity/collection must not create or modify files on the source device");
+    assert!(!logs.join("Quota").exists());assert!(!logs.join("quota-activity-v1").exists());
     let text=std::str::from_utf8(&result.stdout).unwrap();for private in ["PRIVATE_MESSAGE","PRIVATE_ARGUMENT","PRIVATE_INSTRUCTION","PRIVATE_COOKIE"]{assert!(!text.contains(private));}
     result.stdout
 }
@@ -81,5 +96,22 @@ fn main(){
     options.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&data,&options).unwrap();
     assert_eq!(report().totals.tokens.total,540);assert_eq!(activity::usage_summary(&data).unwrap().total,540);
     assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
-    println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync and injection validation");
+    speed_projection(&root,&python);
+    println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync, output-speed metadata and injection validation");
+}
+fn speed_projection(root:&Path,python:&str){
+    let logs=root.join("speed-logs");let data=root.join("speed-data");fs::create_dir_all(logs.join("sessions")).unwrap();fs::create_dir_all(&data).unwrap();activity::report(&data,None,None,None).unwrap();let mut db=Connection::open(data.join("activity.sqlite")).unwrap();
+    let t=chrono::Utc::now().timestamp_millis()-5000;
+    let row=|offset,kind,payload|json!({"timestamp":chrono::DateTime::from_timestamp_millis(t+offset).unwrap().to_rfc3339(),"type":kind,"payload":payload}).to_string()+"\n";
+    let log=row(0,"session_meta",json!({"id":"speed-fixture"}))
+        +&row(1,"turn_context",json!({"model":"speed-model"}))
+        +&row(10,"response_item",json!({"type":"message","role":"assistant","content":"PRIVATE_MESSAGE"}))
+        +&row(510,"event_msg",json!({"type":"item_completed","item":{"type":"AgentMessage","content":"PRIVATE_MESSAGE"},"started_at_ms":t+10,"completed_at_ms":t+510}))
+        +&row(511,"token_usage_record",json!({"response_id":"speed-response","usage":{"output_tokens":96,"reasoning_output_tokens":32},"private":"PRIVATE_COOKIE"}))
+        +&row(512,"event_msg",json!({"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"output_tokens":96,"reasoning_output_tokens":32,"total_tokens":196}}}));
+    fs::write(logs.join("sessions/speed.jsonl"),log).unwrap();fs::write(logs.join("sessions/ignored.jsonl"),"{}\n").unwrap();
+    let bytes=projection(python,&logs,&db,"speed-vm");let mut errors=vec![];assert_eq!(ssh::apply(&mut db,"speed-vm","/home/check",&bytes,&mut errors).unwrap(),1);assert!(errors.is_empty());
+    let report=activity::speed::report(&data,"","codex",0,"").unwrap();assert_eq!(report.summary.samples,1);assert_eq!(report.summary.average,Some(128.));
+    let ignored:String=db.query_row("SELECT body FROM cursors WHERE path LIKE '%ignored.jsonl'",[],|r|r.get(0)).unwrap();assert_eq!(serde_json::from_str::<Cursor>(&ignored).unwrap().speed.version,1,"empty projection must finish timing migration");
+    let bytes=projection(python,&logs,&db,"speed-vm");assert_eq!(ssh::apply(&mut db,"speed-vm","/home/check",&bytes,&mut errors).unwrap(),0);assert_eq!(activity::speed::report(&data,"","codex",0,"").unwrap().summary.samples,1);
 }

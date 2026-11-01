@@ -29,8 +29,7 @@ jobs:
         run: |
           npm ci
           npm run typecheck
-          node scripts/verify-logic.cjs
-          node scripts/verify-ui-render.cjs
+          npm run verify
       - name: Build App and DMG with ad-hoc signature
         run: |
           test "$(uname -m)" = arm64

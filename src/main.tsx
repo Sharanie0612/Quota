@@ -1,10 +1,13 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import { UsageWidget } from './components/UsageWidget';
-import "./styles.css";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import {UsageWidget} from './components/UsageWidget';
+import {SetupView} from './views/SetupView';
+import {initializeAppearance} from './lib/appearance';
+import {resolveWindowKind} from './window';
+import './styles.css';
 
-
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>{new URLSearchParams(location.search).get('window')==='usage-widget'?<UsageWidget/>:<App />}</React.StrictMode>,
-);
+const kind=resolveWindowKind(location.search);
+initializeAppearance(kind);
+const View=kind==='setup'?SetupView:kind==='usage-widget'?UsageWidget:App;
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><View/></React.StrictMode>);

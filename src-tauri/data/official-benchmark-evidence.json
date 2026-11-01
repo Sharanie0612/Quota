@@ -1,0 +1,62 @@
+{
+  "publisher": "OpenAI",
+  "checkedAt": "2026-10-28T00:00:00Z",
+  "records": [
+    {
+      "model": "GPT-6 Astra",
+      "vendor": "OpenAI",
+      "score": 57.9,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "GPT-5.6 Sol",
+      "vendor": "OpenAI",
+      "score": 37.3,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "Claude Fable 5.1",
+      "vendor": "Anthropic",
+      "score": 55.8,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "Claude Fable 5",
+      "vendor": "Anthropic",
+      "score": 44.5,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "Claude Opus 5",
+      "vendor": "Anthropic",
+      "score": 52.6,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "Gemini 3.8 Flash",
+      "vendor": "Google",
+      "score": 19.1,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/gpt-6-astra/"
+    },
+    {
+      "model": "GPT-6.1 Terra",
+      "vendor": "OpenAI",
+      "score": 50.3,
+      "setting": "max",
+      "url": "https://openai.com/index/introducing-gpt-6-1-terra/"
+    },
+    {
+      "model": "GPT-5.6 Terra",
+      "vendor": "OpenAI",
+      "score": 21.5,
+      "setting": "最高公开设置",
+      "url": "https://openai.com/index/introducing-gpt-6-1-terra/"
+    }
+  ]
+}

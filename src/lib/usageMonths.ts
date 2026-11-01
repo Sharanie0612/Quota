@@ -27,6 +27,11 @@ export function restoreUsageRange(raw: string | null, now = new Date()) {
   const fallback = { ...monthRange(monthKey(now))!, mode: 'month' };
   try {
     const saved = JSON.parse(raw ?? 'null');
+    if (['week','quarter','year'].includes(saved?.mode)) {
+      const first=new Date(now);if(saved.mode==='year')first.setMonth(0,1);else first.setDate(first.getDate()-(saved.mode==='week'?6:89));
+      const day=(date:Date)=>`${monthKey(date)}-${String(date.getDate()).padStart(2,'0')}`;
+      return {from:day(first),to:day(now),mode:saved.mode as string};
+    }
     if (saved?.mode === 'all') return { from: '1900-01-01', to: '9999-12-31', mode: 'all' };
     const validDay = (value: unknown): value is string => {
       if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

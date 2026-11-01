@@ -83,7 +83,6 @@ export function AccountsView({
   onRefreshOne,
   onAdd,
   onEdit,
-  onOpenModels,
 }: {
   accounts: AccountView[];
   loading: boolean;
@@ -91,7 +90,6 @@ export function AccountsView({
   onRefreshOne: (id: string) => void;
   onAdd: () => void;
   onEdit: (account: AccountView, mode?: "manual") => void;
-  onOpenModels: (provider: string) => void;
 }) {
   const [trends, setTrends] = useState<Record<string, AccountTrend>>({});
 
@@ -154,7 +152,6 @@ export function AccountsView({
             onRefresh={() => onRefreshOne(a.id)}
             onEdit={() => onEdit(a)}
             onUseManual={() => onEdit(a, "manual")}
-            onShowModels={() => onOpenModels(a.provider)}
           />
         ))}
       </div></section>)}

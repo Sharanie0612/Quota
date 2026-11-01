@@ -5,9 +5,12 @@
   let seq = 1;
   const callbacks = {};
   const eventHandlers = {};
+  const emit = (event,payload) => {for(const [id,handler] of Object.entries(eventHandlers))if(handler.event===event)callbacks[handler.handler]?.cb({event,id:Number(id),payload});};
+  let setupProgress={phase:'idle',message:'',done:false,error:null};
+  let setupAttempts=0;
   let windowMaximized = false;
   let widgetOptions = {enabled:true,side:'right',heightPercent:50};
-  function widgetState(expanded){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side}});}
+  function widgetState(expanded,reset=false){for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='widget-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{expanded,side:widgetOptions.side,enabled:widgetOptions.enabled,reset}});}
   const activityCase = new URLSearchParams(location.search).get("activityCase");
   const catalogCase = new URLSearchParams(location.search).get("catalogCase");
   const modelsCase = new URLSearchParams(location.search).get("modelsCase");
@@ -707,22 +710,87 @@
     async invoke(cmd, args) {
       await new Promise((r) => setTimeout(r, 60));
       switch (cmd) {
+        case 'get_appearance': return window.demoAppearance ?? null;
+        case 'get_widget_speed': {
+          if(window.demoLiveStatus)return window.demoLiveStatus;
+          const now=Date.now(),test=new URLSearchParams(location.search).get('widgetLiveCase');
+          window.demoLiveStartedAt??=now-92000;
+          const task={id:'demo-live-a',model:'gpt-6.1-sol',startedAt:window.demoLiveStartedAt,lastEventAt:now,confirmedOutputTokens:test==='pending'?0:1280,measuredOutputTokens:test==='pending'?0:1120,measuredDurationMs:test==='pending'?0:14000,measuredResponses:test==='pending'?0:4};
+          const tasks=test==='idle'?[]:test==='multiple'?[task,{...task,id:'demo-live-b',model:'gpt-6-astra',startedAt:now-42000}]:[task];
+          return {checkedAt:test==='stale'?now-30000:now,lastEventAt:now,activeRequests:tasks.length,enabled:test!=='paused',sourceConfigured:true,filesRead:1,readMs:8,errors:test==='error'?['演示：日志暂时无法读取']:[],tasks,stream:{available:test!=='no-stream',lastDeltaAt:test==='idle'?null:now,chunksLastFiveSeconds:test==='idle'?0:24}};
+        }
+        case 'export_report_csv': window.demoExport=args;return null;
+        case 'plugin:dialog|save': return 'D:\\Quota-demo-report.csv';
+        case 'open_main_view': window.demoOpenedView=args.view;return null;
+        case 'refresh_output_speed': emit('output-speed-updated',null);return 0;
+        case 'get_output_speed': {
+          if(window.demoSpeedReport)return structuredClone(window.demoSpeedReport);
+          const models=['gpt-6.1-sol','gpt-6-astra'],now=Date.now();
+          const bucketSeconds=Number(args.bucketSeconds)||3600;
+          const minutes=args.lookbackMinutes||args.lookbackHours*60;
+          const start=minutes?now-minutes*60000:args.days?new Date(new Date().setHours(0,0,0,0)).getTime()-(args.days-1)*86400000:now-90*86400000,span=now-start;
+          const test=new URLSearchParams(location.search).get('speedCase');
+          const all=['empty','untimed'].includes(test)?[]:Array.from({length:48},(_,i)=>models.map((model,j)=>{
+            const completedAt=now-span*(47-i)/48-3000-j*1000,durationMs=2000+(i%5)*800;
+            const outputTokens=Math.round((72+j*18+Math.sin(i/6+j)*12)*durationMs/1000);
+            return {id:`demo-${i}-${j}`,model,device:j?'demo-b':'demo-a',completedAt,startedAt:completedAt-durationMs,durationMs,outputTokens,speed:outputTokens*1000/durationMs};
+          })).flat().filter(row=>!args.device||args.device===row.device);
+          const summarize=rows=>{const durationMs=rows.reduce((n,r)=>n+r.durationMs,0),outputTokens=rows.reduce((n,r)=>n+r.outputTokens,0),rates=rows.map(r=>r.speed).sort((a,b)=>a-b);return {average:durationMs?outputTokens*1000/durationMs:null,median:rates[Math.floor(rates.length/2)]??null,p95:rates[Math.max(0,Math.ceil(rates.length*.95)-1)]??null,samples:rows.length,outputTokens,durationMs};};
+          const selected=all.filter(row=>!args.model||row.model===args.model),groups=new Map();
+          for(const row of selected){const timestamp=Math.floor(row.completedAt/(bucketSeconds*1000))*bucketSeconds*1000,key=timestamp+'|'+row.model;const point=groups.get(key)||{timestamp,model:row.model,outputTokens:0,durationMs:0,samples:0};point.outputTokens+=row.outputTokens;point.durationMs+=row.durationMs;point.samples++;groups.set(key,point);}
+          const byModel=models.map(model=>{const rows=all.filter(r=>r.model===model);return {model,summary:summarize(rows),latestAt:Math.max(0,...rows.map(r=>r.completedAt))};}).filter(row=>row.summary.samples);
+          const enabled=test!=='paused',localMonitoring=!args.device||args.device==='demo-a';
+          return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,calls:[...selected].sort((a,b)=>b.completedAt-a.completedAt),recent:[...selected].sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
+        }
+        case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
+        case 'get_benchmarks':
+        case 'refresh_benchmarks': {
+          const board=await fetch('/benchmark-board.json').then(r=>r.json());
+          const test=new URLSearchParams(location.search).get('benchmarkCase');
+          if(test==='offline')board.sources[0].error='演示：来源暂不可用';
+          if(test==='empty'){board.models=[];board.profiles=[];board.referenceCohort=[];board.rankings.forEach(r=>r.entries=[]);}
+          return board;
+        }
+        case 'get_ai_models':
+        case 'refresh_ai_models': {
+          const result=await fetch('/ai-models.json').then(r=>r.json());
+          if(new URLSearchParams(location.search).get('registryCase')==='offline'){
+            result.sources[0].error='演示：官网暂不可用，保留上次核实价格';
+            result.models.filter(m=>m.vendor===result.sources[0].vendor).forEach(m=>m.issue=result.sources[0].error);
+          }
+          return result;
+        }
+        case 'setup_info': return {version:'__QUOTA_VERSION__',target:'D:\\Quota',previousVersion:new URLSearchParams(location.search).get('setupCase')==='upgrade'?'1.0.2801':null,payloadBytes:16*1024*1024};
+        case 'setup_status': return setupProgress;
+        case 'setup_ready': return null;
+        case 'setup_install': {
+          window.demoSetupRequest=args.request;setupAttempts++;
+          if(new URLSearchParams(location.search).get('setupCase')==='retry'&&setupAttempts===1)throw Error('Quota 正在运行。请从系统托盘退出 Quota，再点击重试安装。');
+          if(!/^[A-Za-z]:[\\/].+/.test(args.request.target))throw Error('请选择本机磁盘中的完整安装文件夹');
+          setupProgress={phase:'preparing',message:'正在检查安装环境',done:false,error:null};emit('setup-progress',setupProgress);
+          setTimeout(()=>{setupProgress={phase:'copying',message:'正在解压并复制 Quota 文件',done:false,error:null};emit('setup-progress',setupProgress);},250);
+          setTimeout(()=>{setupProgress={phase:'done',message:'Quota 已安装完成',done:true,error:null};emit('setup-progress',setupProgress);},1400);
+          return null;
+        }
+        case 'setup_finish': window.demoSetupFinished=args.launch;return null;
         case 'get_widget_options': return {...widgetOptions};
-        case 'save_widget_options': widgetOptions={...args.options};return {...widgetOptions};
+        case 'save_widget_options': widgetOptions={...args.options};widgetState(false,true);return {...widgetOptions};
         case 'get_widget_usage': {
           const test=new URLSearchParams(location.search).get('widgetCase');
           if(test==='error')throw Error('演示：统计暂不可读');
           return {today:test==='empty'?0:1234567,total:test==='empty'?0:98765432,date:'2026-10-16',updatedAt:test==='empty'?null:Date.now(),partial:test==='partial'};
         }
-        case 'widget_ready': widgetState(false);return null;
+        case 'widget_ready': widgetState(false,true);return null;
         case 'set_widget_expanded': widgetState(args.expanded);return null;
         case 'move_widget': return null;
-        case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],updatedAt:Date.now(),syncErrors:[]};
+        case 'get_sync_overview': return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'},...demoSshDevices.map(d=>({id:d.deviceId,name:'SSH · '+d.name}))],updatedAt:Date.now(),syncErrors:[]};
+        case 'get_main_window_state': return {maximized:windowMaximized,fullscreen:false,square:windowMaximized||new URLSearchParams(location.search).get('windowCase')==='tiled'};
         case 'sync_activity_now':
         case 'sync_usage_now': return null;
         case "plugin:window|is_maximized": return windowMaximized;
         case "plugin:window|toggle_maximize": {
           windowMaximized=!windowMaximized;
+          for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='main-window-state')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{maximized:windowMaximized,fullscreen:false,square:windowMaximized}});
           for(const [id,handler] of Object.entries(eventHandlers))if(handler.event==='tauri://resize')callbacks[handler.handler]?.cb({event:handler.event,id:Number(id),payload:{width:1280,height:800}});
           return null;
         }
@@ -735,7 +803,7 @@
           const modelVendor=key=>key.startsWith("gpt")?"custom":key.toLowerCase().startsWith("glm")?"zhipu":"deepseek";
           const coveredModels={};
           for(const e of expenses.filter(e=>e.from<=args.to&&e.to>=args.from)){const models=activity.models.filter(m=>modelVendor(m.key)===e.vendor);coveredModels[e.vendor]=models;coveredModels[`${e.vendor}:${e.currency}`]=models;}
-          return {expenses,coveredModels,lifetimeTokens:{input:2400000,output:320000,total:2720000,cached:1700000,cacheWrite:50000,reasoning:90000},lifetimeSessions:38,firstDate:new Date(Date.now()-29*86400000).toLocaleDateString('sv-SE'),lastDate:new Date().toLocaleDateString('sv-SE'),accounts:ACCOUNTS.map(a=>({id:a.id,vendor:a.provider==="mimo-plan"?"mimo":a.provider,label:a.label,currency:a.provider==="custom"?"USD":"CNY",cumulativeRecharge:a.provider==="zhipu"?40:null,cumulativeSpend:a.provider==="zhipu"?28.4:null,observedRecharge:null,observedSpend:null,observedFrom:null,observedTo:null,balanceRises:a.provider==="zhipu"?10:0,balanceDrops:a.provider==="zhipu"?2:0,historyFrom:1791072000,historyTo:1791849600,plan:a.provider==="custom"?"plus":null,issues:[]})),plans:[
+          return {expenses,coveredModels,history:window.demoCostHistory??[],lifetimeTokens:{input:2400000,output:320000,total:2720000,cached:1700000,cacheWrite:50000,reasoning:90000},lifetimeSessions:38,firstDate:new Date(Date.now()-29*86400000).toLocaleDateString('sv-SE'),lastDate:new Date().toLocaleDateString('sv-SE'),accounts:ACCOUNTS.map(a=>({id:a.id,vendor:a.provider==="mimo-plan"?"mimo":a.provider,label:a.label,currency:a.provider==="custom"?"USD":"CNY",cumulativeRecharge:a.provider==="zhipu"?40:null,cumulativeSpend:a.provider==="zhipu"?28.4:null,observedRecharge:null,observedSpend:null,observedFrom:null,observedTo:null,balanceRises:a.provider==="zhipu"?10:0,balanceDrops:a.provider==="zhipu"?2:0,historyFrom:1791072000,historyTo:1791849600,plan:a.provider==="custom"?"plus":null,issues:[]})),plans:[
             {id:"plus",vendor:"custom",name:"ChatGPT Plus",currency:"USD",amount:20,months:1,source:"https://learn.chatgpt.com/docs/pricing",verifiedAt:"2026-10-14",condition:"公开月费；不含税费或额外额度购买"},
             {id:"mimo-lite-cn",vendor:"mimo",name:"MiMo Lite 月付",currency:"CNY",amount:39,months:1,source:"https://mimo.mi.com/docs/zh-CN/tokenplan",verifiedAt:"2026-10-14",condition:"中国区公开月费；优惠请按实付填写"},
             {id:"glm-lite",vendor:"zhipu",name:"GLM Coding Lite",currency:"CNY",amount:118,months:1,source:"https://zcode.z.ai/cn",verifiedAt:"2026-10-14",condition:"官网月付标价；优惠请按实付填写"}
@@ -754,7 +822,7 @@
           }
           window.demoVendorExpenses=next;return null;
         }
-        case "get_monthly_usage_fx": return {rates:args.months.map(month=>window.demoMonthlyRates?.[month]||{month,cnyPerUsd:7,date:'2026-09-30',source:'manual'}),error:null};
+        case "get_monthly_usage_fx": return {rates:args.months.filter(month=>!window.demoFxMissing).map(month=>window.demoMonthlyRates?.[month]||{month,cnyPerUsd:7,date:month+'-20',source:'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml'}),error:null};
         case "save_monthly_usage_fx": window.demoMonthlyRates ||= {}; if(args.rate==null)delete window.demoMonthlyRates[args.month];else window.demoMonthlyRates[args.month]={month:args.month,cnyPerUsd:args.rate,date:new Date().toLocaleDateString('sv-SE'),source:'manual'};return null;
         case "get_activity_storage": return {bytes:51692437, files:430, legacyFiles:430, ownLegacyFiles:218,legacyCompatibility:new URLSearchParams(location.search).get("storageCase")==="legacy"};
         case "get_activity_readers": return new URLSearchParams(location.search).get("storageCase")==="legacy"?[{device:"demo-b",version:null,compressed:null}]:[{device:"demo-b",version:"1.0.1700",compressed:true}];
@@ -952,7 +1020,7 @@
           return null;
         case "app_info":
           return {
-            version: "1.0.2500",
+            version: "__QUOTA_VERSION__",
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }

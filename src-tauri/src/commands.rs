@@ -18,7 +18,17 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
+#[tauri::command]
+pub fn get_main_window_chrome(window: tauri::WebviewWindow) -> Result<crate::window_frame::ChromeStatus, String> {
+    if window.label() != "main" { return Err("只能读取主窗口边框状态".into()); }
+    Ok(crate::window_frame::chrome_status(window.app_handle()))
+}
+
 pub struct AppState {
+    pub benchmarks: crate::benchmarks::Cache,
+    pub appearance:Mutex<Option<crate::appearance::Preferences>>,
+    pub ai_models: Mutex<crate::ai_models::Snapshot>,
+    pub ai_models_refreshing: tokio::sync::Mutex<()>,
     pub billing_lock: Mutex<()>,
     pub mimo_login_lock: tokio::sync::Mutex<()>,
     pub mimo_login_generation: std::sync::atomic::AtomicU64,
@@ -56,6 +66,11 @@ impl AppState {
         let _=crate::activity::save_options(store.dir(),&activity_options);
         let hidden_models = store.load_hidden_models();
         let history = HistoryStore::load(store.dir());
+        let ai_models=crate::ai_models::load(store.dir());
+        let benchmarks=crate::benchmarks::load(store.dir());
+        let appearance=crate::appearance::load(store.dir());
+        let mut ladder=crate::ladder::load(store.dir());
+        crate::ai_models::apply_to_ladder(&mut ladder,&ai_models);
         // 跟随系统代理：reqwest 默认只认环境变量，不读 Windows 系统代理，
         // 否则 Clash 开了系统代理、应用仍然直连，chatgpt.com 这类站点就连不上。
         let http = {
@@ -74,6 +89,10 @@ impl AppState {
             builder.build().unwrap_or_default()
         };
         Self {
+            benchmarks:crate::benchmarks::Cache{dataset:Mutex::new(benchmarks),refreshing:tokio::sync::Mutex::new(())},
+            appearance:Mutex::new(appearance),
+            ai_models:Mutex::new(ai_models),
+            ai_models_refreshing:tokio::sync::Mutex::new(()),
             billing_lock: Mutex::new(()),
             mimo_login_lock: tokio::sync::Mutex::new(()),
             mimo_login_generation: std::sync::atomic::AtomicU64::new(0),
@@ -81,7 +100,7 @@ impl AppState {
             mimo_refresh_lock: tokio::sync::Mutex::new(()),
             mimo_recovery_attempts: Mutex::new(HashMap::new()),
             activity_lock: Mutex::new(()),
-            ladder: Mutex::new(crate::ladder::load(store.dir())),
+            ladder: Mutex::new(ladder),
             ladder_refreshing: Mutex::new(false),
             pending_connections: Mutex::new(HashMap::new()),
             store,
@@ -910,6 +929,7 @@ pub fn model_cards(state: State<'_, AppState>, provider: Option<String>) -> Vec<
         .unwrap_or_default();
 
     let filter = provider.unwrap_or_default();
+    let catalog=crate::ai_models::catalog_entries(&state);
     let mut cards = Vec::new();
     for account in accounts.iter() {
         if !filter.is_empty() && account.provider != filter {
@@ -920,7 +940,7 @@ pub fn model_cards(state: State<'_, AppState>, provider: Option<String>) -> Vec<
                 &account.provider,
                 &account.id,
                 &status.models,
-                &state.catalog,
+                &catalog,
                 &overrides,
             ));
         }
@@ -986,7 +1006,7 @@ fn resolve_entry(state: &AppState, provider: &str, model_id: &str) -> Result<(Ca
         .overrides
         .lock()
         .map_err(|_| "资料库暂不可用".to_string())?;
-    Ok(catalog::comparison_entries(&state.catalog, &overrides, provider, model_id))
+    Ok(catalog::comparison_entries(&crate::ai_models::catalog_entries(&state), &overrides, provider, model_id))
 }
 
 /// 取第三方参考价（带 6 小时内存缓存）
@@ -1225,12 +1245,13 @@ pub fn app_info(state: State<'_, AppState>) -> serde_json::Value {
 }
 
 #[tauri::command]
-pub fn show_main_window(app: AppHandle, account: Option<String>) {
+pub fn show_main_window(app: AppHandle, account: Option<String>,view:Option<String>) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+    if let Some(view)=view.filter(|v|matches!(v.as_str(),"output-speed"|"activity"|"costs"|"settings")){let _=app.emit("navigate-main",view);}
     // 可按账户 id 定位编辑面板
     if let Some(id) = account.filter(|s| !s.trim().is_empty()) {
         let _ = app.emit("focus-account", id);

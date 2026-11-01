@@ -200,3 +200,5 @@ export const IconEyeOff = (p: P) => (
     <path d="m4 4 16 16" />
   </Base>
 );
+
+export const IconSpeed = (p: P) => <Base {...p}><path d="M4 18a9 9 0 1 1 16 0M12 12l5-5M7 19h10"/><circle cx="12" cy="12" r="1.5"/></Base>;

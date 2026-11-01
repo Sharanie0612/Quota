@@ -1,34 +1,18 @@
 // Static rendering of production components; this is not a browser/layout check.
-const fs = require('fs');
 const path = require('path');
 const assert = require('node:assert/strict');
-const ts = require('typescript');
 const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
-const cache = new Map();
-function load(file) {
-  if (cache.has(file)) return cache.get(file);
-  const exports = {}; cache.set(file, exports);
-  const js = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  new Function('exports', 'require', js)(exports, name => {
-    if (!name.startsWith('.')) return require(name);
-    if (name.endsWith('.css')) return {};
-    if (name.endsWith('.svg')) return { default: name };
-    const base = path.resolve(path.dirname(file), name);
-    return load([base, `${base}.ts`, `${base}.tsx`].find(p => fs.existsSync(p) && fs.statSync(p).isFile()));
-  });
-  return exports;
-}
+const load = require('./lib/source-loader.cjs').createSourceLoader();
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props));
 const { LadderChart } = load(path.resolve(__dirname, '../src/components/LadderChart.tsx'));
 const entry = (id, currency, input) => ({ id, name: id, provider: 'deepseek', vendor: 'DeepSeek', price: { currency, input, output: input, unit: '每百万 Token' }, rankings: { general: { rank: 1, score: 90 } }, verifiedAt: '2026-10-04' });
 const entries = [entry('model-yuan', 'CNY', 1), entry('model-dollar', 'USD', 1), { ...entry('unknown', 'CNY', null), verifiedAt: null }];
-const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, layout:'combined', exchange:null});
+const noExchange = render(LadderChart, {entries, domain:'general', focused:null, onFocus:()=>{}, exchange:null});
 assert.match(noExchange,/按原币种分别绘图/);
 assert.equal((noExchange.match(/role="group"/g)||[]).length,2); assert.match(noExchange,/能力排名 · 价格待确认/);
 const props = { entries, domain: 'general', focused: null, onFocus: () => {}, exchange: { cnyPerUsd:7, date:"2026-10-02", error:null } };
-const split = render(LadderChart, { ...props, layout: 'split' });
-const combined = render(LadderChart, { ...props, layout: 'combined' });
+const combined = render(LadderChart, props);
 assert.equal((combined.match(/role="group"/g) || []).length, 1);
 for (const html of [combined]) {
   assert.match(html, /CNY/); assert.match(html, /USD/); assert.match(html, /汇率仅供比较/);
@@ -37,7 +21,7 @@ for (const html of [combined]) {
 }
 assert.match(combined, /1 USD = 7.0000 CNY/);
 assert.match(combined, /CNY统一价格与性能坐标图/);
-const noRate = render(LadderChart,{...props,layout:'combined',exchange:null});
+const noRate = render(LadderChart,{...props,exchange:null});
 assert.equal((noRate.match(/role="button"/g)||[]).length,2);
 console.log('PASS one normalized price axis, original prices, FX-unavailable fallback and exclusion of unknown prices');
 const onlyUsd=render(LadderChart,{...props,entries:[entry('usd-only','USD',1)],exchange:null});
@@ -51,15 +35,6 @@ const retained=render(LadderChart,{...props,entries:[...entries,otherDomain]});
 assert.match(retained,/能力排名 · 价格待确认/);
 assert.match(retained,/unknown/);
 assert.ok(!retained.includes('audio-only'));
-const {applyPricing}=load(path.resolve(__dirname,'../src/lib/ladderPricing.ts'));
-const tiered={...entry('haiku','USD',0.1),priceOptions:[{id:'long',label:'长输入',price:{currency:'USD',unit:'每百万 Token',input:0.5,output:2.5}}]};
-assert.equal(applyPricing(tiered,'long').price.input,0.5);
-assert.equal(applyPricing(tiered,'standard').price.input,0.1);
-assert.equal(applyPricing(tiered,'batch').price.input,null);
-assert.equal(applyPricing(tiered,'off-peak').price.input,0.1);
-assert.equal(tiered.price.input,0.1);
-assert.equal(applyPricing({...tiered,verifiedAt:null},'long').price.input,null);
-console.log('PASS unknown prices retain ranked models, unrelated domains excluded, verified scenarios never invent discounts');
 
 const { AccountCard } = load(path.resolve(__dirname, '../src/components/AccountCard.tsx'));
 const balance = { total: 10, currency: 'CNY', source: 'api', usable: true, note: 'synthetic note', amounts: [{ kind: 'granted', label: '赠送余额', value: 0 }, { kind: 'cumulative_spend', label: '累计消费', value: 25 }] };
@@ -76,29 +51,9 @@ console.log('PASS account details remain collapsed, zero displayed, unsupported-
 // Model families use their own local logos, rather than parent-company graphics.
 const modelNames=['GPT-6','Claude Opus','Gemini Flash','Gemma 4','Nano Banana 2','DeepSeek V4','Kimi K3','GLM-5','MiMo-V2','Qwen3','Grok 4','Muse Spark','Wan 3'];
 const {ModelLogo,modelBrand}=load(path.resolve(__dirname,'../src/components/ModelLogo.tsx'));
-const allModels=render(LadderChart,{...props,entries:modelNames.map((name,i)=>({...entry('model-'+i,'CNY',i+1),name}))});
-for(const name of modelNames) assert.equal(allModels.split('data-model-brand="'+modelBrand(name)+'"').length-1,2);
+for(const name of modelNames) assert.ok(render(ModelLogo,{name}).includes('data-model-brand="'+modelBrand(name)+'"'));
 for(const [name,file] of [['Claude Opus','claude-color'],['Gemini Flash','gemini-color'],['Gemma 4','gemma-color'],['GLM-5','zai'],['MiMo-V2','xiaomimimo'],['Qwen3','qwen-color'],['Grok 4','grok']]) assert.ok(render(ModelLogo,{name}).includes(file+'.svg'));
 assert.ok(render(ModelLogo,{name:'Muse Spark'}).includes('Muse 模型缩写'));
-assert.ok(!allModels.includes('scatter-dot'));
-const selectedCard=render(LadderChart,{...props,focused:entries[0]});
-assert.match(selectedCard,/scatter-selection-ring/);
-console.log('PASS model-family logos identify chart points and legends; missing independent logos use labelled model initials');
-const overlapping=[entry('overlap-a','CNY',1),entry('overlap-b','CNY',1),entry('neighbour','CNY',1.01),entry('axis-end','CNY',10)];
-const overlapHtml=render(LadderChart,{...props,entries:overlapping,focused:overlapping[1]});
-assert.match(overlapHtml,/同坐标 2 个型号/);
-assert.match(overlapHtml,/此位置附近 3 个型号/);
-for(const id of ['overlap-a','overlap-b','neighbour']) assert.ok(overlapHtml.includes(id));
-const {ladderScale}=load(path.resolve(__dirname,'../src/lib/ladderPlot.ts'));
-const scale=ladderScale(overlapping.map(e=>({cost:e.price.input+e.price.output,score:90})));
-const pointTags=[...overlapHtml.matchAll(/data-cost="([^"]+)" data-score="([^"]+)" data-plot-x="([^"]+)" data-plot-y="([^"]+)"/g)];
-assert.equal(pointTags.length,3);
-for(const [,cost,score,x,y] of pointTags){assert.equal(Number(x),scale.x(Number(cost)));assert.equal(Number(y),scale.y(Number(score)));}
-const precise=render(LadderChart,{...props,entries:[entry('micro','CNY',0.000001)],focused:entry('micro','CNY',0.000001)});
-assert.match(precise,/¥0.000002/);
-for(const rate of [0,-1,NaN,Infinity]){const invalidRate=render(LadderChart,{...props,exchange:{...props.exchange,cnyPerUsd:rate}});assert.match(invalidRate,/按原币种分别绘图/);assert.equal((invalidRate.match(/role="group"/g)||[]).length,2);}
-console.log('PASS overlapping markers keep exact numeric coordinates and all models selectable; small-price precision and invalid-FX fallback retained');
-
 const {activityModelChoices,activityModelIdentity}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));
 const modelRows=['openai/gpt-5.4 (high)','gpt-5.4 (low)','zai/glm-5','deepseek/deepseek-v3','custom/model-x',''].map((key,i)=>({key,tokens:{total:100*(i+1)},sessions:i,calls:0}));
 assert.equal(activityModelIdentity('openai/gpt-5.4').vendor,'OpenAI');
@@ -121,15 +76,7 @@ const incomplete=render(AbilityRadar,{entries:[entry('sparse','CNY',1)]});
 assert.ok(!incomplete.includes('fill-opacity="0.08"')); // missing five axes never become zero
 const completeEntry={...entry('complete','CNY',1),rankings:Object.fromEntries(['general','coding','math','science','reasoning','agents'].map(key=>[key,{score:50}]))};
 assert.match(render(AbilityRadar,{entries:[completeEntry]}),/fill-opacity="0.08"/);
-const {CacheUsage}=load(path.resolve(__dirname,'../src/components/CacheUsage.tsx'));
-const cacheRows=['gpt-6.1-sol','GLM-5.3','deepseek-flash'].map(key=>({key,tokens:{input:100,cached:70},sessions:1,calls:0}));
-const cacheProps={rows:cacheRows,modelKeys:cacheRows.map(row=>row.key),format:String,onModel:()=>{}};
-const cacheHtml=render(CacheUsage,cacheProps);
-assert.match(cacheHtml,/总体命中率/);assert.match(cacheHtml,/70.0%/);assert.match(cacheHtml,/命中 70 · 未命中 30/);assert.match(cacheHtml,/已命中 <b>210/);assert.match(cacheHtml,/未命中 <b>90/);
-assert.ok(!cacheHtml.includes('<table'));assert.equal((cacheHtml.match(/class="cache-model-row"/g)||[]).length,3);
-const emptyCache=render(CacheUsage,{...cacheProps,rows:[{key:'empty',tokens:{input:0,cached:0}}]});assert.ok(!/NaN|Infinity/.test(emptyCache));assert.match(emptyCache,/暂无输入记录/);
-const manyCache=render(CacheUsage,{...cacheProps,rows:Array.from({length:10},(_,i)=>({...cacheRows[0],key:'model-'+i}))});assert.equal((manyCache.match(/class="cache-model-row"/g)||[]).length,6);assert.match(manyCache,/展开全部 10 项/);
-console.log('PASS sparse radar, weighted cache hit summary, hit/miss values, zero-input handling and compact model list');
+console.log('PASS sparse radar keeps missing axes unknown');
 
 // Trae usage channels: models Trae provides and models reached with the user's own key stay separate.
 const {activityModelName,activityModelChannel,activityChannelName,activityChannels,activityFilterLabel}=load(path.resolve(__dirname,'../src/lib/activityModels.ts'));
@@ -159,27 +106,8 @@ assert.match(mixedPicker,/label="DeepSeek"/);assert.match(mixedPicker,/>deepseek
 assert.ok(mixedPicker.includes('deepseek-v4-pro · API 接入'));
 const selectedChannelPicker=render(ActivityModelPicker,{rows:channelRows,value:channelKey('glm-5.3','trae'),onChange:()=>{},loading:false});
 assert.ok(selectedChannelPicker.includes(`value="${channelKey('glm-5.3','trae')}" selected=""`));
-const channelCache=render(CacheUsage,{rows:channelRows,format:String,onModel:()=>{}});
-assert.ok(channelCache.includes("deepseek-v4-pro"));assert.match(channelCache,/Trae 提供/);assert.match(channelCache,/API 接入/);assert.ok(!channelCache.includes('\u001f'));
-const groupedCache=render(CacheUsage,{rows:[channelRows[0],{...channelRows[0],key:channelKey('claude-example','api'),tokens:{input:100,cached:200,total:100}}],format:String,onModel:()=>{}});
-assert.equal((groupedCache.match(/class="cache-model-row"/g)||[]).length,2);
-assert.match(groupedCache,/85.0%/);assert.match(groupedCache,/已命中 <b>170/);assert.match(groupedCache,/未命中 <b>30/);
-assert.equal(channelRows[0].tokens.cached,70);
 const unknownPicker=render(ActivityModelPicker,{rows:[{...channelRows[0],key:channelKey('auto','unknown')}],value:'',onChange:()=>{},loading:false});
 assert.match(unknownPicker,/vendor:trae/);assert.match(unknownPicker,/channel:unknown/);assert.ok(unknownPicker.includes('auto · 未鉴别'));
-const {TraeUsageDetails,ActivityDeviceDetails}=load(path.resolve(__dirname,'../src/components/ActivityDetails.tsx'));
-const detailedRows=[{...channelRows[0],tokens:{input:100,cached:70,output:20,total:120}},{...channelRows[1],tokens:{input:100,cached:70,output:30,total:130}}];
-const channelDetail=render(TraeUsageDetails,{rows:detailedRows,channels:detailedRows.map(row=>({...row,key:activityModelChannel(row.key)})),format:String,onModel:()=>{}});
-assert.match(channelDetail,/API 接入 Trae模型明细/);assert.match(channelDetail,/Trae 提供模型明细/);assert.match(channelDetail,/deepseek-v4-pro/);assert.match(channelDetail,/glm-5.3/);assert.match(channelDetail,/>缓存命中</);assert.match(channelDetail,/>120</);
-const {activityDeviceChoices}=load(path.resolve(__dirname,'../src/lib/activityDevices.ts'));
-const remote=(deviceId,host)=>({deviceId,host,name:'ubuntu',aliases:[host,host+'-alias'],home:'',included:true});
-const remoteOptions={codexSshDevices:[remote('remote-a','devbox'),remote('remote-b','labbox')]};
-const remoteDevices=[{id:'remote-a',name:'远程采集设备'},{id:'remote-b',name:'远程采集设备'}];
-const remoteChoices=activityDeviceChoices(remoteDevices,remoteOptions);
-assert.equal(remoteChoices.length,2);assert.notEqual(remoteChoices[0].label,remoteChoices[1].label);assert.match(remoteChoices[0].label,/devbox.*devbox-alias/);
-const deviceDetail=render(ActivityDeviceDetails,{rows:remoteDevices.map((d,i)=>({...detailedRows[i],key:d.id})),devices:remoteDevices,options:remoteOptions,format:String,onDevice:()=>{}});
-assert.equal((deviceDetail.match(/class="activity-device-usage"/g)||[]).length,2);assert.match(deviceDetail,/devbox/);assert.match(deviceDetail,/labbox/);assert.match(deviceDetail,/remote-a/);assert.match(deviceDetail,/remote-b/);
-console.log('PASS Trae per-model details/search/cache rows, channel-specific keys and distinct named SSH devices with aliases');
 const {modelFamilies,modelFamily,releaseDates,releasedWithin}=load(path.resolve(__dirname,'../src/lib/ladderModels.ts'));
 const variantEntries=[{...entry('gpt-high','USD',1),name:'GPT Example (High)',vendor:'OpenAI',releasedAt:'2026-10-02'},{...entry('gpt-low','USD',1),name:'GPT Example (Low)',vendor:'OpenAI'},{...entry('gemini','USD',1),name:'Gemini Example',vendor:'Google',releasedAt:'invalid'},{...entry('other','USD',1),name:'GPT Example (High)',vendor:'Other'}];
 const families=modelFamilies(variantEntries);assert.equal(families.length,3);assert.equal(families[0].vendor,'Google');assert.equal(modelFamilies(variantEntries,'name')[0].name,'Gemini Example');

@@ -1,6 +1,6 @@
 [package]
 name = "quota"
-version = "1.0.2500"
+version = "1.0.3501"
 description = "A lightweight local-first dashboard for AI provider balances and quotas."
 edition = "2021"
 rust-version = "1.77.2"
@@ -45,11 +45,12 @@ hmac = "0.12"
 sha1 = "0.10"
 base64 = "0.22"
 scraper = "0.24"
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
 tauri-plugin-single-instance = "2"
 
 # Windows 平台使用系统凭据管理器（Windows Credential Manager）加密保存 API Key
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Memory", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_Registry", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug", "Win32_System_Memory", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 keyring = { version = "3", features = ["windows-native"] }
 
 # macOS / Linux 备用（跨平台编译时不至于失败）

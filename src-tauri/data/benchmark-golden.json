@@ -1,0 +1,196 @@
+{
+  "checkedAt": "2026-10-29",
+  "method": "AA public original index and LiveBench live frontend declared category weights; independent expected constants, never Quota v1 scores",
+  "sources": [
+    "https://artificialanalysis.ai/leaderboards/models",
+    "https://livebench.ai/data/20261025/table.csv",
+    "https://livebench.ai/data/20261025/categories.json"
+  ],
+  "cases": [
+    {
+      "board": "aa",
+      "modelId": "gemini4carbon",
+      "score": 59.425738829526,
+      "setting": "High"
+    },
+    {
+      "board": "aa",
+      "modelId": "claudeopus55",
+      "score": 58.406,
+      "setting": "Max, Default Fallback"
+    },
+    {
+      "board": "aa",
+      "modelId": "gpt6astra",
+      "score": 56.8539,
+      "setting": "Max"
+    },
+    {
+      "board": "aa",
+      "modelId": "gpt61sol",
+      "score": 54.5087,
+      "setting": "Max"
+    },
+    {
+      "board": "aa",
+      "modelId": "gpt61terra",
+      "score": 50.9765,
+      "setting": "Max"
+    },
+    {
+      "board": "livebench",
+      "modelId": "claudefable51",
+      "score": 85.69444444444444
+    },
+    {
+      "board": "livebench",
+      "modelId": "claudehaiku55",
+      "score": 69.85
+    },
+    {
+      "board": "livebench",
+      "modelId": "claudeopus55",
+      "score": 85.14444444444445
+    },
+    {
+      "board": "livebench",
+      "modelId": "claudesonnet55",
+      "score": 80.03888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "deepseekv41flash1017",
+      "score": 74.02222222222223
+    },
+    {
+      "board": "livebench",
+      "modelId": "gemini38flash",
+      "score": 59.205555555555556
+    },
+    {
+      "board": "livebench",
+      "modelId": "gemini4argon",
+      "score": 79.30000000000001
+    },
+    {
+      "board": "livebench",
+      "modelId": "gemma431b",
+      "score": 38.72222222222222
+    },
+    {
+      "board": "livebench",
+      "modelId": "glm53flash",
+      "score": 62.06666666666667
+    },
+    {
+      "board": "livebench",
+      "modelId": "gpt56terra",
+      "score": 67.78888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "gpt6astra",
+      "score": 85.63888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "gpt6luna",
+      "score": 64.58888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "gpt61sol",
+      "score": 84.07222222222222
+    },
+    {
+      "board": "livebench",
+      "modelId": "gpt61terra",
+      "score": 77.78888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "grok46",
+      "score": 67.75
+    },
+    {
+      "board": "livebench",
+      "modelId": "grok47",
+      "score": 70.13888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "inkling",
+      "score": 47.05
+    },
+    {
+      "board": "livebench",
+      "modelId": "kimik31pro",
+      "score": 71.28888888888889
+    },
+    {
+      "board": "livebench",
+      "modelId": "kimik3",
+      "score": 64.57222222222222
+    },
+    {
+      "board": "livebench",
+      "modelId": "mimov26pro",
+      "score": 68.47777777777777
+    },
+    {
+      "board": "livebench",
+      "modelId": "minimaxm31flash",
+      "score": 66.89444444444445
+    },
+    {
+      "board": "livebench",
+      "modelId": "mistrallarge4",
+      "score": 43.900000000000006
+    },
+    {
+      "board": "livebench",
+      "modelId": "musespark13",
+      "score": 63.03333333333333
+    },
+    {
+      "board": "livebench",
+      "modelId": "musesparkopen",
+      "score": 51.62777777777777
+    },
+    {
+      "board": "livebench",
+      "modelId": "musewonder10",
+      "score": 74.15
+    },
+    {
+      "board": "livebench",
+      "modelId": "nemotronsupervl35nvfp4",
+      "score": 46.5
+    },
+    {
+      "board": "livebench",
+      "modelId": "nemotronsupervl35",
+      "score": 50.227777777777774
+    },
+    {
+      "board": "livebench",
+      "modelId": "qwen3827b",
+      "score": 58.38333333333334
+    },
+    {
+      "board": "livebench",
+      "modelId": "qwen38max",
+      "score": 61.5611111111111
+    },
+    {
+      "board": "livebench",
+      "modelId": "smaugnemotron35nvfp4",
+      "score": 50.30555555555556
+    },
+    {
+      "board": "livebench",
+      "modelId": "step5preview",
+      "score": 58.60555555555555
+    }
+  ]
+}

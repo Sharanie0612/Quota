@@ -162,6 +162,27 @@ export interface Settings {
   defaultLowThreshold: number;
 }
 
+export interface AiModel {
+  available: boolean;
+  id:string;apiId:string;name:string;vendor:string;provider:string;summary:string;
+  context:number|null;maxOutput:number|null;abilities:string[];price:ModelPrice|null;
+  source:string;verifiedAt:string|null;firstSeen:string;issue:string|null;
+  priceOptions:{id:string;label:string;price:ModelPrice}[];
+  cacheWrites:{ttlSeconds:number;price:number}[];
+}
+export interface AiModelSnapshot {schema:number;checkedAt:string|null;models:AiModel[];sources:{vendor:string;url:string;checkedAt:string;models:number;error:string|null}[]}
+export interface BenchmarkObservation {profileId:string;modelId:string;modelName:string;vendor:string;sourceId:string;metric:string;family:string;version:string;domain:string;setting:string;value:number;unit:string;weight:number;official:boolean;url:string;checkedAt:string}
+export interface BenchmarkProfile {id:string;modelId:string;name:string;vendor:string;setting:string;index:number;cost:number|null;speed:number|null;latency:number|null;sourceId:string;version:string}
+export interface BenchmarkEdition {version:string;publishedAt:string;url:string;primaryProfiles:string[]}
+export interface BenchmarkSource {id:string;name:string;url:string;version:string;checkedAt:string;records:number;error:string|null;automatic:boolean;weights:Record<string,number>;edition?:BenchmarkEdition|null}
+export interface BenchmarkComponent {metric:string;value:number;unit:string;weight:number|null;normalized:number|null;configuration:string;evaluator:string;url:string;difficulty:number|null;slope:number|null}
+export interface BenchmarkResult {sourceId:string;version:string;profileId:string;setting:string;score:number;coverage:number;components:BenchmarkComponent[];url:string;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number;calibrationError:number|null;kind:string}
+export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number}
+export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[];tierLabels:Record<string,string>}
+export interface BenchmarkModel {id:string;name:string;vendor:string;results:BenchmarkResult[];observations:BenchmarkObservation[]}
+export interface ModelRelease {id:string;name:string;vendor:string;releasedAt:string;url:string}
+export interface BenchmarkBoard {algorithm:string;sources:BenchmarkSource[];models:BenchmarkModel[];profiles:BenchmarkProfile[];referenceCohort:string[];rankings:BenchmarkRanking[];releases?:ModelRelease[]}
+
 export interface ModelPrice {
   cachedInput?: number | null;
   cacheWrite?: number | null;
@@ -352,6 +373,19 @@ export type RechargeEvent = {
 };
 export interface ActivityTokens { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; total: number }
 export interface ActivityGroup { key: string; tokens: ActivityTokens; calls: number; sessions: number }
+export interface OutputSpeedPoint { timestamp:number; model:string; outputTokens:number; durationMs:number; samples:number }
+export interface OutputSpeedSummary { average:number|null; median:number|null; p95:number|null; samples:number; outputTokens:number; durationMs:number }
+export interface CompletedOutput { id:string; model:string; device:string; startedAt:number; completedAt:number; outputTokens:number; durationMs:number; speed:number }
+export interface RunningModelTask {id:string;model:string;startedAt:number;lastEventAt:number;confirmedOutputTokens:number;measuredOutputTokens:number;measuredDurationMs:number;measuredResponses:number}
+export interface LiveModelStatus {checkedAt:number|null;lastEventAt:number|null;activeRequests:number;enabled:boolean;sourceConfigured:boolean;filesRead:number;readMs:number;errors:string[];tasks:RunningModelTask[];stream:{available:boolean;lastDeltaAt:number|null;chunksLastFiveSeconds:number}}
+export interface OutputSpeedReport {
+  devices:{id:string;name:string}[]; models:string[]; points:OutputSpeedPoint[]; summary:OutputSpeedSummary;
+  updatedAt:number; bucketMinutes?:number; bucketSeconds:number; collectionIntervalSeconds:number;
+  collectionEnabled:boolean; collectedAt:number|null; errors:string[]; rangeStart:number; rangeEnd:number;
+  recent:CompletedOutput[]; calls:CompletedOutput[]; byModel:{model:string;summary:OutputSpeedSummary;latestAt:number}[];
+  coverage:{outputRecords:number;timedRecords:number}; localMonitoring:boolean;
+  live:LiveModelStatus;
+}
 export interface SshHostDiscovery { hosts: string[]; warnings: string[] }
 export interface SshDevice { host:string; home:string; deviceId:string; name:string; included:boolean; aliases:string[]; error?:string }
 export interface SshIdentity { host:string; home:string; deviceId:string; name:string; error:string|null }
@@ -367,6 +401,7 @@ export interface UsageBill { amount: number; currency: string }
 export interface VendorExpense { vendor: string; from: string; to: string; currency: string; subscription: number | null; usage: number | null; planId: string | null }
 export interface SubscriptionPrice { id: string; vendor: string; name: string; currency: string; amount: number; months: number; source: string; verifiedAt: string; condition: string }
 export interface FinanceAccount { id: string; vendor: string; label: string; currency: string; cumulativeRecharge: number | null; cumulativeSpend: number | null; observedRecharge: number | null; observedSpend: number | null; observedFrom: number | null; observedTo: number | null; balanceRises: number; balanceDrops: number; historyFrom: number | null; historyTo: number | null; plan: string | null; issues: string[] }
-export interface VendorCostReport { accounts: FinanceAccount[]; expenses: VendorExpense[]; plans: SubscriptionPrice[]; coveredModels: Record<string, ActivityGroup[]>; lifetimeTokens: ActivityTokens; lifetimeSessions: number; firstDate: string | null; lastDate: string | null }
+export interface CostObservation {accountId:string;vendor:string;label:string;at:number;from:number|null;currency:string;cumulativeSpend:number|null;cumulativeRecharge:number|null;spendDelta:number|null;rechargeDelta:number|null;counterReset:boolean}
+export interface VendorCostReport {history?:CostObservation[]; accounts: FinanceAccount[]; expenses: VendorExpense[]; plans: SubscriptionPrice[]; coveredModels: Record<string, ActivityGroup[]>; lifetimeTokens: ActivityTokens; lifetimeSessions: number; firstDate: string | null; lastDate: string | null }
 export interface MonthlyUsageRate { month: string; cnyPerUsd: number; date: string; source: string }
 export interface MimoLoginStatus { state: "waiting" | "closed" | "connected"; message: string; connectionId: string | null }

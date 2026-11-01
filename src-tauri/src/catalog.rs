@@ -108,7 +108,7 @@ pub fn best_match<'a>(
             continue;
         }
         for key in keys_of(entry) {
-            let s = score(&target, &normalize(&key));
+            let s = score(&target, &normalize(&key)) + if key.eq_ignore_ascii_case(model_id){1.0}else{0.0};
             if s > 0.0 && best.map(|(_, bs)| s > bs).unwrap_or(true) {
                 best = Some((entry, s));
             }

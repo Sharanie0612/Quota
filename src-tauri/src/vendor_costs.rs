@@ -450,6 +450,21 @@ pub struct FinanceAccount {
     pub plan: Option<String>,
     pub issues: Vec<String>,
 }
+#[derive(Clone, Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct CostObservation {
+    pub account_id:String,pub vendor:String,pub label:String,pub at:i64,pub from:Option<i64>,
+    pub currency:String,pub cumulative_spend:Option<f64>,pub cumulative_recharge:Option<f64>,
+    pub spend_delta:Option<f64>,pub recharge_delta:Option<f64>,pub counter_reset:bool,
+}
+fn observation_rows(id:&str,vendor:&str,label:&str,samples:&[&Sample],in_range:&impl Fn(i64)->bool)->Vec<CostObservation>{
+    samples.iter().enumerate().filter(|(_,sample)|in_range(sample.at)).map(|(index,sample)|{
+        let previous=index.checked_sub(1).and_then(|index|samples.get(index)).filter(|previous|previous.currency==sample.currency&&previous.at<sample.at);
+        let difference=|field:fn(&Sample)->Option<f64>|previous.and_then(|old|field(old).zip(field(sample))).filter(|(a,b)|a.is_finite()&&b.is_finite()&&*a>=0.&&b>=a).map(|(a,b)|b-a);
+        let counter_reset=previous.is_some_and(|old|old.spend.zip(sample.spend).is_some_and(|(a,b)|b<a)||old.recharge.zip(sample.recharge).is_some_and(|(a,b)|b<a));
+        CostObservation{account_id:id.into(),vendor:vendor.into(),label:label.into(),at:sample.at,from:previous.map(|old|old.at),currency:sample.currency.clone(),cumulative_spend:sample.spend,cumulative_recharge:sample.recharge,spend_delta:difference(|s|s.spend),recharge_delta:difference(|s|s.recharge),counter_reset}
+    }).collect()
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Report {
@@ -461,6 +476,7 @@ pub struct Report {
     pub lifetime_sessions: u64,
     pub first_date: Option<String>,
     pub last_date: Option<String>,
+    pub history: Vec<CostObservation>,
 }
 fn covered_models(
     dir: &Path,
@@ -578,13 +594,15 @@ pub fn report(state: &AppState, from: &str, to: &str) -> Result<Report, String> 
             .map(|t| t.with_timezone(&chrono::Local).date_naive())
             .is_some_and(|d| d >= first && d <= last)
     };
-    let mut rows = Vec::new();
+    let mut rows = Vec::new();let mut history_rows=Vec::new();let mut known_ids=std::collections::BTreeSet::new();
     for a in accounts {
         let status = status_for(state, &a)?;
         let ids = crate::account_sync::finance_ids(state.store.dir(), &a);
+        known_ids.extend(ids.iter().cloned());
         let mut merged_samples: Vec<_> = ids.iter().filter_map(|id| file.samples.get(id)).flatten().collect();
         merged_samples.sort_by(|a,b| (a.at, &a.currency, serde_json::to_string(a).unwrap_or_default()).cmp(&(b.at, &b.currency, serde_json::to_string(b).unwrap_or_default())));
         merged_samples.dedup_by(|a,b| a.at == b.at && a.currency == b.currency);
+        history_rows.extend(observation_rows(&a.id,vendor(&a.provider),&a.label,&merged_samples,&in_range));
         let current =
             sample(&a, &status).or_else(|| merged_samples.last().map(|s| (*s).clone()));
         let samples: Vec<_> = merged_samples.into_iter()
@@ -674,6 +692,13 @@ pub fn report(state: &AppState, from: &str, to: &str) -> Result<Report, String> 
             issues,
         });
     }
+    for (id,samples) in &file.samples {
+        if !known_ids.contains(id) {
+            let values:Vec<_>=samples.iter().collect();
+            history_rows.extend(observation_rows(id,"unknown",&format!("已移除账户 · {}",id.chars().take(8).collect::<String>()),&values,&in_range));
+        }
+    }
+    history_rows.sort_by(|a,b|b.at.cmp(&a.at).then_with(||a.account_id.cmp(&b.account_id)));
     let expenses: Vec<_> = file.expenses.into_values().collect();
     let covered_models = covered_models(state.store.dir(), &expenses, from, to)?;
     let lifetime = crate::activity::report_range(
@@ -694,6 +719,7 @@ pub fn report(state: &AppState, from: &str, to: &str) -> Result<Report, String> 
         lifetime_sessions: lifetime.totals.sessions,
         first_date: lifetime.daily.first().map(|d| d.key.clone()),
         last_date: lifetime.daily.last().map(|d| d.key.clone()),
+        history: history_rows,
     })
 }
 #[tauri::command]

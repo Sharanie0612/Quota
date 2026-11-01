@@ -19,6 +19,9 @@ async function main() {
   const bundle = path.join(root, "src-tauri/target/release/bundle/nsis");
   // Only the standard Windows release command is normalized; custom targets are left to Tauri.
   const standard = process.platform === "win32" && !args.some(a => ["--target", "--debug", "--no-bundle", "--config", "-c"].includes(a));
+  // NSIS patches the bundle marker before it embeds quota.exe. The setup helper
+  // must read that same file, including when Cargo builds outside src-tauri/target.
+  if (standard) process.env.QUOTA_SETUP_PAYLOAD = path.resolve(root, "src-tauri", process.env.CARGO_TARGET_DIR || "target", "release/quota.exe");
   const old = standard && fs.existsSync(bundle) ? fs.readdirSync(bundle).filter(n => /^Quota_.*-setup\.exe$/.test(n)) : [];
   if (old.length) {
     const archive = path.join(root, "src-tauri/target/installer-archive", new Date().toISOString().replace(/[:.]/g, "-"));

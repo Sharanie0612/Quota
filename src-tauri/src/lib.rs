@@ -1,3 +1,4 @@
+pub mod report_export;
 mod aliyun;
 pub mod activity;
 pub mod usage_costs;
@@ -30,6 +31,11 @@ mod secrets;
 mod storage;
 mod tray;
 pub mod widget;
+pub mod window_frame;
+pub mod ai_models;
+pub mod benchmarks;
+mod appearance;
+pub mod setup;
 
 // 暴露给 examples/：本机跑不了 cargo test，用 example 真正执行解析与网络查询
 pub use catalog::{cards_for_account, comparison_entries, embedded_file, hidden_keys, is_hidden, merge_cards, normalize};
@@ -56,8 +62,16 @@ pub use pricing::{build_comparison, PageScan};
 use tauri::{Manager, WindowEvent};
 
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| tray::show_main(app)))
+    let args:Vec<_>=std::env::args_os().collect();
+    if args.get(1).is_some_and(|arg|arg=="--quota-setup"){
+        if args.get(2).map(std::path::PathBuf::from).is_none_or(|path|setup::run(path).is_err()){std::process::exit(2)}return
+    }
+    let builder=tauri::Builder::default();
+    // A deliberately isolated renderer check can coexist with the user's app.
+    let isolated_check=std::env::var("QUOTA_BENCHMARK_SMOKE").ok().as_deref()==Some("1")
+        && std::env::var_os("QUOTA_DATA_DIR").is_some_and(|p|std::path::PathBuf::from(p).is_absolute());
+    let builder=if isolated_check{builder}else{builder.plugin(tauri_plugin_single_instance::init(|app,args,_|{if args.iter().any(|arg|arg=="--quota-exit-for-update"){app.exit(0)}else{tray::show_main(app)}}))};
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
@@ -71,16 +85,24 @@ pub fn run() {
             if let Err(error) = account_sync::repair_connections(&state) { account_sync::remember_connection_error(&state, error); }
             connections::set_app_handle(app.handle().clone());
             app.manage(state);
+            window_frame::setup(app.handle());
             tray::setup(app.handle())?;
             widget::setup(app.handle())?;
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
+            benchmarks::spawn(app.handle().clone());
+            benchmarks::smoke_if_requested(app.handle().clone());
             activity::spawn(app.handle().clone());
+            activity::speed_live::spawn(app.handle().clone());
             account_sync::spawn(app.handle().clone());
             widget::smoke_if_requested(app.handle());
+            window_frame::smoke_if_requested(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::ScaleFactorChanged { .. }) {
+                let _ = window_frame::update(window);
+            }
             match event {
                 WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
@@ -105,9 +127,19 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            appearance::get_appearance,
+            appearance::save_appearance,
+            ai_models::get_ai_models,
+            ai_models::refresh_ai_models,
+            benchmarks::get_benchmarks,
+            benchmarks::refresh_benchmarks,
+            benchmarks::smoke::benchmark_smoke_report,
+            window_frame::get_main_window_state,
             widget::get_widget_options,
+            commands::get_main_window_chrome,
             widget::save_widget_options,
             widget::get_widget_usage,
+            widget::get_widget_speed,
             widget::widget_ready,
             widget::set_widget_expanded,
             widget::move_widget,
@@ -115,7 +147,10 @@ pub fn run() {
             exchange::get_exchange_rate,
             usage_fx::get_monthly_usage_fx,
             usage_fx::save_monthly_usage_fx,
+            report_export::export_report_csv,
             activity::get_activity,
+            activity::speed::get_output_speed,
+            activity::speed_live::refresh_output_speed,
             activity::get_sync_overview,
             activity::sync_activity_now,
             activity::get_activity_options,

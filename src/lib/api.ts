@@ -1,15 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import type { BenchmarkBoard } from './types';
 import type {
+  AiModelSnapshot,
   ActivityReport, ActivityOptions, SshHostDiscovery, SshIdentity, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
   AccountInput,
   AccountTrend,
   AccountView,
   AppInfo,
-  CatalogEntry,
   CustomProbe,
-  ModelCard,
-  PriceComparison,
   ProviderView,
   RechargeEvent,
   Settings,
@@ -19,6 +18,14 @@ import type {
 } from "./types";
 
 export const api = {
+  getMainWindowChrome: () => invoke<{installed:boolean;blockedFramePaints:number;blockedThemedPaints:number;safeActivationForwards:number}>('get_main_window_chrome'),
+  getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
+  getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),
+  refreshOutputSpeed: () => invoke<number>('refresh_output_speed'),
+  refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
+  reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
+  getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),
+  refreshAiModels: (force=true) => invoke<AiModelSnapshot>('refresh_ai_models',{force}),
   moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),
   syncUsageNow: () => invoke<void>('sync_usage_now'),
   syncActivityNow: () => invoke<void>('sync_activity_now'),
@@ -26,11 +33,14 @@ export const api = {
   getWidgetOptions: () => invoke<{enabled:boolean;side:'left'|'right';heightPercent:number}>('get_widget_options'),
   saveWidgetOptions: (options:{enabled:boolean;side:'left'|'right';heightPercent:number}) => invoke<typeof options>('save_widget_options',{options}),
   getWidgetUsage: () => invoke<{today:number;total:number;date:string;updatedAt:number|null;partial:boolean}>('get_widget_usage'),
+  getWidgetSpeed: () => invoke<import('./types').LiveModelStatus>('get_widget_speed'),
+  openMainView: (view:string) => invoke<void>('show_main_window',{view}),
   widgetReady: () => invoke<void>('widget_ready'),
   setWidgetExpanded: (expanded:boolean) => invoke<void>('set_widget_expanded',{expanded}),
   openMain: () => invoke<void>('show_main_window'),
+  exportReportCsv: (path:string,contents:string) => invoke<void>('export_report_csv',{path,contents}),
   getVendorCosts: (from: string, to: string) => invoke<VendorCostReport>("get_vendor_costs", {from,to}),
-  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months}),
+  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months,average:true}),
   saveMonthlyUsageFx: (month: string, rate: number | null) => invoke<void>("save_monthly_usage_fx",{month,rate}),
   saveVendorExpense: (input: VendorExpense, previous: VendorExpense | null = null) => invoke<void>("save_vendor_expense", {input,previous}),
   getActivityStorage: () => invoke<ActivityStorage>("get_activity_storage"),
@@ -83,26 +93,6 @@ export const api = {
   previewImport: (path: string, password: string) => invoke<ImportPreview>("preview_import", {path, password}),
   importData: (path: string, password: string, fingerprint: string, selection: ImportSelection) =>
     invoke<string>("import_data", {path, password, fingerprint, selection}),
-  modelCards: (provider?: string) =>
-    invoke<ModelCard[]>("model_cards", { provider: provider ?? null }),
-  saveCatalogEntry: (entry: CatalogEntry) => invoke<void>("save_catalog_entry", { entry }),
-  resetCatalog: () => invoke<void>("reset_catalog_overrides"),
-  /** 在模型库里手动隐藏 / 恢复某个模型（存本机 hidden_models.json） */
-  setModelHidden: (modelId: string, hidden: boolean) =>
-    invoke<void>("set_model_hidden", { modelId, hidden }),
-  /** 价格比对：本地资料库 +（可选）官方定价页抓取 +（可选）第三方参考价 */
-  comparePrices: (
-    modelId: string,
-    provider: string,
-    includePage: boolean,
-    includeReference: boolean,
-  ) =>
-    invoke<PriceComparison>("compare_prices", {
-      modelId,
-      provider,
-      includePage,
-      includeReference,
-    }),
   /** 测试自定义余额接口，返回自动发现的金额字段 */
   probeCustomBalance: (input: {
     customUrl?: string | null;

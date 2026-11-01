@@ -37,6 +37,20 @@ def project(value):
             fields["subagent_history_start_ordinal"] = ordinal
     elif kind == "turn_context":
         fields = {"model": text(p.get("model"))}
+    elif kind == "event_msg" and p.get("type") == "task_started":
+        fields = {"type": "task_started"}
+    elif kind == "response_item" and p.get("type") == "message" and p.get("role") == "assistant":
+        fields = {"type": "message", "role": "assistant"}
+    elif kind == "event_msg" and p.get("type") == "item_completed" and isinstance(p.get("item"), dict) and p["item"].get("type") == "AgentMessage":
+        fields = {"type": "item_completed", "item": {"type": "AgentMessage"}}
+        for key in ("started_at_ms", "completed_at_ms"):
+            if type(p.get(key)) is int and p[key] > 0:
+                fields[key] = p[key]
+    elif kind == "token_usage_record" and isinstance(p.get("usage"), dict):
+        usage = p["usage"]
+        if any(type(usage.get(k)) is not int or usage[k] < 0 for k in ("output_tokens", "reasoning_output_tokens")):
+            return None
+        fields = {"response_id": text(p.get("response_id")), "usage": {k: usage[k] for k in ("output_tokens", "reasoning_output_tokens")}}
     elif kind == "event_msg" and p.get("type") == "token_count":
         info = p.get("info")
         usage = info.get("total_token_usage") if isinstance(info, dict) else None

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
-import { Button, Modal, Notice, Seg, Switch } from "../components/ui";
+import { Button, Notice, Seg, Switch } from "../components/ui";
 import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
 import { UsageWidgetSettings } from '../components/UsageWidgetSettings';
+import { AppearanceSettings } from '../components/AppearanceSettings';
 
 import { DataImportPanel } from "../components/DataImportPanel";
 import { api, copyText, errText } from "../lib/api";
@@ -47,8 +48,6 @@ export function SettingsView({
   const [activity, setActivity] = useState<ActivityOptions | null>(null);
   const [activityBusy, setActivityBusy] = useState(false);
   const [activityError, setActivityError] = useState("");
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [resetting, setResetting] = useState(false);
   useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
   const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
     if (!activity || activityBusy) return false;
@@ -132,12 +131,14 @@ export function SettingsView({
 
   return (
     <div className="content-inner settings-page">
+      <AppearanceSettings />
       <CrossDeviceSyncPanel />
       <UsageWidgetSettings />
       <div className="card section">
         <h2><IconClock size={14} /> Token 活动</h2>
         <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
-        <div className="setting-row"><div className="txt"><b>采集频率</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        <div className="setting-row"><div className="txt"><b>完整采集周期</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,10,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,10,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
+        <div className="setting-row"><div className="txt"><b>Codex 本机增量读取</b></div><span>每秒检查，输出完成后记录速度</span></div>
         {activityError && <Notice tone="warn">{activityError}</Notice>}
       </div>
       <div className="card section">
@@ -231,9 +232,9 @@ export function SettingsView({
       </div>
 
       <div className="card section">
-        <h2>提醒与天梯</h2>
+        <h2>提醒与模型资料</h2>
         <div className="setting-row"><div className="txt"><b>余额增加提示</b><span>检测到充值时提示</span></div><Switch checked={settings.notifyRecharge} onChange={(v) => set({ notifyRecharge: v })} label="余额增加提示" /></div>
-        <div className="setting-row"><div className="txt"><b>自动更新模型天梯</b><span>每天检查排名与官方价格，失败保留上次核实结果</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="天梯自动更新" /></div>
+        <div className="setting-row"><div className="txt"><b>自动更新 AI 模型</b><span>每天更新官方价格和公开评测</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="模型资料自动更新" /></div>
       </div>
       <div className="card section">
         <h2>
@@ -253,23 +254,6 @@ export function SettingsView({
         <div className="setting-row"><div className="txt"><b>托盘提醒角标</b><span>额度不足时显示红点</span></div><Switch checked={settings.trayAlert} onChange={(v) => set({ trayAlert: v })} label="托盘角标" /></div>
       </div>
 
-      <div className="card section">
-        <h2>
-          <IconSpark size={14} /> 模型资料库
-        </h2>
-        <div className="setting-row">
-          <div className="txt">
-            <b>恢复内置资料</b>
-            <span>清空你对模型卡片的全部本地修改</span>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setConfirmReset(true)}
-          >
-            恢复
-          </Button>
-        </div>
-      </div>
 
       <div className="card section">
         <h2>
@@ -384,10 +368,6 @@ export function SettingsView({
         </div>
       </div>
 
-      {confirmReset && <Modal title="恢复内置模型资料？" onClose={() => { if (!resetting) setConfirmReset(false); }} footer={<><Button disabled={resetting} onClick={() => setConfirmReset(false)}>取消</Button><Button variant="danger" disabled={resetting} onClick={() => {
-        setResetting(true);
-        void api.resetCatalog().then(() => {setConfirmReset(false);toast('已恢复内置模型资料');}).catch(e => toast(errText(e), 'error')).finally(() => setResetting(false));
-      }}>{resetting ? '恢复中…' : '恢复内置资料'}</Button></>}><p>你对模型资料的本地修改将被清除。</p></Modal>}
     </div>
   );
 }

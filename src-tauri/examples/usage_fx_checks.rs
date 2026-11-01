@@ -18,6 +18,13 @@ fn main() {
     }
     let xml="<Cube time='2026-10-02'><Cube currency='USD' rate='1.5'/><Cube currency='CNY' rate='12'/></Cube><Cube time='2026-09-30'><Cube currency='USD' rate='1.2'/><Cube currency='CNY' rate='8.4'/></Cube><Cube time='2026-09-29'><Cube currency='USD' rate='1'/><Cube currency='CNY' rate='6'/></Cube>";
     let h = parse_history(xml).unwrap();
+    let today=chrono::NaiveDate::from_ymd_opt(2026,10,10).unwrap();
+    let average=usage_fx::monthly_average(&h,"2026-09",today).unwrap().unwrap();
+    assert!((average.cny_per_usd-6.5).abs()<1e-12);
+    assert_eq!(average.date,"2026-09-30");
+    assert_eq!(usage_fx::monthly_average(&h,"2026-10",today).unwrap().unwrap().cny_per_usd,8.0);
+    assert!(usage_fx::monthly_average(&h,"2026-10",chrono::NaiveDate::from_ymd_opt(2026,10,1).unwrap()).unwrap().is_none());
+    assert!(usage_fx::monthly_average(&h,"2026-11",today).unwrap().is_none());
     let r = reference(&h, "2026-10").unwrap().unwrap();
     assert_eq!(r.date, "2026-09-30");
     assert!((r.cny_per_usd-7.0).abs()<1e-12);
@@ -46,5 +53,5 @@ fn main() {
             .unwrap()
     ));
     fs::remove_dir_all(resolved).unwrap();
-    println!("PASS previous-month final quote, no intra-month quote, no currency mixing across dates, bounded XML, missing quote, invalid month, manual reference persistence and atomic restore");
+    println!("PASS monthly average of same-day cross rates, current-month partial average, future exclusion, missing month; legacy fixed reference, bounded XML, manual persistence and atomic restore");
 }

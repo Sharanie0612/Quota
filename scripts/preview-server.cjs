@@ -1,6 +1,6 @@
 /* 本地静态预览服务器：把 dist-mock 目录跑在 http 上，方便在浏览器里核对界面。
-   用法：node scripts/preview-server.js [port]   默认 4174
-   悬浮卡预览：http://127.0.0.1:4174/?window=tray */
+   用法：node scripts/preview-server.cjs [port]   默认 4174
+   悬浮卡预览：http://127.0.0.1:4174/?window=usage-widget */
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -36,5 +36,5 @@ http
     });
   })
   .listen(port, "127.0.0.1", () => {
-    console.log(`preview: http://127.0.0.1:${port}/  (tray: /?window=tray)`);
+    console.log(`preview: http://127.0.0.1:${port}/  (widget: /?window=usage-widget)`);
   });

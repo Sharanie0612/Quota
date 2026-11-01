@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前开发版本为 1.0.3500**：外观提供「液态玻璃」主开关，开启后显示「减少视觉效果」次开关。材质集中在导航层，内容与表单保持清晰；侧栏收起按钮移入标题行，收起后图标24px、点击区48px。保留人民币月均换算、模型对比、实际 Token 单价、逐次调用散点和任务窗。公开下载仍指向已发布版本；本地验收见 [材质与侧栏记录](docs/apple-materials-1.0.3500.md)。
+**当前开发版本为 1.0.3501**：液态玻璃加入边缘透镜、随形高光与可打断的选择形变，顶部栏浮于滚动内容之上。「减少视觉效果」保留柔和玻璃层次，将位移与弹性改为淡入淡出。保留双开关、大图标侧栏、人民币月均换算、模型对比、实际 Token 单价、逐次调用散点和任务窗。公开下载仍指向已发布版本；本地验收见 [光学与减少动态记录](docs/liquid-optics-1.0.3501.md)。
 
 ## 开始使用
 
@@ -90,8 +90,8 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 「设置 → 外观」有两个关联的开关：
 
-- **液态玻璃**：开启高透导航材质、光学高光、柔和景深与鼠标位置反馈。
-- **减少视觉效果**：开启液态玻璃后出现，提高磨砂与遮挡，减弱高光和移动强度。关闭主开关后仍记住这项选择。
+- **液态玻璃**：导航边缘折射应用内背景，高光随表面和鼠标位置变化，选中层可柔和形变并随时中断。
+- **减少视觉效果**：开启液态玻璃后出现，降低折射与透明度，保留柔和的玻璃轮廓；导航和侧栏使用淡入淡出，取消移动和弹性。关闭主开关后仍记住这项选择。
 
 按照 [Apple 材质指南](https://developer.apple.com/design/human-interface-guidelines/materials) 的层次，玻璃集中在导航和交互层；账单、图表、表单和普通按钮保持清晰。Windows版本使用应用自身背景，鼠标光效限制在目标表面内，避免影响文字和点击区域。
 
@@ -116,24 +116,24 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-材质与侧栏来自 1.0.3500 隔离安装版的真实 WebView，费用与图表来自同一构建的合成预览。所有示例均使用合成资料，不叠加桌面背景。
+材质与侧栏来自 1.0.3501 隔离安装版的真实 WebView，费用与图表来自同一构建的合成预览。所有示例均使用合成资料，不叠加桌面背景。
 
-![液态玻璃与导航层次](assets/readme/liquid-light-3500.png)
+![液态玻璃与导航层次](assets/readme/liquid-light-3501.png)
 
-![减少视觉效果：毛玻璃](assets/readme/frosted-light-3500.png)
+![减少视觉效果：柔和玻璃](assets/readme/frosted-light-3501.png)
 
 <details>
 <summary>深色、收起侧栏与业务页面</summary>
 
-![深色液态玻璃](assets/readme/liquid-dark-3500.png)
+![深色液态玻璃](assets/readme/liquid-dark-3501.png)
 
-![收起后的24px导航图标](assets/readme/sidebar-collapsed-3500.png)
+![收起后的24px导航图标](assets/readme/sidebar-collapsed-3501.png)
 
-![人民币费用与实际单价](assets/readme/usage-overview-3500.png)
+![人民币费用与实际单价](assets/readme/usage-overview-3501.png)
 
-![模型价格与能力天梯](assets/readme/model-ladder-3500.png)
+![模型价格与能力天梯](assets/readme/model-ladder-3501.png)
 
-![逐次调用散点](assets/readme/output-speed-3500.png)
+![逐次调用散点](assets/readme/output-speed-3501.png)
 
 </details>
 

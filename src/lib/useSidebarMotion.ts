@@ -7,10 +7,14 @@ export function useSidebarMotion(collapsed:boolean,reducedMotion=false,reducedEf
   useLayoutEffect(()=>{
     animation.current?.cancel();animation.current=null;
     const node=ref.current,old=before.current;before.current=null;
-    if(!node||!old||reducedMotion)return;
+    if(!node||!old)return;
+    if(reducedMotion||reducedEffects){
+      const next=node.animate([{opacity:.55},{opacity:1}],{duration:140,easing:'ease-out'});
+      animation.current=next;return()=>next.cancel();
+    }
     const delta=old.left-node.getBoundingClientRect().left;
     if(Math.abs(delta)<1)return;
-    const next=node.animate([{transform:`translateX(${delta}px)`},{transform:'translateX(0)'}],{duration:reducedEffects?120:260,easing:'cubic-bezier(.2,.8,.2,1)'});
+    const next=node.animate([{transform:`translateX(${delta}px)`},{transform:'translateX(0)'}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});
     animation.current=next;next.onfinish=()=>{if(animation.current===next)animation.current=null;};
     return()=>next.cancel();
   },[collapsed,reducedMotion,reducedEffects]);

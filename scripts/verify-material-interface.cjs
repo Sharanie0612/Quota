@@ -42,7 +42,7 @@ async function main(){
       }
       await page.close();
     }
-    // Without saved appearance, the system transparency setting supplies the initial choice.
+    // A fresh install keeps the master off; explicit app choices survive system transparency preferences.
     const fresh=await browser.newPage();const cdp=await fresh.context().newCDPSession(fresh);await cdp.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-transparency',value:'reduce'}]});await fresh.goto(base);await fresh.waitForFunction(()=>document.documentElement.dataset.material==='solid');await fresh.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'设置',exact:true}).click();await chooseMaterial(fresh,false);await fresh.reload();await fresh.waitForFunction(()=>document.documentElement.dataset.material==='liquid');await fresh.close();
     assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,cases,pixelModes,checks:['master off and two enabled material strengths','opaque content and controls','24px icons / 48px targets','header toggle not blocked by drag region','saved selection','conditional secondary switch and saved strength','high contrast','reduced motion','minimal form']},null,2));console.log('PASS 20 material/palette cases, distinct pixels, stable controls, sidebar targets, persistence and accessibility priorities');
   }finally{await browser.close();}

@@ -15,6 +15,7 @@ import { SettingsView } from "./views/SettingsView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import {useMaterialLight} from './lib/useMaterialLight';
+import {GlassMaterial} from './components/GlassMaterial';
 import {useSidebarMotion} from './lib/useSidebarMotion';
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
@@ -96,6 +97,7 @@ export default function App() {
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>
       <aside className="sidebar material-plane" id="main-sidebar">
+        <GlassMaterial/>
         <div className="sidebar-header">
         <div className="brand" data-tauri-drag-region>
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />

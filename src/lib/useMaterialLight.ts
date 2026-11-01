@@ -10,7 +10,7 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
   useEffect(()=>{
     const root=container.current;
     if(!root||!enabled)return;
-    let frame=0,point:Point|null=null,active:HTMLElement|null=null,pressed:HTMLElement|null=null,disposed=false,nativeFocused=true;
+    let frame=0,point:Point|null=null,active:HTMLElement|null=null,pressed:HTMLElement|null=null,rim:HTMLElement|null=null,disposed=false,nativeFocused=true;
     const fading=new Map<HTMLElement,ReturnType<typeof setTimeout>>();
     const host=(element:Element|null)=>{
       const result=element?.closest<HTMLElement>(surfaces);
@@ -26,6 +26,7 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
     };
     const reset=()=>{
       cancelAnimationFrame(frame);frame=0;point=null;
+      rim?.style.removeProperty('--rim-angle');rim?.removeAttribute('data-rim-active');rim=null;
       pressed?.removeAttribute('data-light-pressed');pressed=null;
       if(active)release(active,true);active=null;
       for(const element of [...fading.keys()])release(element,true);
@@ -37,6 +38,8 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
       const target=focused??(point?host(point.element):null);
       if(active&&active!==target)release(active,false);
       active=target;
+      const plane=target?.closest<HTMLElement>('.material-plane')??null;
+      if(rim!==plane){rim?.style.removeProperty('--rim-angle');rim?.removeAttribute('data-rim-active');rim=plane;}
       if(!target)return;
       clearTimeout(fading.get(target));fading.delete(target);
       const rect=target.getBoundingClientRect();
@@ -44,6 +47,7 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
       const x=focused?rect.width/2:Math.max(0,Math.min(rect.width,point!.x-rect.left));
       const y=focused?rect.height/2:Math.max(0,Math.min(rect.height,point!.y-rect.top));
       target.style.setProperty('--light-x',x+'px');target.style.setProperty('--light-y',y+'px');
+      if(rim){const r=rim.getBoundingClientRect(),rx=(focused?rect.left+x:point!.x)-r.left-r.width/2,ry=(focused?rect.top+y:point!.y)-r.top-r.height/2;rim.style.setProperty('--rim-angle',(Math.atan2(ry,rx)*180/Math.PI+90)+'deg');rim.setAttribute('data-rim-active','true');}
       target.removeAttribute('data-light-suspended');target.setAttribute('data-light-active','true');
     };
     const schedule=()=>{if(!frame)frame=requestAnimationFrame(paint);};
@@ -55,7 +59,7 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
     const down=(event:PointerEvent)=>{move(event);pressed?.removeAttribute('data-light-pressed');pressed=host(event.target instanceof Element?event.target:null);pressed?.setAttribute('data-light-pressed','true');};
     const up=()=>{pressed?.removeAttribute('data-light-pressed');pressed=null;};
     const focus=()=>{point=null;schedule();};
-    const visibility=()=>{if(document.hidden)reset();};
+    const visibility=()=>{if(document.hidden){reset();window.dispatchEvent(new Event('quota-material-reset'));}};
     root.addEventListener('pointermove',move,{passive:true});
     root.addEventListener('pointerdown',down,{passive:true});
     root.addEventListener('pointerleave',leave);
@@ -67,7 +71,7 @@ export function useMaterialLight(enabled:boolean,resetKey:string){
     const observer=new ResizeObserver(reset);
     root.querySelectorAll('.main,.sidebar').forEach(element=>observer.observe(element));
     let stopNative:(()=>void)|undefined;
-    try{void getCurrentWindow().onFocusChanged(event=>{nativeFocused=event.payload;reset();}).then(stop=>{if(disposed)stop();else stopNative=stop;}).catch(()=>undefined);}catch{/* Browser preview keeps DOM focus and visibility checks. */}
+    try{void getCurrentWindow().onFocusChanged(event=>{nativeFocused=event.payload;reset();if(!nativeFocused)window.dispatchEvent(new Event('quota-material-reset'));}).then(stop=>{if(disposed)stop();else stopNative=stop;}).catch(()=>undefined);}catch{/* Browser preview keeps DOM focus and visibility checks. */}
     return()=>{
       disposed=true;reset();observer.disconnect();stopNative?.();
       root.removeEventListener('pointermove',move);root.removeEventListener('pointerdown',down);root.removeEventListener('pointerleave',leave);

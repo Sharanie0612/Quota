@@ -7,7 +7,7 @@
   --material-rim-opacity:0;
 }
 .app {
-  background:radial-gradient(ellipse at 0% 8%,color-mix(in srgb,var(--blue) 14%,var(--bg)),transparent 60%),linear-gradient(145deg,var(--bg),var(--surface-2));
+  background:radial-gradient(ellipse at 0% 0%,color-mix(in srgb,var(--blue) 26%,var(--bg)),transparent 52%),radial-gradient(ellipse at 8% 76%,color-mix(in srgb,var(--blue) 14%,var(--bg)),transparent 40%),linear-gradient(135deg,var(--bg),var(--surface-2) 72%);
 }
 .material-plane {
   position:relative;
@@ -17,7 +17,10 @@
   backdrop-filter:var(--material-filter);
   -webkit-backdrop-filter:var(--material-filter);
   box-shadow:var(--material-depth);
+  clip-path:inset(0 round var(--radius-surface));
 }
+.material-plane > .material-defs {position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;}
+.material-plane[data-lens="ready"] {backdrop-filter:var(--material-filter) var(--material-lens);-webkit-backdrop-filter:var(--material-filter) var(--material-lens);}
 .sidebar {--material-fill:var(--bg-sidebar);}
 .material-plane::before {
   content:"";
@@ -25,34 +28,45 @@
   z-index:0;
   inset:0;
   border-radius:inherit;
-  background:linear-gradient(150deg,var(--material-light),transparent 24%,transparent 76%,color-mix(in srgb,var(--blue) 6%,transparent));
+  padding:1px;
+  background:conic-gradient(from var(--rim-angle,145deg),var(--material-light),transparent 20%,var(--material-light) 46%,transparent 64%,var(--material-light) 92%);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
   opacity:var(--material-rim-opacity);
   pointer-events:none;
   clip-path:inset(0 round var(--radius-surface));
+  transition:opacity 180ms ease;
 }
 .material-plane > * {position:relative;z-index:1;}
 html[data-material="liquid"] .app {
-  --material-fill:color-mix(in srgb,var(--surface) 46%,transparent);
-  --material-filter:blur(10px) saturate(1.32);
+  --material-fill:color-mix(in srgb,var(--surface) 14%,transparent);
+  --material-filter:blur(2px) saturate(1.2);
   --material-edge:color-mix(in srgb,var(--material-light) 65%,var(--border));
-  --material-depth:0 5px 18px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 65%,transparent);
-  --material-rim-opacity:.58;
+  --material-depth:0 8px 24px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 55%,transparent);
+  --material-rim-opacity:.78;
 }
-html[data-material="liquid"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 32%,transparent);}
-html[data-material="liquid"] .main {background:transparent;}
+html[data-material="liquid"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 10%,transparent);}
+html:is([data-material="liquid"],[data-material="frosted"]) .main {background:transparent;}
 .content {background:var(--surface-2);}
+/* Content can pass behind the floating navigation only while scrolling. */
+html:is([data-material="liquid"],[data-material="frosted"]) .workspace-toolbar {position:absolute;left:12px;right:12px;top:12px;margin:0;z-index:3;}
+html:is([data-material="liquid"],[data-material="frosted"]) .main > .content {padding-top:91px;background:linear-gradient(var(--bg),var(--surface-2) 150px);background-attachment:local;}
 html[data-material="liquid"] .motion-highlight {
-  background:linear-gradient(155deg,var(--material-light),transparent 62%),color-mix(in srgb,var(--surface) 82%,transparent);
-  box-shadow:0 2px 7px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 var(--border);
+  background:linear-gradient(150deg,var(--material-light),transparent 38%,transparent 72%,color-mix(in srgb,var(--material-light) 36%,transparent)),color-mix(in srgb,var(--surface) 56%,transparent);
+  box-shadow:0 3px 10px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 70%,transparent);
 }
 html[data-material="liquid"] .nav-item:active {background:color-mix(in srgb,var(--surface) 58%,transparent);}
-html[data-material="liquid"][data-effects="full"] .motion-highlight {transition-timing-function:cubic-bezier(.2,.9,.2,1.035);transition-duration:280ms;}
+html[data-material="liquid"] .nav-item:not(.active) {color:color-mix(in srgb,var(--text-2) 72%,var(--text));}
+html[data-material="liquid"] .material-plane[data-rim-active]::before {opacity:1;}
 html[data-material="frosted"] .app {
-  --material-fill:color-mix(in srgb,var(--surface) 94%,transparent);
-  --material-filter:blur(28px) saturate(1.02);
-  --material-depth:var(--shadow-card);
+  --material-fill:color-mix(in srgb,var(--surface) 72%,transparent);
+  --material-filter:blur(16px) saturate(1.04);
+  --material-depth:0 3px 12px var(--material-shadow),inset 0 1px 0 color-mix(in srgb,var(--material-light) 55%,transparent);
+  --material-rim-opacity:.3;
 }
-html[data-material="frosted"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 94%,transparent);}
+html[data-material="frosted"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 76%,transparent);}
 :where(button,input,select,textarea,summary,[tabindex]):focus-visible {outline:2px solid var(--blue);outline-offset:2px;}
 .window-controls button:focus-visible,.sidebar-toggle:focus-visible {outline-offset:-3px;}
 .sidebar-toggle:focus-visible {background:var(--surface);}
@@ -65,7 +79,7 @@ html[data-material="frosted"] .sidebar {--material-fill:color-mix(in srgb,var(--
 
 /* Pointer light is clipped by the target's own radius and painted under its text. */
 html[data-material="liquid"] :is(.nav-item,.seg button,.btn,.sidebar-toggle,.workspace-tools button) {position:relative;isolation:isolate;}
-html[data-material="liquid"] :is(.nav-item,.seg button,.btn,.sidebar-toggle,.workspace-tools button,.material-plane)::after {content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;background:radial-gradient(110px circle at var(--light-x,50%) var(--light-y,50%),var(--material-light),transparent 76%);opacity:0;transition:opacity 140ms ease;}
+html[data-material="liquid"] :is(.nav-item,.seg button,.btn,.sidebar-toggle,.workspace-tools button,.material-plane)::after {content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;background:radial-gradient(ellipse 140px 85px at var(--light-x,50%) var(--light-y,50%),var(--material-light),transparent 78%);opacity:0;transition:opacity 140ms ease;}
 html[data-material="liquid"] .material-plane::after {z-index:0;}
 html[data-material="liquid"] [data-light-active="true"]::after {opacity:.7;}
 html[data-material="liquid"] [data-light-pressed="true"]::after {opacity:1;}

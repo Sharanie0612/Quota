@@ -47,7 +47,7 @@ npm run verify:ui
 
 需要 Playwright 和 Edge，可设置 `QUOTA_PLAYWRIGHT_MODULE` 指向已安装模块，`QUOTA_BROWSER_PATH` 指向浏览器，`QUOTA_PREVIEW_URL` 指向预览，`QUOTA_UI_OUTPUT` 指向截图/证据目录。无需把个人资料作为测试样本。
 
-当前界面入口包括：20 种配色/深浅/材质组合，实底控件与圆角，系统模式、高对比度、减少动效，1024/1360px 布局，费用筛选/编辑/导出，模型图，速度鼠标/键盘/DPI，以及任务窗状态和收起计时。`verify-material-interface.cjs` 还对照两档真实像素和侧栏按钮命中，检查双开关显示、旧偏好迁移与选择保存。`verify-material-light.cjs`验证局部坐标、快速按压、焦点优先与失焦/缩放/模式切换清理；也支持隔离Native环境。旧全窗光斑与已删除页面的检查已退役。
+当前界面入口包括：20种配色/深浅/材质组合，实底控件与圆角，系统模式、高对比度、减少动效，1024/1360px布局，费用筛选/编辑/导出，模型图，速度鼠标/键盘/DPI，以及任务窗状态和收起计时。`verify-material-interface.cjs`对照材质真实像素和侧栏命中，检查双开关、旧偏好迁移与保存。`verify-material-light.cjs`检查局部坐标、快速按压、焦点优先及清理；`verify-material-optics.cjs`用独立标定纹理核对边缘实际折射、圆角外无泄漏、快速反向连续性，以及减少效果的真实关键帧没有位移或弹性。两者都支持隔离Native环境。标定图仅作光学证据，不用作README产品截图；旧全窗光斑与已删除页面的检查已退役。
 
 ## 打包与安装
 

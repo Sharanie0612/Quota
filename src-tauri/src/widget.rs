@@ -202,12 +202,12 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
             phase="appearance-hit-region";
             for expanded in [false,true] {
                 smoke_on_window_thread(&app,move|app,win,_|set_widget_expanded(app,win,expanded))?;
-                for glass in [true,false] {
+                for (glass,reduce_effects) in [(false,false),(true,false),(true,true)] {
                     smoke_on_window_thread(&app,move|app,_,main|{
                         let state=app.state::<AppState>();
                         let previous=state.appearance.lock().map_err(|_|"外观不可用")?.as_ref().map_or(0,|p|p.revision);
                         let revision=std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|_|"时钟不可用")?.as_millis() as u64;
-                        crate::appearance::save_appearance(app.clone(),main,state,crate::appearance::Preferences{theme:"quota".into(),mode:"light".into(),collapsed:false,glass,revision:revision.max(previous.saturating_add(1))})
+                        crate::appearance::save_appearance(app.clone(),main,state,crate::appearance::Preferences{theme:"quota".into(),mode:"light".into(),collapsed:false,glass,reduce_effects:Some(reduce_effects),revision:revision.max(previous.saturating_add(1))})
                     })?;
                     std::thread::sleep(std::time::Duration::from_millis(150));
                     smoke_on_window_thread(&app,move|_,win,_|{

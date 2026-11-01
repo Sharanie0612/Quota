@@ -1,22 +1,72 @@
+/* A single material plane for navigation; content and ordinary controls stay solid. */
 :root {
-  --workspace-surface:var(--surface-2);
-  --sidebar-surface:var(--bg-sidebar);
-  --toolbar-surface:var(--surface);
-  --surface-filter:none;
+  --material-fill:var(--surface);
+  --material-filter:none;
+  --material-edge:var(--border);
+  --material-depth:none;
+  --material-rim-opacity:0;
 }
+.app {
+  background:radial-gradient(ellipse at 0% 8%,color-mix(in srgb,var(--blue) 14%,var(--bg)),transparent 60%),linear-gradient(145deg,var(--bg),var(--surface-2));
+}
+.material-plane {
+  position:relative;
+  isolation:isolate;
+  background:var(--material-fill);
+  border:1px solid var(--material-edge);
+  backdrop-filter:var(--material-filter);
+  -webkit-backdrop-filter:var(--material-filter);
+  box-shadow:var(--material-depth);
+}
+.sidebar {--material-fill:var(--bg-sidebar);}
+.material-plane::before {
+  content:"";
+  position:absolute;
+  z-index:0;
+  inset:0;
+  border-radius:inherit;
+  background:linear-gradient(150deg,var(--material-light),transparent 24%,transparent 76%,color-mix(in srgb,var(--blue) 6%,transparent));
+  opacity:var(--material-rim-opacity);
+  pointer-events:none;
+  clip-path:inset(0 round var(--radius-surface));
+}
+.material-plane > * {position:relative;z-index:1;}
+html[data-material="liquid"] .app {
+  --material-fill:color-mix(in srgb,var(--surface) 46%,transparent);
+  --material-filter:blur(10px) saturate(1.32);
+  --material-edge:color-mix(in srgb,var(--material-light) 65%,var(--border));
+  --material-depth:0 5px 18px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 65%,transparent);
+  --material-rim-opacity:.58;
+}
+html[data-material="liquid"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 32%,transparent);}
+html[data-material="liquid"] .main {background:transparent;}
+.content {background:var(--surface-2);}
+html[data-material="liquid"] .motion-highlight {
+  background:linear-gradient(155deg,var(--material-light),transparent 62%),color-mix(in srgb,var(--surface) 82%,transparent);
+  box-shadow:0 2px 7px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 var(--border);
+}
+html[data-material="liquid"] .nav-item:active {background:color-mix(in srgb,var(--surface) 58%,transparent);}
+html[data-material="liquid"][data-effects="full"] .motion-highlight {transition-timing-function:cubic-bezier(.2,.9,.2,1.035);transition-duration:280ms;}
 html[data-material="frosted"] .app {
-  --workspace-surface:color-mix(in srgb,var(--surface) 88%,transparent);
-  --sidebar-surface:color-mix(in srgb,var(--bg-sidebar) 84%,transparent);
-  --toolbar-surface:transparent;
-  --surface-filter:blur(22px) saturate(1.08);
-  background:radial-gradient(ellipse at 0% 0%,var(--blue-soft),transparent 65%),linear-gradient(145deg,var(--bg),var(--surface-2));
+  --material-fill:color-mix(in srgb,var(--surface) 94%,transparent);
+  --material-filter:blur(28px) saturate(1.02);
+  --material-depth:var(--shadow-card);
 }
-:where(button,input,select,textarea,summary,[tabindex]):focus-visible { outline:2px solid var(--blue);outline-offset:2px; }
+html[data-material="frosted"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 94%,transparent);}
+:where(button,input,select,textarea,summary,[tabindex]):focus-visible {outline:2px solid var(--blue);outline-offset:2px;}
 .window-controls button:focus-visible,.sidebar-toggle:focus-visible {outline-offset:-3px;}
 .sidebar-toggle:focus-visible {background:var(--surface);}
 @media(forced-colors:active) {
-  .app {--workspace-surface:Canvas;--sidebar-surface:Canvas;--toolbar-surface:Canvas;--surface-filter:none;background:Canvas;}
-  .card,.modal,.btn,.seg {background:Canvas;color:CanvasText;border-color:ButtonText;box-shadow:none;}
+  .app {background:Canvas;--material-filter:none;--material-fill:Canvas;--material-edge:ButtonText;--material-depth:none;--material-rim-opacity:0;}
+  .card,.modal,.btn,.seg,.main {background:Canvas;color:CanvasText;border-color:ButtonText;box-shadow:none;}
   .motion-highlight {border:1px solid Highlight;background:Canvas;box-shadow:none;}
   :where(button,input,select,textarea,summary,[tabindex]):focus-visible {outline-color:Highlight;}
 }
+
+/* Pointer light is clipped by the target's own radius and painted under its text. */
+html[data-material="liquid"] :is(.nav-item,.seg button,.btn,.sidebar-toggle,.workspace-tools button) {position:relative;isolation:isolate;}
+html[data-material="liquid"] :is(.nav-item,.seg button,.btn,.sidebar-toggle,.workspace-tools button,.material-plane)::after {content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;background:radial-gradient(110px circle at var(--light-x,50%) var(--light-y,50%),var(--material-light),transparent 76%);opacity:0;transition:opacity 140ms ease;}
+html[data-material="liquid"] .material-plane::after {z-index:0;}
+html[data-material="liquid"] [data-light-active="true"]::after {opacity:.7;}
+html[data-material="liquid"] [data-light-pressed="true"]::after {opacity:1;}
+html [data-light-suspended="true"]::after,html[data-motion="reduced"] [data-light-active]::after {opacity:0!important;transition:none!important;}

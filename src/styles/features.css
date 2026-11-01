@@ -879,7 +879,7 @@ html[data-color-mode="dark"] { --model-1:#0072b2; --model-1-border:#a6cee4; --mo
   .vendor-cost-head > .btn { justify-self: end; }
 }
 .card {
-  border: 1px solid var(--border); transition: border-color 220ms ease, box-shadow 260ms var(--motion-ease); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--shadow-card); }.glass-setting { margin-top:20px; border-top:1px solid var(--border); padding-top:20px; }
+  border: 1px solid var(--border); transition: border-color 220ms ease, box-shadow 260ms var(--motion-ease); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--shadow-card); }.material-setting { margin-top:20px; border-top:1px solid var(--border); padding-top:20px; }
 .live-model-panel { min-width:0; }
 .live-model-heading,.live-model-heading>div,.live-model-phase { display:flex; align-items:center; gap:8px; }
 .live-model-heading { justify-content:space-between; gap:16px; }

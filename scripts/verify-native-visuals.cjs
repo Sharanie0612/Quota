@@ -3,7 +3,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require(process.env.QUOTA_PLAYWRIGHT_MODULE||'playwright');
 const callModule={exports:require('./lib/source-loader.cjs').createSourceLoader()(path.join(__dirname,'../src/lib/outputCalls'))};
-const {assertSurfaces,assertInkContrast}=require('./lib/appearance-checks.cjs');
+const {assertSurfaces,assertInkContrast,chooseMaterial,assertSidebar}=require('./lib/appearance-checks.cjs');
 async function main(){
   const root=path.resolve(process.env.QUOTA_NATIVE_DATA||'');
   assert(process.env.QUOTA_NATIVE_DATA&&path.isAbsolute(process.env.QUOTA_NATIVE_DATA));
@@ -28,8 +28,7 @@ async function main(){
   const expected='¥'+(100+20*fx.rates[0].cnyPerUsd).toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2});assert.equal(await page.locator('.usage-kpis strong').first().innerText(),expected);await capture('usage-native');
   await page.getByRole('tab',{name:'消费记录',exact:true}).click();assert.equal(await page.locator('.usage-history tbody tr').count(),2);await capture('history-native');
   await page.getByRole('tab',{name:'实际单价',exact:true}).click();assert(await page.locator('.vendor-cost-card').count()>0);checks.push('real monthly-average FX, unified RMB, expense history and actual-price view');
-  await go('设置');const glass=page.getByRole('button',{name:'毛玻璃',exact:true});
-  if(await glass.getAttribute('aria-pressed')==='true')await glass.click();await assertSurfaces(page,false);await glass.click();
+  await go('设置');await chooseMaterial(page,false);await assertSurfaces(page,false);await assertSidebar(page,false);await page.getByRole('button',{name:'收起侧边栏',exact:true}).click();await assertSidebar(page,true);await capture('sidebar-collapsed-native');await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();await chooseMaterial(page,true);
   await page.waitForFunction(()=>document.documentElement.dataset.material==='frosted');await widget.waitForFunction(()=>document.documentElement.dataset.material==='frosted');await assertSurfaces(page,true);
   const preferences=await invoke('get_appearance');await invoke('save_appearance',{preferences:{...preferences,glass:false,revision:preferences.revision-1}});assert.equal((await invoke('get_appearance')).glass,true);
   assert(await widget.evaluate(p=>window.__TAURI_INTERNALS__.invoke('save_appearance',{preferences:p}).then(()=>false,()=>true),preferences),'task window cannot save appearance');
@@ -104,7 +103,7 @@ async function main(){
   const elapsed=await widget.evaluate(async()=>{const data=await window.__TAURI_INTERNALS__.invoke('get_widget_speed'),text=document.querySelector('.task-row time').textContent,part=unit=>Number(text.match(new RegExp('(\\d+)'+unit))?.[1]||0);return {shown:part('\u65f6')*3600+part('\u5206')*60+part('\u79d2'),expected:Math.floor((Date.now()-data.tasks[0].startedAt)/1000),precision:text.includes('\u65f6')?60:1};});assert(Math.abs(elapsed.shown-elapsed.expected)<=elapsed.precision);
   await widget.locator('.widget-value').focus();await widget.keyboard.press('Escape');await widget.locator('.usage-widget:not(.native-expanded)').waitFor();checks.push('native collapsed task text stays idle and opening refreshes the real elapsed time');
   for(const [file,contents] of oldFiles)assert.equal(fs.readFileSync(path.join(root,file),'utf8'),contents);assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'installed-native-webview-cdp-synthetic-data',profileConfirmed:true,expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedInk,taskInk,speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,speedFreeze,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
+  fs.writeFileSync(path.join(out,'evidence.json'),JSON.stringify({passed:true,kind:'bundled-native-webview-cdp-synthetic-data',profileConfirmed:true,expectedRmb:expected,fx:fx.rates[0],calls:speed.calls.length,speedAxis,speedPrecision,speedFocus:{mouse:speedMouseFocus,keyboard:speedKeyboardFocus},speedInk,taskInk,speedPointer:{expected:expectedPointerTime,hovered:speedHovered,clicked:speedClicked,emptyTooltips:speedEmptyTooltips},speedDisplay,speedFreeze,taskClock:{collapsedTextMutations:clockChanges,resumedElapsed:elapsed},checks,desktopCapture:false},null,2));
   console.log(checks.map(check=>'PASS '+check).join('\n'));await browser.close();
 }
 main().catch(error=>{console.error(error);process.exit(1);});

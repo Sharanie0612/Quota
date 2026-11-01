@@ -32,7 +32,7 @@ export function WorkspaceToolbar({ onUsage, onSync }: { onUsage: () => void; onS
   }, [retry]);
   const number = usage ? new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 1 }).format(usage.today) : '—';
   const updated = usage?.updatedAt ? new Date(usage.updatedAt).toLocaleString('zh-CN') : '尚未采集';
-  return <div className="workspace-toolbar" aria-label="工作区状态与快捷操作">
+  return <div className="workspace-toolbar material-plane" aria-label="工作区状态与快捷操作">
     <div className="workspace-device" title={device}>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="3"/><path d="M8 21h8M12 17v4"/></svg>
       <span>{device}</span><small>本机工作区</small>

@@ -14,16 +14,16 @@ async function main(){
   assert(await widget.evaluate(()=>window.__TAURI_INTERNALS__.invoke('get_main_window_chrome').then(()=>false,()=>true)),'widget cannot control or query main chrome');
   original=await invoke('get_appearance');const before=await invoke('get_main_window_chrome');assert(before.installed,'guard must exist on the first renderer call');
   if((await invoke('get_main_window_state')).maximized)await invoke('plugin:window|toggle_maximize',{label:'main'});
-  for(const glass of [false,true])for(const mode of ['light','dark']){
-   await invoke('save_appearance',{preferences:{...original,glass,mode,revision:Date.now()+1}});
-   await page.waitForFunction(([glass,mode])=>document.documentElement.dataset.material===(glass?'frosted':'solid')&&document.documentElement.dataset.colorMode===mode,[glass,mode]);
+  for(const {glass,reduceEffects,material} of [{glass:false,reduceEffects:false,material:'solid'},{glass:true,reduceEffects:false,material:'liquid'},{glass:true,reduceEffects:true,material:'frosted'}])for(const mode of ['light','dark']){
+   await invoke('save_appearance',{preferences:{...original,glass,reduceEffects,mode,revision:Date.now()+1}});
+   await page.waitForFunction(([material,mode])=>document.documentElement.dataset.material===material&&document.documentElement.dataset.colorMode===mode,[material,mode]);
    await invoke('plugin:window|hide',{label:'main'});assert.equal(await invoke('plugin:window|is_visible',{label:'main'}),false);
    await invoke('show_main_window',{});assert.equal(await invoke('plugin:window|is_visible',{label:'main'}),true);
    await invoke('plugin:window|minimize',{label:'main'});assert.equal(await invoke('plugin:window|is_minimized',{label:'main'}),true);
    await invoke('show_main_window',{});assert.equal(await invoke('plugin:window|is_minimized',{label:'main'}),false);
    const outer=await invoke('plugin:window|outer_size',{label:'main'}),inner=await invoke('plugin:window|inner_size',{label:'main'}),origin=await invoke('plugin:window|outer_position',{label:'main'}),client=await invoke('plugin:window|inner_position',{label:'main'});
    assert.deepEqual(inner,outer,'no caption height or thick border inset');assert.deepEqual(client,origin,'client begins at custom frame origin');
-   const chrome=await invoke('get_main_window_chrome');assert(chrome.installed);cases.push({glass,mode,outer,inner,origin,client,chrome});
+   const chrome=await invoke('get_main_window_chrome');assert(chrome.installed);cases.push({glass,reduceEffects,material,mode,outer,inner,origin,client,chrome});
   }
   const after=await invoke('get_main_window_chrome');assert(after.safeActivationForwards>before.safeActivationForwards,'actual native lifecycle must pass through guard');
   const result={passed:true,kind:'native-subclass-and-window-lifecycle',profileConfirmed:true,desktopCapture:false,manualWindowInput:false,before,after,cases};fs.writeFileSync(out,JSON.stringify(result,null,2));console.log(JSON.stringify({passed:true,cases:cases.length,before,after}));

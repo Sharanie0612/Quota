@@ -1,9 +1,9 @@
 const assert=require('node:assert/strict'),path=require('node:path');
 const load=require('./lib/source-loader.cjs').createSourceLoader();
-const {normalizePreferences,newerPreferences,defaultPreferences}=load(path.join(__dirname,'../src/lib/appearance/preferences'));
+const {normalizePreferences,newerPreferences,defaultPreferences,resolveEffects}=load(path.join(__dirname,'../src/lib/appearance/preferences'));
 const {THEMES,themeTokens}=load(path.join(__dirname,'../src/lib/appearance/themes'));
 const {resolveWindowKind}=load(path.join(__dirname,'../src/window'));
-const current={theme:'quota',mode:'light',collapsed:false,glass:true,revision:42};
+const current={theme:'quota',mode:'light',collapsed:false,glass:true,reduceEffects:false,revision:42};
 assert.deepEqual(normalizePreferences(current),current);
 assert.deepEqual(normalizePreferences({...current,theme:'claude',revision:0}),{...current,theme:'quota',revision:0});
 assert.equal(normalizePreferences({...current,glass:undefined}).glass,false);
@@ -12,6 +12,14 @@ assert.equal(newerPreferences(current,{...current,revision:41,glass:false}),curr
 assert.equal(newerPreferences(current,{bad:true}),current);
 assert.equal(newerPreferences(current,{...current,revision:43,glass:false}).glass,false);
 assert.equal(defaultPreferences.glass,false);
+assert.equal(normalizePreferences({theme:'quota',mode:'light',collapsed:false,glass:true,revision:1}).reduceEffects,true);
+assert.equal(normalizePreferences({...current,reduceEffects:'bad'}),null);
+const normal={contrast:false,motion:false};
+assert.deepEqual(resolveEffects({...current,glass:false},normal),{material:'solid',reducedMotion:false});
+assert.deepEqual(resolveEffects(current,normal),{material:'liquid',reducedMotion:false});
+assert.deepEqual(resolveEffects({...current,reduceEffects:true},normal),{material:'frosted',reducedMotion:false});
+assert.deepEqual(resolveEffects(current,{...normal,motion:true}),{material:'liquid',reducedMotion:true});
+assert.deepEqual(resolveEffects(current,{...normal,contrast:true}),{material:'solid',reducedMotion:true});
 for(const theme of THEMES)for(const mode of ['light','dark']){
   const tokens=themeTokens(theme.id,mode);
   for(const [key,value] of Object.entries({window:16,surface:16,control:10,inset:8}))assert.equal(tokens['radius-'+key],value+'px');

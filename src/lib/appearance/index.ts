@@ -1,28 +1,33 @@
 import {useSyncExternalStore} from 'react';
 import {invoke} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {defaultPreferences,newerPreferences,normalizePreferences,type Preferences} from './preferences';
+import {defaultPreferences,newerPreferences,normalizePreferences,resolveEffects,type Preferences} from './preferences';
 import {themeTokens} from './themes';
 import type {WindowKind} from '../../window';
 export {THEMES} from './themes';
 export type {ThemeId,ColorMode} from './themes';
 
-type Appearance=Preferences&{resolved:'light'|'dark'};
+type Appearance=Preferences&{resolved:'light'|'dark';material:'liquid'|'frosted'|'solid';reducedMotion:boolean;reducedTransparency:boolean};
 const KEY='quota.appearance.v1';
-const initial:Appearance={...defaultPreferences,resolved:'light'};
+const initial:Appearance={...defaultPreferences,resolved:'light',material:'solid',reducedMotion:false,reducedTransparency:false};
 let snapshot=initial;
 let initialized=false;
 const listeners=new Set<()=>void>();
 
 function apply(preferences:Preferences) {
   const resolved=preferences.mode==='system'?(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'):preferences.mode;
-  snapshot={...preferences,resolved};
   const html=document.documentElement;
+  const reducedTransparency=matchMedia('(prefers-reduced-transparency: reduce)').matches;
+  const motion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const effects=html.dataset.window==='setup'?{material:'solid' as const,reducedMotion:motion}:resolveEffects(preferences,{contrast:matchMedia('(forced-colors: active)').matches,motion});
+  snapshot={...preferences,resolved,...effects,reducedTransparency};
   for(const [key,value] of Object.entries(themeTokens(preferences.theme,resolved)))html.style.setProperty('--'+key,value);
   html.style.colorScheme=resolved;
   html.dataset.colorTheme=preferences.theme;
   html.dataset.colorMode=resolved;
-  html.dataset.material=preferences.glass&&!matchMedia('(forced-colors: active)').matches?'frosted':'solid';
+  html.dataset.material=effects.material;
+  html.dataset.effects=preferences.glass?(preferences.reduceEffects?'reduced':'full'):'none';
+  html.dataset.motion=effects.reducedMotion?'reduced':'full';
   for(const listener of listeners)listener();
 }
 
@@ -45,6 +50,8 @@ export function initializeAppearance(kind:WindowKind) {
   apply(saved??defaultPreferences);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>apply(snapshot));
   matchMedia('(forced-colors: active)').addEventListener('change',()=>apply(snapshot));
+  matchMedia('(prefers-reduced-transparency: reduce)').addEventListener('change',()=>apply(snapshot));
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',()=>apply(snapshot));
   window.addEventListener('storage',event=>{
     if(event.key!==KEY)return;
     try{accept(JSON.parse(event.newValue||'null'));}catch{/* Ignore damaged external cache updates. */}
@@ -53,8 +60,8 @@ export function initializeAppearance(kind:WindowKind) {
     .then(()=>invoke<Preferences|null>('get_appearance')).then(accept).catch(()=>undefined);
 }
 
-export function setAppearance(patch:Partial<Pick<Preferences,'theme'|'mode'|'collapsed'|'glass'>>) {
-  const preferences:Preferences={theme:snapshot.theme,mode:snapshot.mode,collapsed:snapshot.collapsed,glass:snapshot.glass,...patch,revision:Math.max(Date.now(),snapshot.revision+1)};
+export function setAppearance(patch:Partial<Pick<Preferences,'theme'|'mode'|'collapsed'|'glass'|'reduceEffects'>>) {
+  const preferences:Preferences={theme:snapshot.theme,mode:snapshot.mode,collapsed:snapshot.collapsed,glass:snapshot.glass,reduceEffects:snapshot.reduceEffects,...patch,revision:Math.max(Date.now(),snapshot.revision+1)};
   cache(preferences);apply(preferences);
   void invoke('save_appearance',{preferences}).catch(()=>undefined);
 }

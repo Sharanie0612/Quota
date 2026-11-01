@@ -24,7 +24,7 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 | `src/lib/` | 价格坐标、统计筛选、费用分摊、速度布局等纯计算 |
 | `src/lib/appearance/` | 外观配色、偏好校验、共享状态和同步 |
 
-外观模块有三个职责：`themes.ts` 生成语义颜色和尺寸变量；`preferences.ts` 处理合法值、旧格式与修订号；`index.ts` 应用变量、订阅系统模式并同步本机偏好。原生外观命令集中于这一个状态入口，组件只读状态或提交选择。旧 `glass` 字段继续读取，含义调整为应用内毛玻璃。
+外观模块有三个职责：`themes.ts` 生成语义颜色和尺寸变量；`preferences.ts` 处理合法值、旧格式与修订号；`index.ts` 应用变量、订阅系统模式并同步本机偏好。原生外观命令集中于这一个状态入口，组件只读状态或提交选择。`glass`作为主开关，可选`reduceEffects`保存降低强度；旧开启且缺字段时保留毛玻璃，旧关闭保持关闭。不增加另一份偏好文件。
 
 `src/styles.css` 是唯一样式入口，依次导入基础、布局、公共控件、页面、动效与材质六层。图表和业务复杂布局使用相邻 CSS。新增控件复用语义变量和公共按钮，避免页面再次覆写按钮透明度、圆角或指针光层。
 
@@ -32,11 +32,15 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 
 ## 桌面与窗口
 
-主窗口 `main` 使用不透明 WebView。毛玻璃只模糊应用自身背景，导航/工作区承载材质，卡片和常规按钮保持实底。`appearance.rs` 负责偏好校验、原子保存和广播，不再操作 Blur/Acrylic。
+主窗口 `main` 使用不透明 WebView。两档材质只模糊应用自身背景，由侧栏和工具栏共用一个材质平面；主要内容区、卡片和常规按钮保持实底。`appearance.rs` 负责偏好校验、原子保存和广播，不再操作 Blur/Acrylic。
+
+侧栏按钮与品牌位于同一标题行，收起后的图标24px、目标48px。侧栏宽度通过一个CSS变量同时决定导航尺寸和拖动遮罩起点；侧栏层级高于内容区移动，避免展开时遮挡按钮。减少效果缩短侧栏过渡，系统减少动态会取消进行中的动画。
 
 `window_frame.rs` 维护无系统标题栏的重绘保护、浮动圆角及最大化/Snap 方角。`widget.rs` 管理独立 `usage-widget` 的位置、尺寸和命中区域，前端负责可打断的展开/收起；任务窗不继承主窗口磨砂。所有原生窗口变更遵守窗口线程约束。
 
 `mimo-login` 是无 Quota IPC 权限的官方登录窗口。安装向导使用同一 Cargo 可执行产物的 setup 入口；外观固定浅色，不读取用户主题。托盘单击打开主窗口，关闭行为沿用 Tauri 事件处理。
+
+`useMaterialLight`负责主App内的输入光效：局部坐标、每帧调度、键盘优先、淡出和硬清理。光层位于内容下方，不变更文字或命中区域；原生focus、隐藏及resize与DOM事件分别处理。
 
 ## Rust 领域边界
 
@@ -55,6 +59,6 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 
 ## 验证与维护
 
-`npm run verify` 执行纯逻辑与组件检查，`npm run verify:ui` 在实际构建的合成预览中验证外观、账务操作、图表和任务窗。`scripts/lib/` 共用 TypeScript 加载器、合成费用和表面断言；已经退役的液态效果及旧页面测试删除。
+`npm run verify` 执行纯逻辑与组件检查，`npm run verify:ui` 在实际构建的合成预览中验证外观、账务操作、图表和任务窗。`scripts/lib/` 共用 TypeScript 加载器、合成费用和表面断言；退役的全窗合成与旧页面检查不再作为当前入口。
 
 Rust 运行逻辑使用对应 example；安装包另做覆盖升级、数据哈希、真实命令、窗口几何和任务窗检查。WebView 截图不等于桌面合成或真实鼠标拖动验收。详见 [开发指南](development.md)、[安全边界](security.md)、[统计与账务](activity-stats.md)。

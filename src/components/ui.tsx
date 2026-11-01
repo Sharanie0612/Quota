@@ -71,11 +71,13 @@ export function Switch({
   checked,
   onChange,
   label,
+  controls,
   disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
+  controls?: string;
   disabled?: boolean;
 }) {
   return (
@@ -84,6 +86,8 @@ export function Switch({
       onClick={() => onChange(!checked)}
       aria-label={label}
       aria-pressed={checked}
+      aria-controls={controls}
+      aria-expanded={controls?checked:undefined}
       disabled={disabled}
       type="button"
     />

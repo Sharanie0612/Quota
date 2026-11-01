@@ -10,6 +10,8 @@ pub struct Preferences {
     pub collapsed: bool,
     #[serde(default)]
     pub glass: bool,
+    #[serde(rename="reduceEffects",default,skip_serializing_if="Option::is_none")]
+    pub reduce_effects: Option<bool>,
     #[serde(default)]
     pub revision: u64,
 }

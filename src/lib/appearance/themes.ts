@@ -24,6 +24,8 @@ export function themeTokens(theme:ThemeId,mode:'light'|'dark'):Record<string,str
   Object.assign(values,{red:dark?'#ff938a':'#c4362f',amber:dark?'#f1c86a':'#8b5a00',green:dark?'#78cf9b':'#277943','switch-on':palette.primary??palette.accent,'red-soft':'color-mix(in srgb, var(--red) 12%, '+palette.surface+')','amber-soft':'color-mix(in srgb, var(--amber) 12%, '+palette.surface+')','green-soft':'color-mix(in srgb, var(--green) 12%, '+palette.surface+')','shadow-pop':dark?'0 18px 50px #00000070':'0 18px 50px #00000030'});
 
   Object.assign(values,{'radius-window':geometry.window+'px','radius-surface':geometry.surface+'px','radius-control':geometry.control+'px','radius-inset':geometry.inset+'px','radius-xl':geometry.surface+'px','radius-lg':geometry.surface+'px',radius:geometry.control+'px','radius-sm':geometry.inset+'px'});
+  values['material-light']='color-mix(in srgb, '+(dark?palette.text:palette.surface)+' '+(dark?'24%':'94%')+', transparent)';
+  values['material-shadow']='color-mix(in srgb, '+(dark?palette.bg:palette.text)+' '+(dark?'60%':'12%')+', transparent)';
   values['font-heading']=theme==='claude'?"Georgia, 'Songti SC', serif":'var(--font)';
   return values;
 }

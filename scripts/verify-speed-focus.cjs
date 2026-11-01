@@ -9,7 +9,7 @@ async function main(){
   try{
     for(const theme of ['quota','codex','claude','vscode','github'])for(const mode of ['light','dark'])for(const glass of [false,true]){
       const width=mode==='light'?1024:1360,page=await browser.newPage({viewport:{width,height:1000},colorScheme:mode,reducedMotion:'reduce',locale:'zh-CN',timezoneId:'Asia/Shanghai'});page.on('pageerror',e=>errors.push(e.message));
-      await page.addInitScript(({theme,mode,glass})=>{window.demoAppearance={theme,mode,glass,collapsed:false,revision:Date.now()};localStorage.setItem('quota.appearance.v1',JSON.stringify(window.demoAppearance));},{theme,mode,glass});
+      await page.addInitScript(({theme,mode,glass})=>{window.demoAppearance={theme,mode,glass,reduceEffects:false,collapsed:false,revision:Date.now()};localStorage.setItem('quota.appearance.v1',JSON.stringify(window.demoAppearance));},{theme,mode,glass});
       await page.goto(base);const nav=page.getByRole('navigation',{name:'\u4e3b\u5bfc\u822a'}).getByRole('button',{name:'\u8f93\u51fa\u901f\u5ea6',exact:true});await nav.click();const svg=page.locator('.speed-call-canvas svg');await svg.waitFor();
       for(const forced of [false,true]){
         await page.emulateMedia({forcedColors:forced?'active':'none'});

@@ -14,6 +14,7 @@ import { OutputSpeedView } from "./views/OutputSpeedView";
 import { SettingsView } from "./views/SettingsView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
+import {useMaterialLight} from './lib/useMaterialLight';
 import {useSidebarMotion} from './lib/useSidebarMotion';
 import { useSlidingHighlight } from "./lib/useSlidingHighlight";
 import { WindowControls } from "./components/WindowControls";
@@ -27,12 +28,13 @@ type View = "accounts" | "output-speed" | "activity" | "costs" | "settings" | "a
 
 export default function App() {
   const appearance=useAppearance();
-  const sidebarMotion=useSidebarMotion(appearance.collapsed);
+  const sidebarMotion=useSidebarMotion(appearance.collapsed,appearance.reducedMotion,appearance.glass&&appearance.reduceEffects);
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
 
   const [view, setView] = useState<View>("accounts");
   useEffect(()=>{const un=listen<string>('navigate-main',event=>{if(['costs','output-speed','activity','settings'].includes(event.payload))setView(event.payload as View);});return()=>{void un.then(stop=>stop());};},[]);
+  const light=useMaterialLight(appearance.material==='liquid'&&!appearance.reducedMotion,view+':'+appearance.collapsed);
   const nav = useSlidingHighlight<HTMLElement>(view);
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {contentRef.current?.scrollTo({top:0});}, [view]);
@@ -89,17 +91,19 @@ export default function App() {
       : '';
 
   return (
-    <div className={`app${appearance.collapsed?' sidebar-collapsed':''}`}>
+    <div ref={light} className={`app${appearance.collapsed?' sidebar-collapsed':''}`}>
       <LaunchAnimation/>
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>
       <WindowControls/>
-      <button type="button" className="sidebar-toggle" aria-label={appearance.collapsed?'展开侧边栏':'收起侧边栏'} aria-expanded={!appearance.collapsed} aria-controls="main-sidebar" title={appearance.collapsed?'展开侧边栏':'收起侧边栏'} onClick={()=>{sidebarMotion.capture();setAppearance({collapsed:!appearance.collapsed});}}><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>{appearance.collapsed?<path d="m12 9 3 3-3 3"/>:<path d="m16 9-3 3 3 3"/>}</svg></button>
-      <aside className="sidebar" id="main-sidebar">
+      <aside className="sidebar material-plane" id="main-sidebar">
+        <div className="sidebar-header">
         <div className="brand" data-tauri-drag-region>
           <img className="brand-mark" src={appIcon} alt="" aria-hidden="true" />
           <div className="brand-text">
             <span className="brand-title">Quota</span>
           </div>
+        </div>
+          <button type="button" className="sidebar-toggle" aria-label={appearance.collapsed?'展开侧边栏':'收起侧边栏'} aria-expanded={!appearance.collapsed} aria-controls="main-sidebar" title={appearance.collapsed?'展开侧边栏':'收起侧边栏'} onClick={()=>{sidebarMotion.capture();setAppearance({collapsed:!appearance.collapsed});}}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/>{appearance.collapsed?<path d="m12 9 3 3-3 3"/>:<path d="m16 9-3 3 3 3"/>}</svg></button>
         </div>
 
         <nav className="sidebar-nav" ref={nav} aria-label="主导航">

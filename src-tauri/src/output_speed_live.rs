@@ -94,7 +94,7 @@ impl LocalReader {
             if signature.as_ref()==Some(&current) { continue; }
             if db.is_none() {db=Some(database(dir)?);}
             let connection=db.as_mut().unwrap();
-            match collect_codex_file(connection,path,&o.device_id) {
+            match collect_codex_file(connection,path,&o.device_id,false) {
                 Ok(count)=>{
                     changed+=count;status.files_read+=1;*signature=Some(current);
                     let c=cursor(connection,&path.to_string_lossy())?;

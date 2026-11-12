@@ -139,7 +139,7 @@ pub fn collect_source(
             kind: "tokens".into(),
             channel,
             revision: milliseconds(updated).max(0.0) as u64,
-            speed:None,harness_identity: 0,
+            speed:None,harness_identity: 0,codex_usage_version:0,multica:false,
             tokens: Tokens {
                 input,
                 output,

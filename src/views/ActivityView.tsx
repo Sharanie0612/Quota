@@ -20,7 +20,7 @@ import type { ActivityOptions, ActivityReport } from "../lib/types";
 import type { ActivityMetric, ActivityRange } from "../lib/activityCharts";
 
 const number = (n: number) => new Intl.NumberFormat("zh-CN").format(n);
-const sourceNames: Record<string, string> = { codex: "Codex", zcode: "ZCode", harness: "DeepSeek Harness", trae: "Trae" };
+const sourceNames: Record<string, string> = { codex: "Codex", multica: "Multica", zcode: "ZCode", harness: "DeepSeek Harness", trae: "Trae" };
 
 function ActivityNumber({value,compact}:{value:number|undefined;compact:boolean}) {
   const element=useRef<HTMLElement>(null);
@@ -142,9 +142,9 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     } finally { setBusy(null); }
   };
 
-  const choose = async (key: "codexHome" | "zcodeHome" | "harnessHome" | "traeHome") => {
+  const choose = async (key: "codexHome" | "zcodeHome" | "harnessHome" | "traeHome" | "multicaWorkspaceRoot") => {
     try {
-      const path = await open({ directory: true, multiple: false, title: "选择日志目录" });
+      const path = await open({ directory: true, multiple: false, title: key === "multicaWorkspaceRoot" ? "选择 Multica 工作区" : "选择日志目录" });
       if (typeof path === "string") setOptions(current => current ? { ...current, [key]: path } : current);
     } catch (e) { toast(errText(e), "error"); }
   };
@@ -279,6 +279,19 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
       <div className="setting-row"><div className="txt"><b>自动采集</b><span>仅在 Quota 运行时执行</span></div><Switch checked={options.autoCollect} disabled={!!busy} onChange={autoCollect => setOptions({...options,autoCollect})} label="自动采集 Token 活动" /></div>
       {options.autoCollect && <div className="setting-row"><div className="txt"><b>采集频率</b><span>默认每 30 秒采集一次</span></div><select className="select" aria-label="Token 采集频率" disabled={!!busy} value={options.collectIntervalSeconds ?? 30} onChange={e => setOptions({...options,collectIntervalSeconds:Number(e.target.value)})}>{[5,15,30,60,300,900].map(value => <option key={value} value={value}>{value < 60 ? `${value} 秒` : `${value / 60} 分钟`}</option>)}{options.collectIntervalSeconds && ![5,15,30,60,300,900].includes(options.collectIntervalSeconds) && <option value={options.collectIntervalSeconds}>{options.collectIntervalSeconds} 秒</option>}</select></div>}
       <Field label="设备名称" hint="用于区分跨设备同步后的用量记录"><input className="input" aria-label="设备名称" value={options.deviceName} disabled={!!busy} onChange={e => setOptions({ ...options, deviceName: e.target.value })} /></Field>
+      <details className="activity-source-settings">
+        <summary>Multica 本机用量<small>{options.multicaEnabled ? "已启用" : "未启用"}</small></summary>
+        <div className="setting-row">
+          <div className="txt"><b>采集 Multica 用量</b><span>读取此电脑上由 Multica 运行的 Codex 用量</span></div>
+          <Switch checked={options.multicaEnabled} disabled={!!busy} onChange={multicaEnabled => setOptions({ ...options, multicaEnabled })} label="采集 Multica 用量" />
+        </div>
+        {options.multicaEnabled && <Field label="Multica 工作区目录" hint="留空时自动识别。使用自定义位置时选择 Multica 的 workspaces 根目录。">
+          <div className="activity-path">
+            <input className="input" aria-label="Multica 工作区目录" value={options.multicaWorkspaceRoot} placeholder="自动识别工作区" disabled={!!busy} onChange={e => setOptions({ ...options, multicaWorkspaceRoot: e.target.value })} />
+            <Button disabled={!!busy} onClick={() => void choose("multicaWorkspaceRoot")}>选择</Button>
+          </div>
+        </Field>}
+      </details>
       <section className="activity-ssh-settings" aria-label="SSH 远程设备"><h3>SSH 用量来源</h3><p className="hint">远端无需安装 Quota。通过现有 SSH 连接只读采集 Codex 用量，不在远端创建文件或同步目录。</p>
       <Field label="SSH 设备" hint="识别连接后，勾选需要纳入统计的设备，也可以全部不选。保存后生效。">
         <div className="ssh-device-toolbar"><span className="hint">已纳入 {(options.codexSshDevices??[]).filter(d=>d.included).length} 台设备</span>

@@ -234,7 +234,7 @@ export function SettingsView({
       <div className="card section">
         <h2>提醒与模型资料</h2>
         <div className="setting-row"><div className="txt"><b>余额增加提示</b><span>检测到充值时提示</span></div><Switch checked={settings.notifyRecharge} onChange={(v) => set({ notifyRecharge: v })} label="余额增加提示" /></div>
-        <div className="setting-row"><div className="txt"><b>自动更新 AI 模型</b><span>每天更新官方价格和公开评测</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="模型资料自动更新" /></div>
+        <div className="setting-row"><div className="txt"><b>自动更新 AI 模型</b><span>连接 Artificial Analysis 后，运行期间定期更新指数与单任务成本</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="模型资料自动更新" /></div>
       </div>
       <div className="card section">
         <h2>

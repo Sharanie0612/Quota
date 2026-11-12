@@ -688,6 +688,19 @@
     }
   }
 
+  let taskCostReport;
+  async function readTaskCosts() {
+    if (!taskCostReport) {
+      const snapshot = await fetch('/aa-task-cost.json').then(response => response.ok ? response.json() : null);
+      taskCostReport = { snapshot, connected: false, error: null };
+    }
+    return taskCostReport;
+  }
+  window.demoPublishTaskCosts = async (snapshot, error = null) => {
+    taskCostReport = { ...await readTaskCosts(), snapshot, error };
+    emit('task-cost-updated', null);
+  };
+
   // Tauri 2 unlisten calls this hook before invoking the backend stub.
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener() {} };
@@ -743,13 +756,21 @@
           return {devices:[{id:'demo-a',name:'工作电脑'},{id:'demo-b',name:'笔记本'}],models,points:[...groups.values()],summary:summarize(selected),updatedAt:now,bucketSeconds,bucketMinutes:bucketSeconds/60,collectionIntervalSeconds:localMonitoring?1:10,collectionEnabled:enabled,collectedAt:now,errors:[],rangeStart:start,rangeEnd:now,calls:[...selected].sort((a,b)=>b.completedAt-a.completedAt),recent:[...selected].sort((a,b)=>b.completedAt-a.completedAt).slice(0,24),byModel,coverage:{outputRecords:test==='empty'?0:test==='untimed'?12:selected.length+4,timedRecords:selected.length},localMonitoring,live:{checkedAt:now,lastEventAt:now-3000,activeRequests:test==='waiting'?1:0,enabled,sourceConfigured:true,filesRead:1,readMs:8,errors:[]}};
         }
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
-        case 'get_benchmarks':
-        case 'refresh_benchmarks': {
-          const board=await fetch('/benchmark-board.json').then(r=>r.json());
-          const test=new URLSearchParams(location.search).get('benchmarkCase');
-          if(test==='offline')board.sources[0].error='演示：来源暂不可用';
-          if(test==='empty'){board.models=[];board.profiles=[];board.referenceCohort=[];board.rankings.forEach(r=>r.entries=[]);}
-          return board;
+        case 'get_task_cost':
+          return readTaskCosts();
+        case 'refresh_task_cost': {
+          const report = await readTaskCosts();
+          if (window.demoNextTaskCost) await window.demoPublishTaskCosts(window.demoNextTaskCost);
+          else return report;
+          return readTaskCosts();
+        }
+        case 'save_task_cost_key': {
+          if (args.key === 'invalid-fixture') throw Error('Artificial Analysis 拒绝访问');
+          const report = await readTaskCosts();
+          taskCostReport = { ...report, connected: Boolean(args.key), error: null };
+          if (args.key && window.demoNextTaskCost) await window.demoPublishTaskCosts(window.demoNextTaskCost);
+          else emit('task-cost-updated', null);
+          return taskCostReport;
         }
         case 'get_ai_models':
         case 'refresh_ai_models': {

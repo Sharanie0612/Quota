@@ -35,6 +35,28 @@
 .scatter-dot { stroke-width: 1; opacity: 1; vector-effect: non-scaling-stroke; }
 .scatter-point:hover .scatter-dot, .scatter-point:focus-visible .scatter-dot { stroke-width: 1.5; }
 .scatter-selection-ring { fill: none; stroke: var(--blue); stroke-width: 1.5; pointer-events: none; vector-effect: non-scaling-stroke; }
+.scatter-frontier { fill: none; stroke: var(--blue); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.72; pointer-events: none; }
+.scatter-panel { position: relative; }
+.scatter-tooltip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  min-width: 245px;
+  max-width: 285px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.scatter-tooltip > b { display: flex; gap: 8px; align-items: center; line-height: 1.4; }
+.scatter-tooltip > span { color: var(--text-2); }
+.scatter-tooltip > div { display: flex; gap: 24px; align-items: center; justify-content: space-between; }
+.scatter-tooltip strong { color: var(--blue); font-size: 18px; }
 .scatter-count { fill: var(--text-2); font-size: 10px; pointer-events: none; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
 .scatter-inspector { min-height: 64px; border-top: 1px solid var(--border); padding: 10px 8px 0; font-size: 12px; }
 .scatter-inspector > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--text-2); }
@@ -147,3 +169,21 @@
 .ladder-score-track i { display:block; height:100%; background:var(--blue); border-radius:8px; }
 .ladder-score-row b { font-size:12px; font-variant-numeric:tabular-nums; }
 @media(max-width:1100px) { .ladder-score-list { grid-template-columns:1fr; } }
+
+.chart-expanded {
+  position: fixed;
+  inset: 12px;
+  z-index: 1000;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  padding: 18px;
+  overflow: auto;
+  box-shadow: var(--shadow-pop);
+}
+.chart-expanded .scatter-panel > svg { height: auto; aspect-ratio: 2.05; min-height: 360px; max-height: calc(100dvh - 220px); }
+.chart-expanded .scatter-chart { padding: 16px; }
+.chart-expanded .ladder-unpriced,
+.chart-expanded .scatter-inspector { display: none; }
+.chart-expanded .scatter-footer { padding: 12px 3px 0; }
+.chart-expanded .chart-heading { padding-bottom: 12px; }

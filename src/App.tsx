@@ -185,7 +185,7 @@ export default function App() {
             />
           ) : null}
 
-          {view === 'ai-models' ? <AiModelsHub/> : null}
+          {view === 'ai-models' ? <AiModelsHub autoUpdate={settings?.ladderAutoUpdate ?? true}/> : null}
           {view === "activity" ? <ActivityView onOpenSyncSettings={()=>setView('settings')} /> : null}
           {view === "output-speed" ? <OutputSpeedView onOpenSyncSettings={()=>setView("settings")}/> : null}
           {view === "costs" ? <UsageCostsView /> : null}

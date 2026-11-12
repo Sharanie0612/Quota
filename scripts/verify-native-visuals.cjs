@@ -87,7 +87,7 @@ async function main(){
   }
   await page.waitForFunction(()=>window.nativeSpeedFreeze.completed===1);speedFreeze.probeCompletedAfterRelease=1;
   await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.material==='frosted');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
-  await go('AI 模型');await page.getByRole('tab',{name:'价格 × 能力',exact:true}).click();await page.locator('.scatter-point').first().waitFor();
+  await go('AI 模型');await page.getByRole('heading',{name:'Intelligence Index vs. Cost per Task',exact:true}).waitFor();await page.locator('.scatter-point').first().waitFor();
   const nodes=await page.locator('.scatter-point').evaluateAll(elements=>elements.map(e=>({x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),members:JSON.parse(e.dataset.members)})));
   for(let i=0;i<nodes.length;i++)for(let j=0;j<i;j++)assert(Math.hypot(nodes[i].x-nodes[j].x,nodes[i].y-nodes[j].y)>=27.9);
   const ids=nodes.flatMap(n=>n.members.map(m=>m.id));assert.equal(ids.length,new Set(ids).size);await capture('ladder-native');

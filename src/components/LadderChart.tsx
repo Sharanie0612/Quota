@@ -10,7 +10,7 @@ export const currencyTitle = (currency: string) => currency === "CNY" ? "人民�
 import { reasoningLabel } from "../lib/ladderModels";
 export { reasoningLabel } from "../lib/ladderModels";
 
-type Props = { entries: LadderEntry[]; domain: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null; onShowList?:()=>void;fixedCurrency?:"CNY";compact?:boolean };
+type Props = { entries: LadderEntry[]; domain: string; scoreLabel?: string; focused: LadderEntry | null; onFocus: (entry: LadderEntry) => void; exchange?: LadderExchange | null; onShowList?:()=>void;fixedCurrency?:"CNY";compact?:boolean };
 export function LadderChart(props: Props) {
   const [expanded,setExpanded]=useState(false);
   useEffect(()=>{if(!expanded)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setExpanded(false);};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[expanded]);

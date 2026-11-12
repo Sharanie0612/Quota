@@ -1,38 +1,306 @@
-import {useEffect,useMemo,useState} from 'react';
-import {listen} from '@tauri-apps/api/event';
-import {api,errText} from '../lib/api';
-import type {AiModelSnapshot,BenchmarkBoard,LadderEntry,LadderSnapshot} from '../lib/types';
-import {filterVisualModels,visualAxes,visualModels,type EvaluationScope,type VisualModel} from '../lib/visualModels';
-import {type LadderExchange} from '../lib/ladderPlot';
-import {AbilityRadar,modelColors} from '../components/AbilityRadar';
-import {LadderChart} from '../components/LadderChart';
-import {Button,EmptyState,Modal,Notice,Seg} from '../components/ui';
-import {IconRefresh,IconSearch} from '../components/icons';
-import {ModelLogo} from '../components/ModelLogo';
-import {priceText} from '../lib/format';
-import './model-ladder.css';
+import { useEffect, useMemo, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { api, errText } from "../lib/api";
+import type { AiModelSnapshot, BenchmarkBoard, LadderSnapshot } from "../lib/types";
+import { aaDomains, aaLeaderboard, aaMethodology, aaSource, aaVersion, evaluationWeight, scoreOptions, visualAxes } from "../lib/aaMethodology";
+import { filterVisualModels, inEvaluationWindow, rankVisualModels, visualModels, type EvaluationScope, type VisualModel } from "../lib/visualModels";
+import { plotPrice, validExchange, type LadderExchange } from "../lib/ladderPlot";
+import { AbilityRadar, modelColors } from "../components/AbilityRadar";
+import { BenchmarkBreakdown } from "../components/BenchmarkBreakdown";
+import { LadderChart } from "../components/LadderChart";
+import { Button, EmptyState, Modal, Notice, Seg } from "../components/ui";
+import { IconRefresh, IconSearch } from "../components/icons";
+import { ModelLogo } from "../components/ModelLogo";
+import { priceText } from "../lib/format";
+import "./model-ladder.css";
 
-export function AiModelsHub({initialVendor='all'}:{initialVendor?:string}){
-  const [board,setBoard]=useState<BenchmarkBoard|null>(null),[registry,setRegistry]=useState<AiModelSnapshot|null>(null),[legacy,setLegacy]=useState<LadderSnapshot|null>(null),[exchange,setExchange]=useState<LadderExchange|null>(null);
-  const [tab,setTab]=useState('ladder'),[domain,setDomain]=useState('general'),[scope,setScope]=useState<EvaluationScope>('main30'),[vendor,setVendor]=useState(initialVendor),[search,setSearch]=useState('');
-  const [compareVendor,setCompareVendor]=useState('all'),[selection,setSelection]=useState<string[]|null>(null),[detail,setDetail]=useState<VisualModel|null>(null),[method,setMethod]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
-  useEffect(()=>{let live=true;const load=()=>Promise.allSettled([api.getBenchmarks(),api.getAiModels(),api.getLadder(),api.getExchangeRate()]).then(([b,r,l,e])=>{if(live){if(b.status==='fulfilled')setBoard(b.value);if(r.status==='fulfilled')setRegistry(r.value);if(l.status==='fulfilled')setLegacy(l.value);if(e.status==='fulfilled')setExchange(e.value);const errors=[b,r,l,e].filter((v):v is PromiseRejectedResult=>v.status==='rejected').map(v=>errText(v.reason));setError(errors.join('；'));}}).catch(e=>{if(live)setError(errText(e));});void load();const un=listen('benchmarks-updated',()=>void load());return()=>{live=false;void un.then(fn=>fn());};},[]);
-  const all=useMemo(()=>board?visualModels(board,registry,legacy):[],[board,registry,legacy]);
-  const filtered=filterVisualModels(all,scope).filter(m=>(vendor==='all'||m.entry.vendor===vendor)&&`${m.entry.name} ${m.entry.vendor}`.toLowerCase().includes(search.trim().toLowerCase()));
-  const selected=selection??filterVisualModels(all,'main30').filter((m,i,rows)=>rows.findIndex(n=>n.model.id===m.model.id)===i).slice(0,3).map(m=>m.entry.id);
-  const comparisons=selected.map(id=>all.find(m=>m.entry.id===id)).filter((m):m is VisualModel=>!!m);
-  const choose=(id:string)=>setSelection(current=>{const ids=current??selected;return ids.includes(id)?ids.filter(v=>v!==id):ids.length<3?[...ids,id]:ids;});
-  const refresh=async()=>{setBusy(true);setError('');const results=await Promise.allSettled([api.refreshBenchmarks(),api.refreshAiModels(true)]);if(results[0].status==='fulfilled')setBoard(results[0].value);if(results[1].status==='fulfilled')setRegistry(results[1].value);const errors=results.filter((r):r is PromiseRejectedResult=>r.status==='rejected').map(r=>errText(r.reason));setError(errors.join('；'));try{setLegacy(await api.getLadder());setExchange(await api.getExchangeRate());}catch(e){setError(errText(e));}setBusy(false);};
-  const focus=(entry:LadderEntry)=>setDetail(all.find(m=>m.entry.id===entry.id)??null);
-  return <div className="content-inner visual-model-page" data-evaluation-scope={scope}>
-    <div className="visual-model-toolbar"><div className="visual-model-title"><h1>AI 模型</h1><Seg value={tab} options={[{value:'ladder',label:'模型天梯'},{value:'ability',label:'六维对比'}]} onChange={setTab}/></div><div><Button size="sm" variant="quiet" onClick={()=>setMethod(true)}>算法与来源</Button><Button size="sm" disabled={busy} onClick={()=>void refresh()}><IconRefresh size={14} className={busy?'spin':''}/>{busy?'更新中…':'更新数据'}</Button></div></div>
-    {error&&<Notice tone="warn">{error}</Notice>}
-    {(board?.sources.some(s=>['artificial-analysis','model-releases'].includes(s.id)&&s.error)||registry?.sources.some(s=>s.error))&&<Notice tone="warn" actions={<Button size="sm" onClick={()=>setMethod(true)}>查看来源</Button>}>部分来源未能更新，已保留上次数据。</Notice>}
-    {tab==='ladder'?<>
-      <div className="visual-model-filters"><div className="search"><IconSearch size={15}/><input className="input" aria-label="搜索天梯模型" placeholder="搜索模型" value={search} onChange={e=>setSearch(e.target.value)}/></div><select className="select" aria-label="天梯厂商" value={vendor} onChange={e=>setVendor(e.target.value)}><option value="all">全部厂商</option>{[...new Set([...(board?.releases?.map(r=>r.vendor)??[]),...all.map(m=>m.entry.vendor)])].sort().map(name=><option key={name}>{name}</option>)}</select><select className="select" aria-label="测评范围" value={scope} onChange={e=>setScope(e.target.value as EvaluationScope)}><option value="main30">主力 · 近30天测评</option><option value="all30">全部档位 · 近30天测评</option><option value="all">全部有效测评</option></select><select className="select" aria-label="能力评分维度" value={domain} onChange={e=>setDomain(e.target.value)}><option value="general">综合能力</option>{visualAxes.map(a=><option key={a.key} value={a.key}>{a.label}</option>)}</select></div>
-      {board?<LadderChart entries={filtered.map(m=>m.entry)} domain={domain} focused={detail?.entry??null} onFocus={focus} exchange={exchange} fixedCurrency="CNY" compact/>:<EmptyState icon={<IconSearch size={24}/>} title="正在读取模型…"/>}
-    </>:<section className="card visual-ability"><div className="visual-ability-heading"><h2>六维能力对比</h2><div className="visual-comparison-controls"><select className="select" aria-label="六维对比厂商" value={compareVendor} onChange={e=>setCompareVendor(e.target.value)}><option value="all">全部厂商</option>{[...new Set(all.map(m=>m.entry.vendor))].sort().map(vendor=><option key={vendor}>{vendor}</option>)}</select><select className="select" aria-label="添加六维对比模型" value="" disabled={selected.length>=3} onChange={e=>choose(e.target.value)}><option value="">选择型号与配置</option>{[...new Set(all.map(m=>m.entry.vendor))].filter(vendor=>compareVendor==='all'||vendor===compareVendor).sort().map(vendor=><optgroup key={vendor} label={vendor}>{all.filter(m=>m.entry.vendor===vendor&&!selected.includes(m.entry.id)).map(m=><option key={m.entry.id} value={m.entry.id}>{m.entry.name}</option>)}</optgroup>)}</select></div></div><div className="visual-compare-selected">{comparisons.map((m,i)=><button key={m.entry.id} onClick={()=>choose(m.entry.id)} style={{color:modelColors[i]}}><i style={{background:modelColors[i]}}/>{m.entry.name}<span>×</span></button>)}</div>{comparisons.length?<AbilityRadar entries={comparisons.map(m=>m.entry)} axes={visualAxes}/>:<EmptyState icon={<IconSearch size={24}/>} title="选择模型开始对比"/>}</section>}
-    {detail&&<Modal wide title={detail.entry.name} onClose={()=>setDetail(null)} footer={<><Button onClick={()=>setDetail(null)}>关闭</Button><Button variant="primary" disabled={!selected.includes(detail.entry.id)&&selected.length>=3} onClick={()=>{if(!selected.includes(detail.entry.id))choose(detail.entry.id);setTab('ability');setDetail(null);}}>六维对比</Button></>}><div className="visual-model-detail"><AbilityRadar entries={[detail.entry]} axes={visualAxes}/><div><div className="visual-model-score"><ModelLogo name={detail.entry.name} size={28}/><strong>{detail.profile.index.toFixed(1)}</strong><span>AA Intelligence Index v5</span></div><dl><dt>评测配置</dt><dd>{detail.profile.setting}</dd><dt>测评版本更新</dt><dd>{detail.edition?.publishedAt??'未确认'}</dd><dt>型号发布</dt><dd>{detail.release?.releasedAt??'未确认'}</dd><dt>价格核实</dt><dd>{detail.entry.verifiedAt?new Date(detail.entry.verifiedAt).toLocaleDateString('zh-CN'):'未确认'}</dd><dt>输入 / 百万 Token</dt><dd>{priceText(detail.entry.price.input,detail.entry.price.currency)}</dd><dt>输出 / 百万 Token</dt><dd>{priceText(detail.entry.price.output,detail.entry.price.currency)}</dd></dl><div className="visual-model-links"><Button size="sm" onClick={()=>void api.openExternal('https://artificialanalysis.ai/leaderboards/models')}>评测来源</Button>{detail.entry.priceSource&&<Button size="sm" onClick={()=>void api.openExternal(detail.entry.priceSource)}>官方定价</Button>}</div></div></div></Modal>}
-    {method&&<Modal title="算法与来源" onClose={()=>setMethod(false)} footer={<Button onClick={()=>setMethod(false)}>关闭</Button>}><div className="visual-model-method"><p>综合能力直接采用 Artificial Analysis Intelligence Index v5 的公开实测指数，每个点固定为一个完整评测配置。价格按厂商官网标准 Token 单价核实，美元价格使用 ECB 汇率换算人民币。</p><p>不使用估算指数、不把不同推理档位的成绩拼在一起，也不把不同榜单的分数相加。测评成绩反映公开任务表现，不能替代具体工作流的使用体验。</p><p>六维分别对应 HLE-Diamond、FrontierCode 2.0、AA-Omniscience accuracy、CritPt v2 hard、AutomationBench-AA 与 MMMU-Pro 的原始百分比，缺少成绩的维度留空。各轴不参与另造综合分。</p><p>当前主力取自来源默认展示的在用配置，并为未覆盖厂商补充其完整实测最高分配置。近30天按测评版本公开更新日筛选，型号发布日期与数据抓取时间不参与筛选。来源未提供每个型号的重跑时间时，仅显示测评版本更新日。没有测评或官方价格的型号不会获得虚构坐标。</p><Button onClick={()=>void api.openExternal('https://artificialanalysis.ai/methodology/intelligence-benchmarking')}>查看评测算法</Button>{board?.sources.filter(s=>['artificial-analysis','model-releases'].includes(s.id)).map(s=><section key={s.id}><h3>{s.name}</h3>{s.edition&&<p>测评版本更新：{s.edition.publishedAt} <Button size="sm" onClick={()=>void api.openExternal(s.edition!.url)}>更新公告</Button></p>}<p>{s.checkedAt?new Date(s.checkedAt).toLocaleString('zh-CN'):'尚未更新'}</p>{s.error&&<Notice tone="warn">{s.error}</Notice>}</section>)}</div></Modal>}
+const compareLimit = 3;
+const labelScope = [
+  { value: "main30", label: "主力 · 近 30 天测评" },
+  { value: "main", label: "主力配置" },
+  { value: "all30", label: "近 30 天 · 全部配置" },
+  { value: "all", label: "全部有效测评" },
+];
+const referenceNote = "领域分按公开分项及权重计算。知识工作使用公开 Elo 估算，AA 综合指数采用来源发布值。";
+
+function ModelDetail({ model, onClose, onCompare, canCompare }: {
+  model: VisualModel;
+  onClose: () => void;
+  onCompare: () => void;
+  canCompare: boolean;
+}) {
+  const { entry, profile, release, edition, breakdown } = model;
+  return <Modal wide title={entry.name} onClose={onClose} footer={<>
+    <Button onClick={onClose}>关闭</Button>
+    <Button variant="primary" onClick={onCompare} disabled={!canCompare}>查看对比</Button>
+  </>}>
+    <div className="benchmark-detail">
+      <div className="benchmark-detail-summary">
+        <div className="visual-model-score">
+          <ModelLogo name={entry.name} size={30} />
+          <div><span>AA 综合指数 · {aaVersion(profile.version)}</span><strong>{profile.index.toFixed(1)}</strong></div>
+        </div>
+        <dl>
+          <dt>评测配置</dt><dd>{profile.setting}</dd>
+          <dt>版本发布日期</dt><dd>{edition?.publishedAt || "未确认具体日期"}</dd>
+          <dt>型号发布</dt><dd>{release?.releasedAt ?? "未确认"}</dd>
+          <dt>公开分项</dt><dd>{breakdown.coverage} / 9</dd>
+        </dl>
+        <dl>
+          <dt>输入</dt><dd>{priceText(entry.price.input, entry.price.currency)}</dd>
+          <dt>输出</dt><dd>{priceText(entry.price.output, entry.price.currency)}</dd>
+          <dt>缓存命中</dt><dd>{priceText(entry.price.cachedInput, entry.price.currency)}</dd>
+          <dt>计价单位</dt><dd>{entry.verifiedAt ? entry.price.unit : "—"}</dd>
+          <dt>价格核实</dt><dd>{entry.verifiedAt ? new Date(entry.verifiedAt).toLocaleDateString("zh-CN") : "待核实"}</dd>
+          {entry.price.note && <><dt>计费条件</dt><dd>{entry.price.note}</dd></>}
+        </dl>
+      </div>
+      <div className="visual-model-links">
+        <Button size="sm" onClick={() => void api.openExternal(aaLeaderboard)}>评测来源</Button>
+        {entry.priceSource && <Button size="sm" onClick={() => void api.openExternal(entry.priceSource)}>厂商官方定价</Button>}
+      </div>
+      <BenchmarkBreakdown models={[model]} />
+      <p className="benchmark-note">{referenceNote}</p>
+    </div>
+  </Modal>;
+}
+
+function ModelComparison({ models, selected, onSelect, onRemove }: {
+  models: VisualModel[];
+  selected: VisualModel[];
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const vendors = [...new Set(models.map(model => model.entry.vendor))].sort();
+  const selectedIds = new Set(selected.map(model => model.entry.id));
+  return <section className="card visual-ability">
+    <div className="visual-ability-heading">
+      <h2>能力对比</h2>
+      <select className="select" aria-label="添加对比配置" value="" disabled={selected.length >= compareLimit}
+        onChange={event => onSelect(event.target.value)}>
+        <option value="">{selected.length >= compareLimit ? "已选 3 个配置" : "添加型号与配置"}</option>
+        {vendors.map(vendor => {
+          const options = models.filter(model => model.entry.vendor === vendor && !selectedIds.has(model.entry.id));
+          return options.length > 0 && <optgroup key={vendor} label={vendor}>
+            {options.map(model => <option key={model.entry.id} value={model.entry.id}>{model.entry.name}</option>)}
+          </optgroup>;
+        })}
+      </select>
+    </div>
+    <div className="visual-compare-selected">
+      {selected.map((model, index) => <button key={model.entry.id} onClick={() => onRemove(model.entry.id)}
+        aria-label={`移除 ${model.entry.name}`}>
+        <i style={{ background: modelColors[index] }} />{model.entry.name}<span aria-hidden="true">×</span>
+      </button>)}
+    </div>
+    {selected.length > 0 ? <>
+      <AbilityRadar entries={selected.map(model => model.entry)} axes={visualAxes} label="四个领域的能力对比图" />
+      <BenchmarkBreakdown models={selected} />
+      <p className="benchmark-note">{referenceNote}</p>
+    </> : <EmptyState icon={<IconSearch size={24} />} title="添加一个评测配置开始对比" />}
+  </section>;
+}
+
+function Methodology({ board, registry, exchange, onClose }: {
+  board: BenchmarkBoard | null;
+  registry: AiModelSnapshot | null;
+  exchange: LadderExchange | null;
+  onClose: () => void;
+}) {
+  const source = board?.sources.find(source => source.id === aaSource);
+  return <Modal wide title="评测方法与来源" onClose={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
+    <div className="visual-model-method">
+      <p>Artificial Analysis v5.0.1 将四个领域各计 25%。Quota 按同一型号、推理档位与回退设置展示来源发布的综合指数。</p>
+      <p>领域分按公开分项加权换算到 0–100，分项缺失时留空。知识工作按公开 Elo 换算为参考分，AA 使用加入指数时冻结的 Elo。评测以英文文本任务为主。</p>
+      <div className="benchmark-method-grid">
+        {aaDomains.map(domain => <section key={domain.id}>
+          <h3>{domain.label} <small>25%</small></h3>
+          <ul>{domain.evaluations.map(evaluation => <li key={evaluation.name}>
+            <strong>{evaluation.name} · {evaluationWeight(evaluation)}%</strong>
+            <span>{evaluation.scoring}</span>
+          </li>)}</ul>
+        </section>)}
+      </div>
+      <p>价格采用厂商标准 Token 单价。人民币图表使用 ECB 汇率{validExchange(exchange) ? `（${exchange.date}，1 USD ≈ ${exchange.cnyPerUsd.toFixed(4)} CNY）` : "，汇率缺失时美元模型保留在榜单"}。</p>
+      {source?.checkedAt && <p>当前快照 {aaVersion(source.edition?.version) ?? source.version} · {new Date(source.checkedAt).toLocaleString("zh-CN")}</p>}
+      {source?.error && <Notice tone="warn">{source.error}</Notice>}
+      {registry?.sources.filter(source => source.error).map(source => <p key={source.vendor}>{source.vendor} · {source.error}</p>)}
+      <div className="visual-model-links">
+        <Button onClick={() => void api.openExternal(aaMethodology)}>Artificial Analysis 方法原文</Button>
+        {source?.edition && <Button onClick={() => void api.openExternal(source.edition!.url)}>版本记录</Button>}
+      </div>
+    </div>
+  </Modal>;
+}
+
+export function AiModelsHub({ initialVendor = "all" }: { initialVendor?: string }) {
+  const [board, setBoard] = useState<BenchmarkBoard | null>(null);
+  const [registry, setRegistry] = useState<AiModelSnapshot | null>(null);
+  const [legacy, setLegacy] = useState<LadderSnapshot | null>(null);
+  const [exchange, setExchange] = useState<LadderExchange | null>(null);
+  const [tab, setTab] = useState("ladder");
+  const [view, setView] = useState("ranking");
+  const [domain, setDomain] = useState("general");
+  const [scopeChoice, setScope] = useState<EvaluationScope | null>(null);
+  const [vendor, setVendor] = useState(initialVendor);
+  const [search, setSearch] = useState("");
+  const [selection, setSelection] = useState<string[] | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [method, setMethod] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    let revision = 0;
+    async function load() {
+      const request = ++revision;
+      const [benchmarks, models, ladder, fx] = await Promise.allSettled([
+        api.getBenchmarks(), api.getAiModels(), api.getLadder(), api.getExchangeRate(),
+      ]);
+      if (!active || request !== revision) return;
+      if (benchmarks.status === "fulfilled") setBoard(benchmarks.value);
+      if (models.status === "fulfilled") setRegistry(models.value);
+      if (ladder.status === "fulfilled") setLegacy(ladder.value);
+      if (fx.status === "fulfilled") setExchange(fx.value);
+      setError([benchmarks, models, ladder, fx].flatMap(result => result.status === "rejected" ? [errText(result.reason)] : []).join(" · "));
+      setLoaded(true);
+    }
+    void load();
+    const subscription = listen("benchmarks-updated", () => void load());
+    return () => { active = false; void subscription.then(unlisten => unlisten()); };
+  }, []);
+
+  const all = useMemo(() => board ? visualModels(board, registry, legacy) : [], [board, registry, legacy]);
+  const source = board?.sources.find(source => source.id === aaSource);
+  const scope = scopeChoice ?? (inEvaluationWindow(source?.edition?.publishedAt, 30) ? "main30" : source?.edition ? "main" : "all");
+  const inScope = filterVisualModels(all, scope);
+  const query = search.trim().toLowerCase();
+  const filtered = inScope.filter(model => (vendor === "all" || model.entry.vendor === vendor)
+    && `${model.entry.name} ${model.entry.vendor}`.toLowerCase().includes(query));
+  const ranked = rankVisualModels(filtered, domain);
+  const scoreLabel = scoreOptions.find(option => option.key === domain)?.label ?? "综合指数";
+  const vendors = [...new Set(all.map(model => model.entry.vendor))].sort();
+  const primary = filterVisualModels(all, "main");
+  const featured = primary.length ? primary : all;
+  const defaults = featured.filter((model, index) => featured.findIndex(candidate => candidate.model.id === model.model.id
+    && candidate.entry.vendor === model.entry.vendor) === index).slice(0, compareLimit).map(model => model.entry.id);
+  const selected = (selection ?? []).filter(id => all.some(model => model.entry.id === id));
+  const comparisons = selected.flatMap(id => all.filter(model => model.entry.id === id));
+  const detail = all.find(model => model.entry.id === detailId);
+  const versions = [...new Set(all.map(model => aaVersion(model.profile.version)))];
+  const edition = aaVersion(source?.edition?.version) ?? versions.join(" / ");
+
+  function toggleCompare(id: string) {
+    setSelection(previous => {
+      const ids = (previous ?? selected).filter(id => all.some(model => model.entry.id === id));
+      if (ids.includes(id)) return ids.filter(value => value !== id);
+      return ids.length < compareLimit ? [...ids, id] : ids;
+    });
+  }
+
+  async function refresh() {
+    setBusy(true);
+    setError("");
+    try {
+      const [scores, prices] = await Promise.allSettled([api.refreshBenchmarks(), api.refreshAiModels(true)]);
+      if (scores.status === "fulfilled") setBoard(scores.value);
+      if (prices.status === "fulfilled") setRegistry(prices.value);
+      const [ladder, fx] = await Promise.allSettled([api.getLadder(), api.getExchangeRate()]);
+      if (ladder.status === "fulfilled") setLegacy(ladder.value);
+      if (fx.status === "fulfilled") setExchange(fx.value);
+      setError([scores, prices, ladder, fx].flatMap(result => result.status === "rejected" ? [errText(result.reason)] : []).join(" · "));
+    } finally {
+      setLoaded(true);
+      setBusy(false);
+    }
+  }
+
+  return <div className="content-inner visual-model-page" data-evaluation-scope={scope} data-benchmark-edition={edition}>
+    <header className="visual-model-toolbar">
+      <div className="visual-model-title"><h1>AI 模型</h1>{edition && <span>Artificial Analysis · {edition}</span>}</div>
+      <div className="visual-model-actions">
+        <Button size="sm" variant="quiet" onClick={() => setMethod(true)}>评测方法与来源</Button>
+        <Button size="sm" disabled={busy} onClick={() => void refresh()}>
+          <IconRefresh size={14} className={busy ? "spin" : ""} />{busy ? "更新中…" : "更新数据"}
+        </Button>
+      </div>
+    </header>
+    <div className="benchmark-navigation">
+      <Seg value={tab} options={[{ value: "ladder", label: "模型天梯" }, { value: "ability", label: "能力对比" }]} onChange={value => {
+        if (value === "ability" && selection === null) setSelection(defaults);
+        setTab(value);
+      }} />
+      {tab === "ladder" && <Seg value={view} options={[{ value: "ranking", label: "榜单" }, { value: "chart", label: "价格 × 能力" }]} onChange={setView} />}
+    </div>
+    {error && <Notice tone="warn">{error}</Notice>}
+    {(source?.error || registry?.sources.some(source => source.error)) && <Notice tone="warn"
+      actions={<Button size="sm" onClick={() => setMethod(true)}>查看来源</Button>}>
+      部分来源更新失败，正在使用上次有效数据。
+    </Notice>}
+    {!loaded ? <EmptyState icon={<IconSearch size={24} />} title="正在读取评测…" /> : tab === "ladder" ? <>
+      <div className="visual-model-filters">
+        <div className="search"><IconSearch size={15} /><input className="input" aria-label="搜索天梯模型"
+          placeholder="搜索模型或厂商" value={search} onChange={event => setSearch(event.target.value)} /></div>
+        <select className="select" aria-label="天梯厂商" value={vendor} onChange={event => setVendor(event.target.value)}>
+          <option value="all">全部厂商</option>
+          {vendors.map(name => <option key={name}>{name}</option>)}
+        </select>
+        <select className="select" aria-label="测评范围" value={scope} onChange={event => setScope(event.target.value as EvaluationScope)}>
+          {labelScope.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+      </div>
+      <nav className="benchmark-domains" aria-label="能力评分维度">
+        {scoreOptions.map(option => <button key={option.key} type="button" aria-pressed={domain === option.key}
+          onClick={() => setDomain(option.key)}>
+          <strong>{option.label}</strong><span>{option.key === "general" ? "AA 发布值" : "25% 权重"}</span>
+        </button>)}
+      </nav>
+      <div className="benchmark-result-info">
+        <span role="status">{ranked.length} 个配置{filtered.length > ranked.length && ` · ${filtered.length - ranked.length} 个分项不齐`}</span>
+        {domain !== "general" && <span>{domain === "knowledge-work" ? "使用公开 Elo 的领域参考分" : "按公开分项计算的领域分"}</span>}
+        {selected.length > 0 && <Button size="sm" variant="quiet" onClick={() => setTab("ability")}>对比 {selected.length} 个配置</Button>}
+      </div>
+      {view === "chart" ? <LadderChart entries={filtered.map(model => model.entry)} domain={domain} scoreLabel={scoreLabel}
+        focused={detail?.entry ?? null} onFocus={entry => setDetailId(entry.id)} exchange={exchange} fixedCurrency="CNY" compact />
+        : ranked.length > 0 ? <section className="card benchmark-ranking" aria-label="模型排名">
+          <table>
+            <thead><tr><th scope="col">名次</th><th scope="col">型号与配置</th><th scope="col" aria-sort="descending">{scoreLabel}</th>
+              <th scope="col" title="每百万输入加每百万输出 Token 的标准单价">标准价 · ¥</th><th scope="col">对比</th></tr></thead>
+            <tbody>{ranked.map(({ model, rank, score }) => {
+              const { entry, profile } = model;
+              const included = selected.includes(entry.id);
+              const cost = entry.verifiedAt ? plotPrice(entry, "total", "CNY", exchange) : null;
+              return <tr key={entry.id} data-profile-id={entry.id} data-score={score}>
+                <td className="benchmark-rank">{rank}</td>
+                <th scope="row"><button className="benchmark-profile" onClick={() => setDetailId(entry.id)}>
+                  <ModelLogo name={entry.name} size={25} /><span><strong>{model.model.name}</strong>
+                    <small>{entry.vendor} · {profile.setting}</small></span>
+                </button></th>
+                <td className="benchmark-score"><strong>{score.toFixed(1)}</strong>
+                  <span aria-hidden="true"><i style={{ width: `${score}%` }} /></span>
+                </td>
+                <td className="benchmark-price">{cost === null ? "—" : priceText(cost, "CNY")}</td>
+                <td><Button size="sm" variant={included ? "primary" : "default"} disabled={!included && selected.length >= compareLimit}
+                  aria-label={`${included ? "移除对比" : "加入对比"} ${entry.name}`}
+                  onClick={() => toggleCompare(entry.id)}>{included ? "已选" : "加入"}</Button></td>
+              </tr>;
+            })}</tbody>
+          </table>
+        </section> : <EmptyState icon={<IconSearch size={24} />} title="当前筛选暂无可比较的评测"
+          desc={scope.endsWith("30") && source?.edition && !source.edition.publishedAt ? "当前版本仅公布更新月份，近 30 天筛选需要具体发布日期。" : undefined}
+          action={
+          scope !== "all" ? <Button size="sm" onClick={() => setScope("all")}>查看全部有效测评</Button> : undefined
+        } />}
+    </> : <ModelComparison models={all} selected={comparisons} onSelect={toggleCompare} onRemove={toggleCompare} />}
+    {detail && <ModelDetail model={detail} onClose={() => setDetailId(null)}
+      canCompare={selected.includes(detail.entry.id) || selected.length < compareLimit}
+      onCompare={() => {
+        if (!selected.includes(detail.entry.id)) toggleCompare(detail.entry.id);
+        setTab("ability");
+        setDetailId(null);
+      }} />}
+    {method && <Methodology board={board} registry={registry} exchange={exchange} onClose={() => setMethod(false)} />}
   </div>;
 }

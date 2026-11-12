@@ -233,7 +233,15 @@ pub fn load(dir: &Path) -> Dataset {
             .iter()
             .find(|old| old.id == source.id)
             .is_none_or(|old| {
-                (old.id == "artificial-analysis" && old.edition.is_none() && source.edition.is_some()) || chrono::DateTime::parse_from_rfc3339(&old.checked_at).ok()
+                if old.id == "artificial-analysis" {
+                    if old.edition.as_ref().is_some_and(|edition| edition.version == edition::V5_PATCH) {
+                        return false;
+                    }
+                    if old.edition.is_none() && source.edition.is_some() {
+                        return true;
+                    }
+                }
+                chrono::DateTime::parse_from_rfc3339(&old.checked_at).ok()
                     < chrono::DateTime::parse_from_rfc3339(&source.checked_at).ok()
             })
         {
@@ -278,6 +286,7 @@ pub fn valid(data: &Dataset) -> bool {
         && data.profiles.iter().all(|p| {
             !p.id.is_empty()
                 && p.source_id == "artificial-analysis"
+                && edition::supported(&p.version)
                 && p.index.is_finite()
                 && (0. ..=100.).contains(&p.index)
                 && [p.cost, p.speed, p.latency]
@@ -351,9 +360,18 @@ async fn download_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, 
 pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, String>)> {
     let releases=async {releases::parse(&download(client,releases::URL).await?,&chrono::Utc::now().to_rfc3339())};
     let aa = async {
-        let (body,index,publication)=tokio::join!(download(client,"https://artificialanalysis.ai/leaderboards/models"),download(client,edition::INDEX),download(client,edition::PUBLICATION));
-        let mut data=parse_aa(&body?,&chrono::Utc::now().to_rfc3339())?;
-        edition::attach(&mut data,&index?,&publication?)?;Ok(data)
+        let (body, index) = tokio::join!(
+            download(client, "https://artificialanalysis.ai/leaderboards/models"),
+            download(client, edition::INDEX),
+        );
+        let mut data = parse_aa(&body?, &chrono::Utc::now().to_rfc3339())?;
+        let publication = if data.sources[0].version == edition::V5 {
+            download(client, edition::PUBLICATION).await?
+        } else {
+            String::new()
+        };
+        edition::attach(&mut data, &index?, &publication)?;
+        Ok(data)
     };
     let lb = async {
         let index = download(client, "https://livebench.ai/").await?;
@@ -421,6 +439,15 @@ pub async fn fetch(client: &reqwest::Client) -> Vec<(String, Result<Dataset, Str
 }
 pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String>)>) -> Dataset {
     for (id, result) in updates {
+        let result = result.and_then(|next| {
+            let patch = |dataset: &Dataset| dataset.sources.iter().any(|source| {
+                source.id == "artificial-analysis" && source.edition.as_ref().is_some_and(|edition| edition.version == edition::V5_PATCH)
+            });
+            if id == "artificial-analysis" && patch(&previous) && !patch(&next) {
+                return Err("来源暂时返回旧版评测，保留 v5.0.1 数据".into());
+            }
+            Ok(next)
+        });
         match result {
             Ok(next) if valid(&next) && (!next.observations.is_empty() || next.epoch.is_some() || !next.releases.is_empty()) => {
                 replace_source(&mut previous, &next, &id)
@@ -473,7 +500,7 @@ pub async fn refresh(state: &AppState, force: bool) -> Result<Board, String> {
             .map_err(|_| "评测数据暂不可用")?;
         let automatic: Vec<_> = current.sources.iter().filter(|s| s.automatic).collect();
         if !force
-            && automatic.len() == 3
+            && automatic.len() == 4
             && automatic.iter().all(|s| {
                 s.error.is_none()
                     && chrono::DateTime::parse_from_rfc3339(&s.checked_at)

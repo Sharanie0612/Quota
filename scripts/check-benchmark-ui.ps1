@@ -1,4 +1,9 @@
-param([Parameter(Mandatory=$true)][string]$ExePath,[Parameter(Mandatory=$true)][string]$DataDir,[Parameter(Mandatory=$true)][string]$ActivityDb)
+param(
+ [Parameter(Mandatory=$true)][string]$ExePath,
+ [Parameter(Mandatory=$true)][string]$DataDir,
+ [Parameter(Mandatory=$true)][string]$ActivityDb,
+ [string]$BenchmarkData
+)
 $ErrorActionPreference='Stop'
 $taskWorkspace=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')+'\'
 $taskData=[IO.Path]::GetFullPath($DataDir)
@@ -9,6 +14,9 @@ $taskUtf8=[Text.UTF8Encoding]::new($false)
 $taskConfig=@{version=1;accounts=@();settings=@{autoRefresh=$false;ladderAutoUpdate=$false;notifyLowBalance=$false;closeToTray=$false;refreshIntervalMinutes=30;defaultLowThreshold=20;notifyRecharge=$false;trayAlert=$false}}
 $taskOptions=@{deviceId=[guid]::NewGuid().ToString();deviceName='Product UI check';autoCollect=$false;syncAccounts=$false;syncDir='';codexHome='';zcodeHome='';harnessHome='';traeHome='';traeEnabled=$false;codexSshDevices=@()}
 foreach($taskEntry in @(@('config.json',$taskConfig),@('activity-settings.json',$taskOptions),@('usage-widget.json',@{enabled=$false;side='right';heightPercent=50}))){[IO.File]::WriteAllText((Join-Path $taskData $taskEntry[0]),($taskEntry[1]|ConvertTo-Json -Depth 8),$taskUtf8)}
+if ($BenchmarkData) {
+ Copy-Item -LiteralPath $BenchmarkData -Destination (Join-Path $taskData 'ai-benchmarks-v3.json')
+}
 # Read-only SQLite backup includes committed WAL pages. A raw copy can silently
 # omit the new samples when the fixture's last open connection was a reader.
 $taskSnapshot=@'
@@ -25,7 +33,7 @@ try{
  if(-not $taskProcess.WaitForExit(60000)){throw 'Packaged product UI did not complete within 60 seconds'}
  $taskReport=Get-Content -LiteralPath (Join-Path $taskData 'benchmark-ui-check.json') -Raw|ConvertFrom-Json
  if($taskProcess.ExitCode -ne 0 -or -not $taskReport.passed){throw ('Packaged product UI mismatch: '+$taskReport.error)}
- Write-Output ('PASS packaged WebView: '+@($taskReport.report.all).Count+' full-configuration scores; '+@($taskReport.report.primary).Count+' current primary configurations; '+@($taskReport.report.recent).Count+' configurations in recent evaluation edition; six-axis radar; output-speed values; model-library and donut-detail removal')
+ Write-Output ('PASS packaged WebView: '+@($taskReport.report.all).Count+' full-configuration scores; '+@($taskReport.report.primary).Count+' current primary configurations; '+@($taskReport.report.recent).Count+' configurations in recent evaluation edition; four-domain radar and benchmark matrix; output-speed values; model-library and donut-detail removal')
 }finally{
  if($taskProcess -and -not $taskProcess.HasExited){Stop-Process -Id $taskProcess.Id -ErrorAction SilentlyContinue}
  $env:QUOTA_DATA_DIR=$taskPreviousData;$env:QUOTA_BENCHMARK_SMOKE=$taskPreviousSmoke;$env:WEBVIEW2_USER_DATA_FOLDER=$taskPreviousWebView

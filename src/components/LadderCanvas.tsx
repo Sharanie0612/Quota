@@ -5,8 +5,8 @@ import {plotPriceLabel,scatterClusters} from '../lib/scatterLayout';
 import {reasoningLabel} from '../lib/ladderModels';
 import {useChartSize} from '../lib/useChartSize';
 import {ModelLogo,modelBrand} from './ModelLogo';
-type Props={entries:LadderEntry[];domain:string;focused:LadderEntry|null;onFocus:(entry:LadderEntry)=>void;exchange?:LadderExchange|null;metric:LadderMetric;currency:string;highlightBrand:string};
-export function LadderCanvas({entries,domain,focused,onFocus,exchange,metric,currency,highlightBrand}:Props){
+type Props={entries:LadderEntry[];domain:string;scoreLabel?:string;focused:LadderEntry|null;onFocus:(entry:LadderEntry)=>void;exchange?:LadderExchange|null;metric:LadderMetric;currency:string;highlightBrand:string};
+export function LadderCanvas({entries,domain,scoreLabel="能力指数",focused,onFocus,exchange,metric,currency,highlightBrand}:Props){
   const chart=useChartSize(1000,440),[hover,setHover]=useState<string|null>(null),[opened,setOpened]=useState<string|null>(null);
   const bounds={left:54,right:chart.width-30,top:38,bottom:chart.height-64};
   const raw=entries.map(entry=>({entry,id:entry.id,cost:plotPrice(entry,metric,currency,exchange)!,score:entry.rankings[domain].score}));
@@ -16,7 +16,7 @@ export function LadderCanvas({entries,domain,focused,onFocus,exchange,metric,cur
   const choose=(cluster:typeof clusters[number])=>{if(cluster.members.length===1)onFocus(cluster.anchor.entry);else setOpened(value=>value===cluster.anchor.id?null:cluster.anchor.id);};
   return <div className="scatter-panel" onKeyDown={event=>{if(event.key==='Escape'){setOpened(null);setHover(null);}}}>
     <svg ref={chart.ref} viewBox={`0 0 ${chart.width} ${chart.height}`} data-plot-width={chart.width} data-plot-height={chart.height} role="group" aria-label={`${currency}统一价格与性能坐标图`}>
-      <text x={bounds.left} y="18" className="scatter-axis-title">能力指数 ↑</text>
+      <text x={bounds.left} y="18" className="scatter-axis-title">{scoreLabel} ↑</text>
       {scale.scoreTicks.map(value=><g key={value}><line x1={bounds.left} x2={bounds.right} y1={scale.y(value)} y2={scale.y(value)} className="scatter-grid"/><text x={bounds.left-12} y={scale.y(value)+4} textAnchor="end" className="scatter-tick">{value}</text></g>)}
       {scale.ticks.map(value=><g key={value}><line x1={scale.x(value)} x2={scale.x(value)} y1={bounds.top} y2={bounds.bottom} className="scatter-grid"/><text x={scale.x(value)} y={bounds.bottom+26} textAnchor="middle" className="scatter-tick">{value>0&&value<.001?value.toExponential(0):Number(value.toPrecision(3))}</text></g>)}
       <text x={(bounds.left+bounds.right)/2} y={chart.height-8} textAnchor="middle" className="scatter-axis-title">{metric==='cached'?'缓存命中':metric==='output'?'输出':metric==='input'?'输入':'输入 + 输出'} · {currency==='CNY'?'¥':currency} / {metric==='total'?'百万输入 + 百万输出':'百万 Token'} · 对数刻度 →</text>

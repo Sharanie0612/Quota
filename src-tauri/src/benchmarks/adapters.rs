@@ -77,7 +77,7 @@ fn current_index(value: &Value, versions: &mut BTreeSet<String>) {
         _ => {}
     }
 }
-pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
+pub(super) fn aa_frames(html: &str) -> Result<Vec<Value>, String> {
     if html.len() > 16 * 1024 * 1024 || !html.contains("Artificial Analysis") {
         return Err("AA 来源标识或大小变化".into());
     }
@@ -92,37 +92,85 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
             }
         }
     }
-    let mut objects = Vec::new();
     let mut frames = Vec::new();
-    for line in stream.lines() {
-        let Some((id, body)) = line.split_once(':') else {
-            continue;
-        };
-        if id.is_empty() || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+    let mut remaining = stream.as_str();
+    while !remaining.is_empty() {
+        remaining = remaining.trim_start_matches(['\r', '\n']);
+        let Some((id, body)) = remaining.split_once(':') else { break };
+        // Next's preload hints have no frame ID and carry no model data.
+        if id.is_empty() && body.starts_with("HL[") {
+            remaining = body.split_once('\n').map_or("", |(_, next)| next);
             continue;
         }
-        if let Ok(value) = serde_json::from_str::<Value>(body) {
+        if id.is_empty() || !id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err("AA 数据帧结构变化".into());
+        }
+        if let Some(text) = body.strip_prefix('T') {
+            let (hex, payload) = text.split_once(',').ok_or("AA 文本帧不完整")?;
+            let length = usize::from_str_radix(hex, 16).map_err(|_| "AA 文本帧长度无效")?;
+            remaining = payload.get(length..).ok_or("AA 文本帧长度无效")?;
+            continue;
+        }
+        let (line, next) = body.split_once('\n').unwrap_or((body, ""));
+        remaining = next;
+        if let Ok(value) = serde_json::from_str::<Value>(line) {
             frames.push(value);
         }
     }
+    Ok(frames)
+}
+
+pub(super) fn aa_index_version(frames: &[Value]) -> Result<&'static str, String> {
     let mut versions = BTreeSet::new();
-    for frame in &frames {
+    for frame in frames {
         current_index(frame, &mut versions);
     }
-    if versions != BTreeSet::from(["Artificial Analysis Intelligence Index v5.0".into()]) {
-        return Err("AA 指数版本变化，保留上次数据并等待适配".into());
+    if versions.len() == 1 {
+        match versions.first().map(String::as_str) {
+            Some("Artificial Analysis Intelligence Index v5.0") => return Ok(edition::V5),
+            Some("Artificial Analysis Intelligence Index v5.0.1") => return Ok(edition::V5_PATCH),
+            _ => {}
+        }
     }
+    Err("AA 指数版本变化，保留上次数据并等待适配".into())
+}
+
+const INDEX_KEYS: [&str; 10] = [
+    "aa-briefcase", "automationbench-aa", "gdp-pdf", "frontiercode-2-0", "terminalbench-4-0",
+    "terminal-bench-science", "critpt-v2-hard", "omniscience-accuracy",
+    "omniscience-non-hallucination", "hle-diamond",
+];
+
+fn aa_score(key: &str, value: &Value) -> Option<(f64, &'static str)> {
+    let value = value.as_f64()?;
+    if key == "aa-briefcase" {
+        (0. ..=5000.).contains(&value).then_some((value, "Elo"))
+    } else {
+        (0. ..=1.).contains(&value).then_some((value * 100., "percent"))
+    }
+}
+
+pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
+    let frames = aa_frames(html)?;
+    let version = aa_index_version(&frames)?;
+    let mut objects = Vec::new();
     for frame in &frames {
-        walk(frame, &mut objects)
+        walk(frame, &mut objects);
     }
     let mut observations = Vec::new();
     let mut profiles = Vec::new();
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeMap::new();
     for model in objects {
         let Some(slug) = model["slug"].as_str() else {
             continue;
         };
-        if !seen.insert(slug.to_string()) || model["deprecated"] == true {
+        if let Some(previous) = seen.insert(slug, model) {
+            if previous != model {
+                return Err("AA 同一评测配置出现冲突，保留上次数据".into());
+            }
+            continue;
+        }
+        if model["deprecated"] == true {
             continue;
         }
         let (Some(name), Some(vendor), Some(scores)) = (
@@ -144,19 +192,8 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
             let Some((domain, family, label, weight)) = metric(key) else {
                 continue;
             };
-            let Some(raw) = value.as_f64().filter(|v| v.is_finite()) else {
+            let Some((value, unit)) = aa_score(key, value) else {
                 continue;
-            };
-            let (value, unit) = if key == "aa-briefcase" {
-                if !(0. ..=5000.).contains(&raw) {
-                    continue;
-                }
-                (raw, "Elo")
-            } else {
-                if !(0. ..=1.).contains(&raw) {
-                    continue;
-                }
-                (raw * 100., "percent")
             };
             observations.push(Observation {
                 profile_id: slug.into(),
@@ -187,11 +224,9 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
                 .filter(|v| v.is_finite() && (0. ..=100.).contains(v))
             {
                 let number = |key: &str| model[key].as_f64().filter(|v| v.is_finite() && *v >= 0.);
-                // Only v5-complete profiles can share the v5 cost/quality plot.
-                if ["frontiercode-2-0", "hle-diamond", "critpt-v2-hard"]
-                    .iter()
-                    .all(|key| scores.get(*key).and_then(Value::as_f64).is_some())
-                {
+                // v5.0.1 omits the estimated flag. Require the full constituent
+                // suite to keep partial or estimated results out of the ladder.
+                if INDEX_KEYS.iter().all(|key| scores.get(*key).and_then(|value| aa_score(key, value)).is_some()) {
                     profiles.push(Profile {
                         id: slug.into(),
                         model_id: model_id.clone(),
@@ -207,7 +242,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
                         speed: number("medianOutputTokensPerSecond"),
                         latency: number("medianTimeToFirstTokenSeconds"),
                         source_id: "artificial-analysis".into(),
-                        version: "Intelligence Index v5".into(),
+                        version: version.into(),
                     });
                 }
             }
@@ -222,7 +257,7 @@ pub fn parse_aa(html: &str, checked: &str) -> Result<Dataset, String> {
         id: "artificial-analysis".into(),
         name: "Artificial Analysis".into(),
         url: AA.into(),
-        version: "Intelligence Index v5 / additional evaluations".into(),
+        version: version.into(),
         checked_at: checked.into(),
         records: observations.len(),
         error: None,

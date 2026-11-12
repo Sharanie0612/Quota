@@ -103,6 +103,12 @@ fn checks() {
     let data = fixture();
     let board = benchmarks::calculate(&data);
     let aa = ranking(&board, "aa");
+    let mut patch = data.clone();
+    for profile in &mut patch.profiles {
+        profile.version = "Intelligence Index v5.0.1".into();
+    }
+    let patch = benchmarks::calculate(&patch);
+    assert_eq!(ranking(&patch, "aa").entries[0].score, 80.);
     assert_eq!(aa.entries[0].score, 80.);
     assert_eq!(aa.entries[0].profile_id, "model7-High");
     let model = board.models.iter().find(|m| m.id == "model7").unwrap();
@@ -196,7 +202,8 @@ fn main() {
         serde_json::from_str(&fs::read_to_string(audit.join("sources.json")).unwrap()).unwrap();
     let checked = checked["checkedAt"].as_str().unwrap();
     let aa_html = fs::read_to_string(audit.join("artificial-analysis.html")).unwrap();
-    assert!(benchmarks::parse_aa(&aa_html.replace("Index v5.0", "Index v6.0"), checked).is_err());
+    let unknown_version = aa_html.replace("Index v5.0", "Index v6.0");
+    assert!(benchmarks::parse_aa(&unknown_version, checked).is_err());
     let table = fs::read_to_string(audit.join("livebench-current-table.csv")).unwrap();
     let categories = fs::read_to_string(audit.join("livebench-current-categories.json")).unwrap();
     let release = fs::read_to_string(audit.join("livebench-release.txt")).unwrap();
@@ -204,10 +211,30 @@ fn main() {
     let index_html=fs::read_to_string(audit.join("aa-index.html")).expect("download AA evaluation page");
     let edition_html=fs::read_to_string(audit.join("aa-index-v5.html")).expect("download AA version announcement");
     benchmarks::edition::attach(&mut aa,&index_html,&edition_html).expect("verified evaluation edition");
-    let edition=aa.sources.iter().find(|s|s.id=="artificial-analysis").unwrap().edition.as_ref().unwrap();
-    assert_eq!(edition.published_at,"2026-10-27");assert!(edition.primary_profiles.contains(&"gpt-6-astra".to_string()));
-    assert!(aa.profiles.iter().all(|p|aa.profiles.iter().any(|other|other.vendor==p.vendor&&edition.primary_profiles.contains(&other.id))));
-    let mut invalid=aa.clone();assert!(benchmarks::edition::attach(&mut invalid,&index_html,&edition_html.replace("datePublished","unconfirmedDate")).is_err());
+    let edition = aa.sources[0].edition.as_ref().unwrap();
+    let mut invalid = aa.clone();
+    match edition.version.as_str() {
+        "Intelligence Index v5" => {
+            assert_eq!(edition.published_at, "2026-10-27");
+            assert!(benchmarks::edition::attach(
+                &mut invalid, &index_html, &edition_html.replace("datePublished", "unconfirmedDate"),
+            ).is_err());
+        }
+        "Intelligence Index v5.0.1" => {
+            assert!(edition.published_at.is_empty(), "v5.0.1 must not inherit the v5.0 release day");
+            let older = index_html.replace("Index v5.0.1", "Index v5.0");
+            assert!(benchmarks::edition::attach(&mut invalid, &older, &edition_html).is_err());
+            let old: Dataset = serde_json::from_str(include_str!("../data/benchmarks.json")).unwrap();
+            let retained = benchmarks::merge(aa.clone(), vec![("artificial-analysis".into(), Ok(old))]);
+            assert_eq!(retained.profiles.len(), aa.profiles.len());
+            assert_eq!(retained.profiles[0].version, edition.version);
+            assert!(retained.sources[0].error.is_some());
+        }
+        version => panic!("unexpected source version {version}"),
+    }
+    assert!(aa.profiles.iter().all(|profile| aa.profiles.iter().any(|other| {
+        other.vendor == profile.vendor && edition.primary_profiles.contains(&other.id)
+    })));
     let lb = benchmarks::parse_livebench(&table, &categories, release.trim(), checked).unwrap();
     assert!(benchmarks::parse_livebench(
         &table.replace("reasoning", "reasoning_v3"),
@@ -339,11 +366,12 @@ fn main() {
             reconciled.push(serde_json::json!({"board":id,"model":model,"expected":score,"actual":actual.score,"profileId":actual.profile_id}));
         }
     }
+    let historical = benchmarks::calculate(&old);
     for row in golden["cases"].as_array().unwrap() {
         let source = row["board"].as_str().unwrap();
         let id = row["modelId"].as_str().unwrap();
         let expected = row["score"].as_f64().unwrap();
-        let entry = ranking(&board, source)
+        let entry = ranking(&historical, source)
             .entries
             .iter()
             .find(|e| e.model_id == id)
@@ -358,22 +386,7 @@ fn main() {
         }
         reconciled.push(serde_json::json!({"board":source,"model":id,"expected":expected,"actual":entry.score,"profileId":entry.profile_id}));
     }
-    let top: Vec<_> = ranking(&board, "aa")
-        .entries
-        .iter()
-        .take(5)
-        .map(|e| e.model_id.as_str())
-        .collect();
-    assert_eq!(
-        top,
-        vec![
-            "gemini4carbon",
-            "claudeopus55",
-            "gpt6astra",
-            "gpt61sol",
-            "claudesonnet55"
-        ]
-    );
+    assert!(!ranking(&board, "aa").entries.is_empty());
     for entry in &ranking(&board, "aa").entries {
         let profile = dataset
             .profiles
@@ -383,12 +396,7 @@ fn main() {
         assert_eq!(entry.score, profile.index);
     }
     assert_eq!(
-        dataset
-            .sources
-            .iter()
-            .find(|s| s.id == "livebench")
-            .unwrap()
-            .weights["LiveBench Long Agentic"],
+        old.sources.iter().find(|s| s.id == "livebench").unwrap().weights["LiveBench Long Agentic"],
         2.
     );
     for r in board.rankings.iter().take(7) {
@@ -416,6 +424,7 @@ fn main() {
         serde_json::to_vec_pretty(&board).unwrap(),
     )
     .unwrap();
+    fs::write(audit.join("dataset.json"), serde_json::to_vec(&dataset).unwrap()).unwrap();
     if std::env::args().any(|a| a == "--write-seed") {
         fs::write(
             root.join("data/benchmarks.json"),

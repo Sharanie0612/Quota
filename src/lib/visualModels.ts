@@ -1,33 +1,82 @@
-import type {AiModelSnapshot,BenchmarkBoard,BenchmarkEdition,BenchmarkModel,BenchmarkProfile,LadderEntry,LadderSnapshot,ModelRelease} from './types';
-export const visualAxes=[{key:'reasoning',label:'推理'},{key:'coding',label:'编程'},{key:'knowledge',label:'知识'},{key:'research',label:'科研'},{key:'agents',label:'智能体'},{key:'visual',label:'视觉'}];
-const metrics:Record<string,string>={reasoning:'HLE-Diamond',coding:'FrontierCode 2.0',knowledge:'AA-Omniscience v1.1 · accuracy',research:'CritPt v2 · hard subset',agents:'AutomationBench-AA',visual:'MMMU-Pro'};
-export const modelIdentity=(value:string)=>value.replace(/\s*\([^)]*\)\s*$/,'').toLowerCase().replace(/[^a-z0-9]/g,'');
-const vendorIdentity=(value:string)=>({zai:'zhipu',zhipu:'zhipu',xiaomi:'xiaomi',spacexai:'xai'}[modelIdentity(value)]??modelIdentity(value));
-export function inEvaluationWindow(value:string|undefined,days:number,now=new Date()){
-  if(!days)return true;if(!value||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
-  const date=new Date(value+'T12:00:00');if(Number.isNaN(date.getTime())||date.toLocaleDateString('en-CA')!==value)return false;
-  const cutoff=new Date(now.getFullYear(),now.getMonth(),now.getDate(),12);cutoff.setDate(cutoff.getDate()-(days-1));
-  return date.getTime()>=cutoff.getTime()&&value<=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+import type { AiModelSnapshot, BenchmarkBoard, BenchmarkEdition, BenchmarkModel, BenchmarkProfile, LadderEntry, LadderSnapshot, ModelRelease } from "./types";
+import { aaSource, aaVersion, profileBreakdown } from "./aaMethodology";
+
+const configuration = /\s*\((?:non-reasoning|reasoning|minimal|low|medium|high|xhigh|max)(?:,\s*default fallback)?\)\s*$/i;
+export const modelIdentity = (value: string) => value.replace(configuration, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const vendorIdentity = (value: string) => {
+  const key = modelIdentity(value);
+  return ({ zai: "zhipu", spacexai: "xai" } as Record<string, string>)[key] ?? key;
+};
+
+export function inEvaluationWindow(value: string | undefined, days: number, now = new Date()) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) return false;
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const age = (today - date.getTime()) / 86400000;
+  return age >= 0 && age < days;
 }
-export type EvaluationScope='main30'|'all30'|'all';
-export interface VisualModel {entry:LadderEntry;profile:BenchmarkProfile;model:BenchmarkModel;release?:ModelRelease;edition?:BenchmarkEdition}
-export function filterVisualModels(models:VisualModel[],scope:EvaluationScope,now=new Date()){
-  return models.filter(m=>(scope==='all'||(m.profile.version===m.edition?.version&&inEvaluationWindow(m.edition?.publishedAt,30,now)))&&(scope!=='main30'||!!m.edition?.primaryProfiles.includes(m.profile.id)));
+
+export type EvaluationScope = "main30" | "main" | "all30" | "all";
+export interface VisualModel {
+  entry: LadderEntry;
+  profile: BenchmarkProfile;
+  model: BenchmarkModel;
+  release?: ModelRelease;
+  edition?: BenchmarkEdition;
+  breakdown: ReturnType<typeof profileBreakdown>;
 }
-export function visualModels(board:BenchmarkBoard,registry:AiModelSnapshot|null,legacy:LadderSnapshot|null):VisualModel[]{
-  return board.profiles.filter(p=>p.sourceId==='artificial-analysis'&&Number.isFinite(p.index)&&p.index>=0&&p.index<=100).flatMap(profile=>{
-    const model=board.models.find(m=>m.id===profile.modelId);if(!model)return [];
-    const key=modelIdentity(model.name),vendor=vendorIdentity(model.vendor);
-    const same=(name:string,owner:string)=>modelIdentity(name)===key&&vendorIdentity(owner)===vendor;
-    const official=registry?.models.find(m=>m.available&&!!m.verifiedAt&&(same(m.name,m.vendor)||same(m.apiId,m.vendor)));
-    const old=legacy?.entries.find(e=>same(e.name,e.vendor)&&!!e.verifiedAt);
-    const release=board.releases?.find(r=>r.id===key&&vendorIdentity(r.vendor)===vendor);
-    const result=model.results.find(r=>r.sourceId==='artificial-analysis'&&r.profileId===profile.id);if(!result)return [];
-    const edition=board.sources.find(s=>s.id==='artificial-analysis')?.edition??undefined;
-    const rankings:LadderEntry['rankings']={general:{rank:0,score:profile.index,source:result.url,updatedAt:edition?.publishedAt??''}};
-    for(const axis of visualAxes){const raw=model.observations.find(o=>o.sourceId==='artificial-analysis'&&o.profileId===profile.id&&o.metric===metrics[axis.key]&&o.unit==='percent'&&o.value>=0&&o.value<=100);if(raw)rankings[axis.key]={rank:0,score:raw.value,source:raw.url,updatedAt:raw.checkedAt};}
-    const price=official?.price??old?.price??{currency:'CNY',unit:'每百万 Tokens',input:null,output:null,note:null};
-    return [{entry:{id:profile.id,name:profile.name,vendor:model.vendor,provider:official?.provider??old?.provider??'',rankings,price,priceSource:official?.source??old?.priceSource??'',verifiedAt:official?.verifiedAt??old?.verifiedAt??null,releasedAt:release?.releasedAt??null},profile,model,release,edition}];
-  }).sort((a,b)=>b.profile.index-a.profile.index||a.profile.id.localeCompare(b.profile.id));
+
+export function filterVisualModels(models: VisualModel[], scope: EvaluationScope, now = new Date()) {
+  return models.filter(model => {
+    if (scope === "all") return true;
+    if (model.profile.version !== model.edition?.version) return false;
+    if (scope !== "main" && !inEvaluationWindow(model.edition?.publishedAt, 30, now)) return false;
+    return scope === "all30" || !!model.edition?.primaryProfiles.includes(model.profile.id);
+  });
 }
-export const axisMetric=(axis:string)=>metrics[axis]??'Artificial Analysis Intelligence Index v5';
+
+export function rankVisualModels(models: VisualModel[], metric: string) {
+  const ranked = models.filter(model => model.entry.rankings[metric] != null)
+    .sort((a, b) => b.entry.rankings[metric].score - a.entry.rankings[metric].score || a.profile.name.localeCompare(b.profile.name) || a.profile.id.localeCompare(b.profile.id));
+  let rank = 0;
+  return ranked.map((model, index) => {
+    const score = model.entry.rankings[metric].score;
+    if (index === 0 || score !== ranked[index - 1].entry.rankings[metric].score) rank = index + 1;
+    return { model, rank, score };
+  });
+}
+
+export function visualModels(board: BenchmarkBoard, registry: AiModelSnapshot | null, legacy: LadderSnapshot | null): VisualModel[] {
+  const source = board.sources.find(source => source.id === aaSource);
+  const models = new Map(board.models.map(model => [model.id, model]));
+  return board.profiles.flatMap(profile => {
+    if (profile.sourceId !== aaSource || !aaVersion(profile.version) || !Number.isFinite(profile.index)
+      || profile.index < 0 || profile.index > 100) return [];
+    const model = models.get(profile.modelId);
+    const result = model?.results.find(result => result.sourceId === aaSource && result.profileId === profile.id);
+    if (!model || !result || modelIdentity(model.name) !== modelIdentity(profile.name)) return [];
+    const key = modelIdentity(model.name);
+    const vendor = vendorIdentity(profile.vendor);
+    const same = (name: string, owner: string) => modelIdentity(name) === key && vendorIdentity(owner) === vendor;
+    const official = registry?.models.find(model => model.available && !!model.verifiedAt
+      && (same(model.name, model.vendor) || same(model.apiId, model.vendor)));
+    const old = legacy?.entries.find(entry => same(entry.name, entry.vendor) && !!entry.verifiedAt);
+    const release = board.releases?.find(release => release.id === key && vendorIdentity(release.vendor) === vendor);
+    const edition = source?.edition?.version === profile.version ? source.edition : undefined;
+    const breakdown = profileBreakdown(profile, model.observations);
+    const rankings: LadderEntry["rankings"] = {
+      general: { rank: 0, score: profile.index, source: result.url, updatedAt: source?.checkedAt ?? "" },
+    };
+    for (const [domain, score] of Object.entries(breakdown.scores)) {
+      rankings[domain] = { rank: 0, score, source: result.url, updatedAt: source?.checkedAt ?? "" };
+    }
+    const price = official?.price ?? old?.price ?? { currency: "CNY", unit: "每百万 Tokens", input: null, output: null, note: null };
+    const entry = {
+      id: profile.id, name: profile.name, vendor: profile.vendor, provider: official?.provider ?? old?.provider ?? "",
+      rankings, price, priceSource: official?.source ?? old?.priceSource ?? "",
+      verifiedAt: official?.verifiedAt ?? old?.verifiedAt ?? null, releasedAt: release?.releasedAt ?? null,
+    };
+    return [{ entry, profile, model, release, edition, breakdown }];
+  }).sort((a, b) => b.profile.index - a.profile.index || a.profile.id.localeCompare(b.profile.id));
+}

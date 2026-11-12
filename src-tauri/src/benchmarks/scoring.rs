@@ -162,7 +162,7 @@ pub fn calculate(data: &Dataset) -> Board {
         for profile in data.profiles.iter().filter(|p| {
             p.model_id == id
                 && p.source_id == "artificial-analysis"
-                && p.version == "Intelligence Index v5"
+                && edition::supported(&p.version)
                 && !p.id.is_empty()
         }) {
             if !profiles.insert(profile.id.clone()) {

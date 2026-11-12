@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前开发版本为 1.0.3800**。Token 活动新增可选的 Multica 本机采集，AI 模型页提供 Artificial Analysis 四领域榜单、九项评测对比和人民币价格图。 [Token 活动](docs/activity-stats.md) · [模型评测与价格](docs/model-benchmarks.md)
+**当前开发版本为 1.0.3900**。AI 模型页以 Artificial Analysis 综合指数和美元单任务成本对比模型，连接 AA API 后可自动同步新配置。[模型评测与单任务成本](docs/model-benchmarks.md)
 
 ## 开始使用
 
@@ -39,7 +39,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 | --- | --- |
 | **账户总览** | 余额、订阅余量、查询状态与低余额提醒；累计充值和消费分别记录 |
 | **我的使用** | 人民币总支出、使用 Token、实际单价；记录与编辑费用，按月份、厂商查询及导出 |
-| **AI 模型** | AA 综合及四领域榜单、人民币价格图、九项测评并列对比 |
+| **AI 模型** | Intelligence Index vs. Cost per Task 散点图，支持搜索、厂商筛选和 AA API 自动更新 |
 | **Token 活动** | Codex、ZCode、Harness、可选 Multica 和 Trae 的趋势与环形占比，按来源、模型和设备筛选 |
 | **输出速度** | 每次调用的速度散点，按时间、模型、设备筛选；悬浮窗显示运行任务 |
 | **设置** | 配色、明暗、视觉效果、采集频率、通知、悬浮窗、备份和跨设备同步 |

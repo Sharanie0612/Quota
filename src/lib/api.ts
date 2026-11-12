@@ -1,8 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { BenchmarkBoard } from './types';
 import type {
-  AiModelSnapshot,
+  TaskCostReport,
   ActivityReport, ActivityOptions, SshHostDiscovery, SshIdentity, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
   AccountInput,
   AccountTrend,
@@ -19,13 +18,12 @@ import type {
 
 export const api = {
   getMainWindowChrome: () => invoke<{installed:boolean;blockedFramePaints:number;blockedThemedPaints:number;safeActivationForwards:number}>('get_main_window_chrome'),
-  getBenchmarks: () => invoke<BenchmarkBoard>('get_benchmarks'),
+  getTaskCost: () => invoke<TaskCostReport>('get_task_cost'),
+  refreshTaskCost: () => invoke<TaskCostReport>('refresh_task_cost'),
+  saveTaskCostKey: (key: string) => invoke<TaskCostReport>('save_task_cost_key', { key }),
   getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),
   refreshOutputSpeed: () => invoke<number>('refresh_output_speed'),
-  refreshBenchmarks: () => invoke<BenchmarkBoard>('refresh_benchmarks'),
   reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
-  getAiModels: () => invoke<AiModelSnapshot>('get_ai_models'),
-  refreshAiModels: (force=true) => invoke<AiModelSnapshot>('refresh_ai_models',{force}),
   moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),
   syncUsageNow: () => invoke<void>('sync_usage_now'),
   syncActivityNow: () => invoke<void>('sync_activity_now'),

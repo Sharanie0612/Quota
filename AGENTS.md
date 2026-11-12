@@ -9,7 +9,7 @@
 Windows 桌面应用 Quota：本地优先地查看 AI 服务商余额、额度与用量，并保留模型资料与官方充值入口。
 
 - 技术栈：Tauri 2（Rust）+ React 18 + TypeScript + Vite，界面为苹果简约风格。
-- 六个页面：账户总览 / 我的使用 / AI 模型 / Token 活动 / 输出速度 / 设置。「AI 模型」提供 AA 综合指数和四领域榜单、人民币价格图、九项评测对比，默认展示当前主力配置。模型库及其账户/设置入口已移除。主窗口 label `main`；托盘单击直接打开主窗口。独立贴边用量窗 `usage-widget` 展示今日/累计 Token，不复用旧账户悬浮卡。
+- 六个页面：账户总览 / 我的使用 / AI 模型 / Token 活动 / 输出速度 / 设置。「AI 模型」展示 Artificial Analysis Intelligence Index 与加权美元单任务成本，连接 AA API 后可自动更新。模型库及其账户/设置入口已移除。主窗口 label `main`；托盘单击直接打开主窗口。独立贴边用量窗 `usage-widget` 展示今日/累计 Token，不复用旧账户悬浮卡。
 - 界面要求（用户明确要求，不要改回去）：
   - **极简表单**：添加/编辑账户只展示平台、账户名称、连接信息、同步方式（账户名称可选；小米与 ChatGPT 使用连接按钮），其余全部收进「高级设置」折叠。
   - **配三步中文教程**：表单顶部要有三步流程说明和「API Key 在哪拿？」入口。
@@ -48,10 +48,8 @@ UI 样式自检（不开桌面程序，浏览器里看真实界面）：
 
 ```bash
 npm run build
-rm -rf dist-mock && mkdir -p dist-mock && cp -r dist/assets dist-mock/
-node -e "const fs=require('fs');const h=fs.readFileSync('dist/index.html','utf8');fs.writeFileSync('dist-mock/index.html',h.replace('<head>','<head><script>'+fs.readFileSync('scripts/mock-tauri.js','utf8')+'</script>'))"
-node scripts/preview-server.cjs 4174
-# 主面板 http://127.0.0.1:4174/ ；悬浮卡 http://127.0.0.1:4174/?window=usage-widget（浏览器调窄到 364px）
+npm run preview:ui
+# 主面板 http://127.0.0.1:4187/ ；悬浮卡 http://127.0.0.1:4187/?window=usage-widget（浏览器调窄到 364px）
 ```
 
 ---
@@ -219,6 +217,7 @@ node scripts/preview-server.cjs 4174
 | 2026-11-01 导航边缘实际折射、随形高光与可打断形变，减少动态改为淡入淡出（本地修复，验收见 docs/liquid-optics-1.0.3501.md） | `1.0.3501` | `1.0.3501` |
 | 2026-11-13 按 AA v5.0.1 重构 AI 模型页（Windows 本地安装包，规则见 docs/model-benchmarks.md） | `1.0.3700` | `1.0.3700` |
 | 2026-11-13 集成 Multica 本机采集及 Codex 续聊增量校正（Windows 本地安装包，见 docs/activity-stats.md） | `1.0.3800` | `1.0.3800` |
+| 2026-11-13 AI 模型单任务成本图与官方 AA API 自动更新（Windows 本地安装包，见 docs/model-benchmarks.md） | `1.0.3900` | `1.0.3900` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 
@@ -235,7 +234,8 @@ node scripts/preview-server.cjs 4174
 - 主窗口使用无系统标题栏布局；窗口按钮及拖动权限仅授予 `main`，关闭必须沿用 Tauri close 事件以遵守托盘设置。小米恢复使用固定官方 `genLoginUrl` 入口，不能只加载首页；认证与套餐查询分开，先保存成功续接的会话。Cookie 的相对 Max-Age 写入凭据库前固定为绝对到期时间，不人为延长服务端登录。运行 `mimo_login_checks`、`mimo_session_checks` 及账户关联回归。
 - ChatGPT 显示订阅内 Codex 额度，显式连接本机 Codex 登录；固定官方额度端点，不复制或刷新 Codex token。不可将这些额度称为网页聊天额度。
 - 1.0.3700 的综合排名和能力坐标采用 AA 发布的指数。四领域各占 25%，按同一完整配置的公开分项加权；知识工作使用公开 Elo 得到领域参考分。近 30 天按测评版本的确切发布日期筛选。v5.0.1 仅确认更新月份，默认显示该版主力配置。规则见 `docs/model-benchmarks.md`。
-- 评分发布逐条核对原始来源、配置与真实 WebView 坐标。保留历史 Epoch/场景适配回归，当前 UI 不展示这些聚合分数。运行 `verify-visual-models.cjs`、`benchmark_checks -- --fixtures` 和 `verify-benchmark-ui.cjs`；打包后用 `check-benchmark-ui.ps1` 和合成活动资料库验收。
+- 1.0.3900 以 AA 公开 API 的同一配置指数和美元单任务成本绘图。完整分页成功后原子替换快照，失败保留上次有效快照。AA API Key 仅保存在系统凭据管理器。缺少可比成本的指数单列，数据与缓存不参与同步。
+- 评分发布逐条核对原始来源、配置与真实 WebView 坐标。运行 `task_cost_checks`、`verify-benchmark-ui.cjs`，打包后用 `check-benchmark-ui.ps1` 和合成活动资料库验收。保留历史 Epoch/场景适配回归 `verify-visual-models.cjs` 和 `benchmark_checks -- --fixtures`。
 - 改测评解析先运行 `scripts/audit-benchmark-sources.py`、`scripts/reference-scenarios.py`，再运行 `cargo run --release --example benchmark_checks -- --fixtures`；人工更新种子加 `--write-seed`。来源版本变化保留上次有效记录，不能将旧值标为新测量。
 - 官方定价与测评分别更新，保留来源、单位、配置和时间。厂商或精确型号缺失时保留上次价格与失败状态；测评机构失败不阻断官方价格核实。
 

@@ -178,6 +178,26 @@ export interface BenchmarkSource {id:string;name:string;url:string;version:strin
 export interface BenchmarkComponent {metric:string;value:number;unit:string;weight:number|null;normalized:number|null;configuration:string;evaluator:string;url:string;difficulty:number|null;slope:number|null}
 export interface BenchmarkResult {sourceId:string;version:string;profileId:string;setting:string;score:number;coverage:number;components:BenchmarkComponent[];url:string;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number;calibrationError:number|null;kind:string}
 export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:string;coverage:number;profileId:string;setting:string;sourceRanks:Record<string,number>;lower:number|null;upper:number|null;rangeKind:string;benchmarkCount:number}
+
+export interface TaskCostModel {
+  id: string;
+  name: string;
+  creator: string;
+  releaseDate: string | null;
+  index: number;
+  costPerTask: number | null;
+}
+
+export interface TaskCostReport {
+  snapshot: {
+    origin: "api" | "historical";
+    indexVersion: string;
+    checkedAt: string;
+    models: TaskCostModel[];
+  } | null;
+  connected: boolean;
+  error: string | null;
+}
 export interface BenchmarkRanking {id:string;name:string;version:string;unit:string;entries:BenchmarkRank[];tierLabels:Record<string,string>}
 export interface BenchmarkModel {id:string;name:string;vendor:string;results:BenchmarkResult[];observations:BenchmarkObservation[]}
 export interface ModelRelease {id:string;name:string;vendor:string;releasedAt:string;url:string}

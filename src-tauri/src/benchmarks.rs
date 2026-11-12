@@ -6,13 +6,11 @@ mod scoring;
 pub mod releases;
 pub mod edition;
 pub(crate) mod smoke;
-use crate::commands::AppState;
 pub use adapters::{parse_aa, parse_livebench};
 pub use scoring::calculate;
 use serde::{Deserialize, Serialize};
 pub use smoke::smoke_if_requested;
-use std::{collections::BTreeMap, path::Path, sync::Mutex};
-use tauri::{Emitter, Manager, State};
+use std::{collections::BTreeMap, path::Path};
 
 pub const ALGORITHM: &str = "source-native-configuration/4.0";
 pub const AREAS: [&str; 6] = [
@@ -183,11 +181,6 @@ pub struct Board {
     pub reference_cohort: Vec<String>,
     pub rankings: Vec<Ranking>,
 }
-pub struct Cache {
-    pub dataset: Mutex<Dataset>,
-    pub refreshing: tokio::sync::Mutex<()>,
-}
-
 pub fn key(value: &str) -> String {
     value
         .chars()
@@ -490,87 +483,4 @@ pub fn merge(mut previous: Dataset, updates: Vec<(String, Result<Dataset, String
         }
     }
     previous
-}
-pub async fn refresh(state: &AppState, force: bool) -> Result<Board, String> {
-    {
-        let current = state
-            .benchmarks
-            .dataset
-            .lock()
-            .map_err(|_| "评测数据暂不可用")?;
-        let automatic: Vec<_> = current.sources.iter().filter(|s| s.automatic).collect();
-        if !force
-            && automatic.len() == 4
-            && automatic.iter().all(|s| {
-                s.error.is_none()
-                    && chrono::DateTime::parse_from_rfc3339(&s.checked_at)
-                        .ok()
-                        .is_some_and(|t| {
-                            (0..86400).contains(&(chrono::Utc::now().timestamp() - t.timestamp()))
-                        })
-            })
-        {
-            return Ok(calculate(&current));
-        }
-    }
-    let Ok(_guard) = state.benchmarks.refreshing.try_lock() else {
-        return Ok(calculate(
-            &*state
-                .benchmarks
-                .dataset
-                .lock()
-                .map_err(|_| "评测数据暂不可用")?,
-        ));
-    };
-    let updates = fetch(&state.http).await;
-    let mut current = state
-        .benchmarks
-        .dataset
-        .lock()
-        .map_err(|_| "评测数据暂不可用")?;
-    let next = merge(current.clone(), updates);
-    if !valid(&next) {
-        return Err("评测数据校验未通过".into());
-    }
-    crate::storage::write_atomic(
-        &state.store.dir().join("ai-benchmarks-v3.json"),
-        &serde_json::to_string(&next).map_err(|_| "编码评测数据失败")?,
-    )?;
-    *current = next;
-    Ok(calculate(&current))
-}
-#[tauri::command]
-pub fn get_benchmarks(state: State<'_, AppState>) -> Result<Board, String> {
-    Ok(calculate(
-        &*state
-            .benchmarks
-            .dataset
-            .lock()
-            .map_err(|_| "评测数据暂不可用")?,
-    ))
-}
-#[tauri::command]
-pub async fn refresh_benchmarks(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-) -> Result<Board, String> {
-    let board = refresh(&state, true).await?;
-    let _ = app.emit("benchmarks-updated", ());
-    Ok(board)
-}
-pub fn spawn(app: tauri::AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(18)).await;
-        loop {
-            let enabled = app
-                .state::<AppState>()
-                .config
-                .lock()
-                .is_ok_and(|c| c.settings.ladder_auto_update);
-            if enabled && refresh(&app.state::<AppState>(), false).await.is_ok() {
-                let _ = app.emit("benchmarks-updated", ());
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
-        }
-    });
 }

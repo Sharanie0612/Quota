@@ -34,6 +34,7 @@ pub mod widget;
 pub mod window_frame;
 pub mod ai_models;
 pub mod benchmarks;
+pub mod task_cost;
 mod appearance;
 pub mod setup;
 
@@ -90,7 +91,7 @@ pub fn run() {
             widget::setup(app.handle())?;
             refresh::spawn(app.handle().clone());
             ladder::spawn(app.handle().clone());
-            benchmarks::spawn(app.handle().clone());
+            task_cost::spawn(app.handle().clone());
             benchmarks::smoke_if_requested(app.handle().clone());
             activity::spawn(app.handle().clone());
             activity::speed_live::spawn(app.handle().clone());
@@ -131,8 +132,9 @@ pub fn run() {
             appearance::save_appearance,
             ai_models::get_ai_models,
             ai_models::refresh_ai_models,
-            benchmarks::get_benchmarks,
-            benchmarks::refresh_benchmarks,
+            task_cost::get_task_cost,
+            task_cost::refresh_task_cost,
+            task_cost::save_task_cost_key,
             benchmarks::smoke::benchmark_smoke_report,
             window_frame::get_main_window_state,
             widget::get_widget_options,

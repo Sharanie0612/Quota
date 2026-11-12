@@ -1,6 +1,7 @@
 import { useEffect,useState } from "react";
 import {createPortal} from 'react-dom';
 import {LadderCanvas as Canvas} from './LadderCanvas';
+import {plotPriceLabel} from '../lib/scatterLayout';
 import type { LadderEntry } from "../lib/types";
 import { comparisonPrice, plotPrice, validExchange, type LadderExchange, type LadderMetric } from "../lib/ladderPlot";
 import { ModelLogo, modelBrand } from "./ModelLogo";
@@ -33,7 +34,22 @@ export function LadderChart(props: Props) {
   </div></details></div>
     {<>
       {!props.compact&&<p className="hint" role="status">{validExchange(props.exchange) ? `1 USD = ${props.exchange.cnyPerUsd.toFixed(4)} CNY · ECB ${props.exchange.date}${props.exchange.error ? ` · ${props.exchange.error}` : ""}` : "汇率暂不可用，按原币种分别绘图。"}</p>}
-      <div>{groups.map(group => <div className="card scatter-chart" key={group.currency}>{group.entries.length ? <Canvas {...props} entries={group.entries} currency={group.currency} metric={metric} highlightBrand={highlightBrand} /> : <div className="section"><h3>{ranked.length?"这个分类暂不支持价格对比":"这个分类暂无已收录评测"}</h3><p className="hint">图表需要同一计费单位、已核实价格与评测分。仍可在列表查看现有模型与来源。</p>{props.onShowList&&<button className="btn" onClick={props.onShowList}>查看模型列表</button>}</div>}</div>)}</div>
+      <div>{groups.map(group => <div className="card scatter-chart" key={group.currency}>{group.entries.length ? <Canvas
+        points={group.entries.map(entry => ({
+          id: entry.id,
+          name: entry.name,
+          detail: reasoningLabel(entry),
+          cost: plotPrice(entry, metric, group.currency, props.exchange)!,
+          score: entry.rankings[props.domain].score,
+          dimmed: Boolean(highlightBrand) && modelBrand(entry.name) !== highlightBrand,
+        }))}
+        selectedId={props.focused?.id ?? null}
+        onSelect={id => props.onFocus(group.entries.find(entry => entry.id === id)!)}
+        yLabel={props.scoreLabel ?? "能力指数"}
+        xLabel={`${{cached:"缓存命中",output:"输出",input:"输入",total:"输入 + 输出"}[metric]} · ${group.currency === "CNY" ? "¥" : group.currency} / ${metric === "total" ? "百万输入 + 百万输出" : "百万 Token"} · 对数刻度`}
+        label={`${group.currency}统一价格与性能坐标图`}
+        costLabel={cost => plotPriceLabel(cost, group.currency)}
+      /> : <div className="section"><h3>{ranked.length?"这个分类暂不支持价格对比":"这个分类暂无已收录评测"}</h3><p className="hint">图表需要同一计费单位、已核实价格与评测分。仍可在列表查看现有模型与来源。</p>{props.onShowList&&<button className="btn" onClick={props.onShowList}>查看模型列表</button>}</div>}</div>)}</div>
       <div className="scatter-footer">{!props.compact&&<p className="hint">区间自动适配当前模型 · 价格轴使用对数刻度 · 汇率仅供比较</p>}<div className="scatter-legend">{[...new Set(groups.flatMap(group => group.entries.map(entry => modelBrand(entry.name))))].sort().map(brand => <button type="button" key={brand} aria-pressed={highlightBrand === brand} onClick={() => setHighlightBrand(current => current === brand ? "" : brand)}><ModelLogo name={brand} size={20} />{brand}</button>)}</div></div>
       {!!omitted.length&&<Unpriced className="card ladder-unpriced">{props.compact&&<summary>{omitted.length} 款暂无可比人民币价格</summary>}<div className="chart-heading"><h3>能力排名 · 价格待确认</h3><span className="hint">{omitted.length} 个评测档位</span></div><p className="hint">保留当前分类的全部评分；暂无可比价格的型号不设虚假价格坐标。</p><div className="ladder-score-list">{[...omitted].sort((a,b)=>b.rankings[props.domain].score-a.rankings[props.domain].score).map(entry=><button key={entry.id} data-profile-id={entry.id} data-score={entry.rankings[props.domain].score} onClick={()=>props.onFocus(entry)} className="ladder-score-row" title={entry.candidate?.error??"官方未提供可比较的 Token 价格"}><ModelLogo name={entry.name} size={20}/><span>{entry.name}<small>{reasoningLabel(entry)}</small></span><span className="ladder-score-track"><i style={{width:`${entry.rankings[props.domain].score}%`}}/></span><b>{entry.rankings[props.domain].score.toFixed(1)}</b></button>)}</div></Unpriced>}
     </>}

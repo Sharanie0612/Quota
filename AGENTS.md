@@ -218,6 +218,7 @@ node scripts/preview-server.cjs 4174
 | 2026-11-01 液态玻璃双开关、局部鼠标高光与大图标侧栏（Windows本地覆盖升级通过，见 docs/apple-materials-1.0.3500.md） | `1.0.3500` | `1.0.3500` |
 | 2026-11-01 导航边缘实际折射、随形高光与可打断形变，减少动态改为淡入淡出（本地修复，验收见 docs/liquid-optics-1.0.3501.md） | `1.0.3501` | `1.0.3501` |
 | 2026-11-13 按 AA v5.0.1 重构 AI 模型页（Windows 本地安装包，规则见 docs/model-benchmarks.md） | `1.0.3700` | `1.0.3700` |
+| 2026-11-13 集成 Multica 本机采集及 Codex 续聊增量校正（Windows 本地安装包，见 docs/activity-stats.md） | `1.0.3800` | `1.0.3800` |
 
 历史包版本为 `0.1.0`，不映射为已发布的 `1.0.0000`。2026-10-03 本次功能更新首次采用展示号 `1.0.0100` → 包版本 `1.0.100`，状态为本地构建、待发布；上表示例不代表历史发布记录。后续发布记录必须追加保留。
 
@@ -242,7 +243,8 @@ node scripts/preview-server.cjs 4174
 
 ### Token 活动维护
 
-- `activity.rs` 只读 Codex JSONL 和智谱 ZCode SQLite，保存和同步用量与计时指标，不保存对话、工具参数和凭据。
+- Codex JSONL（含 Multica 本机 Codex 会话）和智谱 ZCode SQLite 为只读数据源。保存和同步用量与计时指标，排除对话、工具参数和凭据。
+- Multica 采集默认关闭。启用后复用 Codex 的游标与事件 ID，来源标记保留旧同步包兼容性。续聊新日志和计数重置按有效 `last_token_usage` 建立基线；重读仍可访问的历史时原位校正，防止旧同步包恢复重复计数。运行 `multica_checks` 和 `codex_usage_checks`。
 - SSH 连接先识别设备，再由用户选择是否纳入统计；新设备默认不选，允许全部不选。同机别名合并，离线保留选择；取消后停止采集，历史退出 Token 活动、我的使用及悬浮窗汇总，但原始指标和同步记录保留。选择仅作用于当前 Quota 主机，不能因重新识别或旧单主机迁移重新开启。相关改动运行 `verify-ssh-devices.cjs`、`ssh_activity_checks` 及费用/悬浮窗回归。
 - 用量悬浮窗只读既有去重指标，今日/累计口径与我的使用一致并排除 Trae；不得新增采集账本。窗口收起时缩小原生命中区域；关闭主窗口且未开启托盘保留时须退出全应用。改动运行 `widget_checks`、`activity_checks` 及安装包 `scripts/check-widget.ps1`（升级脚本加 `-CheckWidget`），分别记录统计、原生几何和鼠标交互验证。裸 Tauri 原生 example 受本机 WinRT DLL 限制，改用打包程序的隔离检查，不当作已通过。
 - 同步需用户在各设备选择同一个共享目录；不自动猜测云盘目的地。设备 UUID 独立，事件 ID 全局去重，复制日志的确定性设备归属需在文档说明。

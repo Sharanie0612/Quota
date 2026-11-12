@@ -27,7 +27,7 @@ fn projection_mode(python:&str,logs:&Path,db:&Connection,host:&str,mode:&str)->V
     let before=snapshot(logs);
     let prefix=format!("ssh:{:x}:",Sha256::digest(format!("{host}\n/home/check").as_bytes()));
     let mut offsets=BTreeMap::new();let mut query=db.prepare("SELECT path,body FROM cursors").unwrap();
-    for row in query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).unwrap(){let(path,body)=row.unwrap();if let Some(path)=path.strip_prefix(&prefix){offsets.insert(path.to_string(),serde_json::from_str::<Cursor>(&body).unwrap().offset);}}
+    for row in query.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).unwrap(){let(path,body)=row.unwrap();if let Some(path)=path.strip_prefix(&prefix){let c:Cursor=serde_json::from_str(&body).unwrap();offsets.insert(path.to_string(),if c.speed.version<1 || c.usage_version<1 {0}else{c.offset});}}
     let mut child=Command::new(python).arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("scripts/codex-ssh-metrics.py")).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
     child.stdin.take().unwrap().write_all(json!({"format":"quota-codex-ssh-v1","home":logs,"offsets":offsets,"mode":mode}).to_string().as_bytes()).unwrap();
     let result=child.wait_with_output().unwrap();assert!(result.status.success(),"projection failed");assert!(result.stderr.is_empty());
@@ -97,7 +97,57 @@ fn main(){
     assert_eq!(report().totals.tokens.total,540);assert_eq!(activity::usage_summary(&data).unwrap().total,540);
     assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
     speed_projection(&root,&python);
+    resumed_projection(&root,&python);
     println!("PASS SSH projections: privacy whitelist, original identity/delta parity, incremental reads, incomplete tails, truncation, copied logs/aliases, cursor rollback, bounded historical pages, remote owner sync, output-speed metadata and injection validation");
+}
+fn resumed_projection(root: &Path, python: &str) {
+    let logs = root.join("resumed-logs");
+    let data = root.join("resumed-data");
+    fs::create_dir_all(logs.join("sessions")).unwrap();
+    fs::create_dir_all(&data).unwrap();
+    activity::report(&data, None, None, None).unwrap();
+    let mut db = Connection::open(data.join("activity.sqlite")).unwrap();
+    let log = line("session_meta", json!({"id":"resumed-ssh"}), 0)
+        + &line("event_msg", json!({
+            "type":"token_count", "info": {
+                "total_token_usage":{"input_tokens":120_000_000,"output_tokens":1_000_000,"total_tokens":121_000_000},
+                "last_token_usage":{"input_tokens":60_000,"output_tokens":200,"total_tokens":60_200,"private":"PRIVATE_COOKIE"}
+            }
+        }), 1);
+    fs::write(logs.join("sessions/resumed.jsonl"), log).unwrap();
+
+    let apply = |db: &mut Connection| {
+        let bytes = projection(python, &logs, db, "resumed-host");
+        let mut errors = Vec::new();
+        let changed = ssh::apply(db, "resumed-host", "/home/check", &bytes, &mut errors).unwrap();
+        assert!(errors.is_empty(), "{errors:?}");
+        changed
+    };
+    let total = || activity::report(&data, None, None, None).unwrap().totals.tokens.total;
+    assert_eq!(apply(&mut db), 1);
+    assert_eq!(total(), 60_200);
+
+    // A consumed legacy cursor must re-read the same event and replace its count.
+    db.execute("UPDATE cursors SET body=json_set(body,'$.usage_version',0)", []).unwrap();
+    db.execute(
+        "UPDATE metrics SET body=json_remove(json_set(body,'$.tokens.input',120000000,'$.tokens.output',1000000,'$.tokens.total',121000000),'$.codexUsageVersion')",
+        [],
+    ).unwrap();
+    assert_eq!(apply(&mut db), 1);
+    assert_eq!(total(), 60_200);
+    assert_eq!(apply(&mut db), 0);
+
+    let fallback = line("session_meta", json!({"id":"legacy-ssh"}), 0)
+        + &line("event_msg", json!({
+            "type":"token_count", "info": {
+                "total_token_usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120},
+                "last_token_usage":{"input_tokens":1,"output_tokens":2,"reasoning_output_tokens":null}
+            }
+        }), 1);
+    fs::write(logs.join("sessions/optional-malformed.jsonl"), fallback).unwrap();
+    assert_eq!(apply(&mut db), 1);
+    assert_eq!(total(), 60_320);
+    println!("PASS resumed SSH counters, legacy cursor correction and malformed optional counter fallback");
 }
 fn speed_projection(root:&Path,python:&str){
     let logs=root.join("speed-logs");let data=root.join("speed-data");fs::create_dir_all(logs.join("sessions")).unwrap();fs::create_dir_all(&data).unwrap();activity::report(&data,None,None,None).unwrap();let mut db=Connection::open(data.join("activity.sqlite")).unwrap();

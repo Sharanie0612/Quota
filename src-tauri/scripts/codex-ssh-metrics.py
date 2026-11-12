@@ -69,6 +69,13 @@ def project(value):
         canonical = json.dumps(usage, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
         metric_id = hashlib.sha256(("codex:tokens:" + str(millis) + ":" + canonical).encode("utf-8")).hexdigest()
         fields = {"type": "token_count", "info": {"total_token_usage": {k: usage[k] for k in COUNTERS if k in usage}}}
+        # The first event of a resumed rollout carries old cumulative usage.
+        # Transfer only numeric last-request counters, never the surrounding info.
+        last = info.get("last_token_usage")
+        if isinstance(last, dict) and all(
+            k not in last or (type(last[k]) is int and last[k] >= 0) for k in COUNTERS
+        ):
+            fields["info"]["last_token_usage"] = {k: last[k] for k in COUNTERS if k in last}
     elif kind == "response_item" and p.get("type") in ("function_call", "custom_tool_call"):
         call = p.get("call_id", p.get("id"))
         if not isinstance(call, str):

@@ -8,6 +8,8 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::commands::AppState;
 #[path = "activity_harness.rs"]
 mod harness;
+#[path = "activity_multica.rs"]
+mod multica;
 #[path = "activity_sync.rs"]
 pub mod sync_storage;
 #[path = "activity_trae.rs"]
@@ -25,6 +27,7 @@ static LOCAL_CODEX_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 fn hash(text: &str) -> String { format!("{:x}", Sha256::digest(text.as_bytes())) }
 fn label(text: &str) -> String { text.chars().filter(|c| !c.is_control()).take(160).collect() }
 fn now() -> i64 { chrono::Utc::now().timestamp_millis() }
+fn is_false(value: &bool) -> bool { !value }
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -37,6 +40,10 @@ pub struct Options {
     pub codex_home: String, pub zcode_home: String, pub sync_dir: String,
     #[serde(default)]
     pub harness_home: String,
+    #[serde(default)]
+    pub multica_enabled: bool,
+    #[serde(default)]
+    pub multica_workspace_root: String,
     #[serde(default)]
     pub trae_home: String,
     #[serde(default)]
@@ -63,7 +70,7 @@ pub fn options(dir: &Path) -> Options {
         let home = std::env::var_os("USERPROFILE").map(PathBuf::from).or_else(dirs::home_dir).unwrap_or_default();
         Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
             codex_home: std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).to_string_lossy().into(),
-            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![]) }
+            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), multica_enabled: false, multica_workspace_root: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![]) }
     });
     result.codex_ssh_devices=Some(result.ssh_devices());result
 }
@@ -79,6 +86,16 @@ impl Tokens {
         let n = |key| v.get(key).and_then(Value::as_u64).unwrap_or(0);
         let input = n("input_tokens"); let output = n("output_tokens");
         Self { input, cached: n("cached_input_tokens"), cache_write: n("cache_write_input_tokens"), output, reasoning: n("reasoning_output_tokens"), total: v.get("total_tokens").and_then(Value::as_u64).unwrap_or(input.saturating_add(output)) }
+    }
+    fn codex_last(v: &Value) -> Option<Self> {
+        v.get("input_tokens")?.as_u64()?;
+        v.get("output_tokens")?.as_u64()?;
+        for key in ["cached_input_tokens", "cache_write_input_tokens", "reasoning_output_tokens", "total_tokens"] {
+            if let Some(value) = v.get(key) { value.as_u64()?; }
+        }
+        let usage = Self::codex(v);
+        (usage.total == usage.input.checked_add(usage.output)?
+            && usage.cached <= usage.input && usage.reasoning <= usage.output).then_some(usage)
     }
     fn delta(&self, old: &Self) -> Self {
         if self.input < old.input || self.output < old.output || self.total < old.total { return self.clone(); }
@@ -101,24 +118,55 @@ pub struct Metric {
     /// Stable Harness attempt identities across physical format migrations.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub harness_identity: u32,
+    /// Kept separate from revision: old clients discard this unknown field when
+    /// re-exporting, so their max-merge cannot certify an inflated legacy count.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub codex_usage_version: u32,
+    /// Preserve the Codex wire source and event ID for older sync readers.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub multica: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speed: Option<speed::Sample>,
 }
 fn is_zero(value: &u32) -> bool { *value == 0 }
 impl Metric {
+    fn activity_source(&self) -> &str {
+        if self.multica { "multica" } else { &self.source }
+    }
     fn valid(&self) -> bool {
         self.id.len()==64 && self.id.bytes().all(|b| b.is_ascii_hexdigit()) && uuid::Uuid::parse_str(&self.device).is_ok()
             && matches!(self.source.as_str(), "codex"|"zcode"|"harness"|"trae") && matches!(self.kind.as_str(), "tokens"|"tool")
             && matches!(self.channel.as_str(), ""|"trae"|"api")
+            && (!self.multica || self.source == "codex")
             && (self.harness_identity == 0 || (self.source == "harness" && self.harness_identity == 1))
+            && (self.codex_usage_version == 0 || (self.source == "codex" && self.kind == "tokens" && self.codex_usage_version == CODEX_USAGE_REVISION))
             && [&self.session,&self.model,&self.agent,&self.tool].iter().all(|s| s.len()<=640 && !s.chars().any(char::is_control))
             && self.timestamp>0 && self.timestamp <= now()+86400000
             && [self.tokens.input,self.tokens.cached,self.tokens.output,self.tokens.total,self.tokens.reasoning,self.tokens.cache_write].iter().all(|v| *v<=1_000_000_000_000)
             && self.speed.as_ref().is_none_or(|sample| sample.valid(self))
     }
 }
+// A corrected observation supersedes legacy counts for the SAME event ID,
+// including old cloud packets. This is a parser revision, not a clock value.
+const CODEX_USAGE_REVISION: u32 = 1;
 #[derive(Default, Serialize, Deserialize)]
-pub struct Cursor { pub offset:u64, pub session:String, pub model:String, pub agent:String, pub previous:Tokens, pub inherited_until:Option<u64>, #[serde(default)] pub speed: speed::TimingCursor }
+pub struct Cursor {
+    pub offset: u64,
+    pub session: String,
+    pub model: String,
+    pub agent: String,
+    pub previous: Tokens,
+    pub inherited_until: Option<u64>,
+    #[serde(default)]
+    pub speed: speed::TimingCursor,
+    #[serde(default)]
+    pub usage_version: u32,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub multica: bool,
+}
+impl Cursor {
+    fn needs_codex_replay(&self) -> bool { self.speed.version < 1 || self.usage_version < CODEX_USAGE_REVISION }
+}
 pub fn parse_codex(v: &Value, c: &mut Cursor, device: &str) -> Option<Metric> {
     let p=v.get("payload")?;
     let timestamp=v.get("timestamp").and_then(Value::as_str).and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())?.timestamp_millis();
@@ -137,17 +185,29 @@ pub fn parse_codex(v: &Value, c: &mut Cursor, device: &str) -> Option<Metric> {
     if outer=="event_msg" && inner=="token_count" {
         let raw=p.get("info")?.get("total_token_usage")?;
         if raw.is_null() { return None; }
-        let total=Tokens::codex(raw); let delta=total.delta(&c.previous); c.previous=total;
-        if inherited || delta.total==0 || c.session.is_empty() { return None; }
+        let total=Tokens::codex(raw);
+        let needs_baseline=c.previous.total==0 || total.input<c.previous.input
+            || total.output<c.previous.output || total.total<c.previous.total;
+        let cumulative_delta=total.delta(&c.previous); c.previous=total.clone();
+        if inherited || cumulative_delta.total==0 || c.session.is_empty() { return None; }
+        // A resumed thread can start a new rollout with its entire old total.
+        // Only its last request is new when this file has no usable baseline.
+        // Ordinary incremental records still use cumulative differences; repeat
+        // notifications with unchanged totals must never add last usage again.
+        let delta=if needs_baseline {
+            p.pointer("/info/last_token_usage").and_then(Tokens::codex_last)
+                .filter(|last| last.input<=total.input && last.output<=total.output && last.total<=total.total)
+                .unwrap_or(cumulative_delta)
+        } else { cumulative_delta };
         // Timestamp + cumulative counters also deduplicate history copied into forks.
         let id=hash(&format!("codex:tokens:{timestamp}:{}", serde_json::to_string(raw).ok()?));
         let speed=c.speed.take(delta.output,delta.reasoning);
-        return Some(Metric { id, device:device.into(), source:"codex".into(),harness_identity:0,revision:0, session:label(&c.session), model:if c.model.is_empty(){"未知模型".into()}else{c.model.clone()},agent:c.agent.clone(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),speed,tokens:delta });
+        return Some(Metric { id, device:device.into(), source:"codex".into(),multica:c.multica,harness_identity:0,codex_usage_version:CODEX_USAGE_REVISION,revision:0, session:label(&c.session), model:if c.model.is_empty(){"未知模型".into()}else{c.model.clone()},agent:c.agent.clone(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),speed,tokens:delta });
     }
     if outer=="response_item" && matches!(inner,"function_call"|"custom_tool_call") && !inherited {
         let call=p.get("call_id").or_else(|| p.get("id")).and_then(Value::as_str)?;
         let tool=label(p.get("name").and_then(Value::as_str).unwrap_or("未知工具"));
-        return Some(Metric { id:hash(&format!("codex:tool:{call}")),device:device.into(),source:"codex".into(),speed:None,harness_identity:0,revision:0,session:label(&c.session),model:c.model.clone(),agent:c.agent.clone(),tool,timestamp,kind:"tool".into(),channel:String::new(),tokens:Tokens::default() });
+        return Some(Metric { id:hash(&format!("codex:tool:{call}")),device:device.into(),source:"codex".into(),multica:c.multica,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&c.session),model:c.model.clone(),agent:c.agent.clone(),tool,timestamp,kind:"tool".into(),channel:String::new(),tokens:Tokens::default() });
     }
     None
 }
@@ -198,6 +258,7 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
     next.device=owner;
     if let Some(text)=&old {
         let previous:Metric=serde_json::from_str(text).map_err(|_| "统计记录损坏")?;
+        let multica = next.multica || previous.multica;
         // Replays by old clients cannot erase a measured speed. Resolve duplicate
         // timings deterministically so copied logs converge on every device.
         match (&next.speed,&previous.speed) {
@@ -214,13 +275,21 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
         next.device=previous.device.clone().min(next.device);
         // Harness replaces the latest settlement for an attempt; older synced samples must
         // not resurrect an earlier (possibly larger) count.
-        if matches!(next.source.as_str(), "harness" | "trae") {
+        if next.source=="codex" && next.kind=="tokens" && next.codex_usage_version!=previous.codex_usage_version {
+            if previous.codex_usage_version>next.codex_usage_version {let owner=next.device;next=previous;next.device=owner;}
+        } else if matches!(next.source.as_str(), "harness" | "trae") {
             if previous.revision > next.revision { let owner=next.device; next=previous; next.device=owner; }
         } else {
         next.tokens.input=previous.tokens.input.max(next.tokens.input); next.tokens.cached=previous.tokens.cached.max(next.tokens.cached);
         next.tokens.cache_write=previous.tokens.cache_write.max(next.tokens.cache_write);next.tokens.output=previous.tokens.output.max(next.tokens.output);
         next.tokens.reasoning=previous.tokens.reasoning.max(next.tokens.reasoning);next.tokens.total=previous.tokens.total.max(next.tokens.total);
         }
+        // Older clients and copies in the ordinary Codex folder can omit the origin.
+        next.multica = next.source == "codex" && multica;
+    }
+    // A pre-fix speed sample may have used the inflated output counter.
+    if next.speed.as_ref().is_some_and(|sample| !sample.valid(&next)) {
+        next.speed=event.speed.clone().filter(|sample| sample.valid(&next));
     }
     let body=serde_json::to_string(&next).map_err(|_| "保存统计失败")?;
     if old.as_deref()==Some(&body) { return Ok(false); }
@@ -243,19 +312,23 @@ fn files(dir:&Path, out:&mut Vec<PathBuf>,depth:u8,errors:&mut Vec<String>) {
         let Ok(kind)=item.file_type() else { errors.push("部分 Codex 日志文件状态无法读取".into()); continue; };
         if kind.is_symlink(){continue}
         if kind.is_dir(){files(&item.path(),out,depth+1,errors)}
-        else if item.path().extension().is_some_and(|e|e=="jsonl"){out.push(item.path())}
+        else if kind.is_file() && item.path().extension().is_some_and(|e|e=="jsonl"){out.push(item.path())}
     }
 }
 // Each file commits its cursor with its metrics. A failed/locked old rollout must
 // be retried without blocking newer sessions or losing their committed counts.
-fn collect_codex_file(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
+fn collect_codex_file(db:&mut Connection,path:&Path,device:&str,multica:bool) -> Result<usize,String> {
     let mut count=0;
     let key=path.to_string_lossy().to_string(); let mut c=cursor(db,&key)?;
-    // One upgrade replay enriches existing IDs; it never adds a second usage row.
-    if c.speed.version<1 { c=Cursor::default();c.speed.version=1; }
+    let known_multica = c.multica;
+    // Replay to correct old IDs or add the origin to a previously collected log.
+    if c.needs_codex_replay() || (multica && !known_multica) { c=Cursor::default(); }
     let mut f=fs::File::open(path).map_err(|_| "部分 Codex 会话暂时无法读取")?;
     let size=f.metadata().map_err(|_| "无法读取会话大小")?.len();
-    if size<c.offset { c=Cursor::default(); } if size==c.offset {return Ok(0)}
+    if size<c.offset { c=Cursor::default(); }
+    c.speed.version=1;c.usage_version=CODEX_USAGE_REVISION;
+    c.multica = multica || known_multica;
+    if size==c.offset {return Ok(0)}
     f.seek(SeekFrom::Start(c.offset)).map_err(|_| "读取会话进度失败")?;
     let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;
     let mut reader=BufReader::new(f);let mut line=Vec::new();
@@ -282,14 +355,27 @@ fn collect_codex(db:&mut Connection,home:&Path,device:&str,errors:&mut Vec<Strin
     }
     if !found { errors.push("未找到 Codex 会话目录，请在采集设置中选择 Codex 实际使用的数据目录（包含 sessions 或 archived_sessions）".into()); }
     else if paths.is_empty() && errors.is_empty() { errors.push("Codex 目录内暂无 JSONL 会话日志，请确认采集位置与 Codex 实际使用的数据目录一致".into()); }
-    paths.sort();let mut count=0;let mut failed=0;let mut first_error=None;
+    collect_codex_paths(db, paths, device, false, errors)
+}
+fn collect_codex_paths(db: &mut Connection, mut paths: Vec<PathBuf>, device: &str, multica: bool, errors: &mut Vec<String>) -> usize {
+    paths.sort();
+    paths.dedup();
+    let mut count = 0;
+    let mut failed = 0;
+    let mut first_error = None;
     for path in paths {
-        match collect_codex_file(db,&path,device) {
-            Ok(n)=>count+=n,
-            Err(error) => {failed+=1;first_error.get_or_insert(error);}
+        match collect_codex_file(db, &path, device, multica) {
+            Ok(n) => count += n,
+            Err(error) => {
+                failed += 1;
+                first_error.get_or_insert(error);
+            }
         }
     }
-    if let Some(error)=first_error {errors.push(format!("{failed} 份 Codex 会话读取或统计失败（{error}），其余会话已继续采集；失败会话保留进度并在下次重试"));}
+    if let Some(error) = first_error {
+        let source = if multica { "Multica" } else { "Codex" };
+        errors.push(format!("{failed} 份 {source} 会话读取或统计失败（{error}），其余会话已继续采集；失败会话保留进度并在下次重试"));
+    }
     count
 }
 fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
@@ -306,21 +392,21 @@ fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,Stri
         let num=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);
         let request:String=r.get::<_,Option<String>>(0)?.unwrap_or(r.get(12)?);
         let attempt=num(1)?;
-        Ok(Metric { id:hash(&format!("zcode:model:{request}:{attempt}")),device:device.into(),source:"zcode".into(),speed:None,harness_identity:0,revision:0,session:label(&r.get::<_,String>(2)?),model:label(&r.get::<_,String>(3)?),agent:label(&r.get::<_,Option<String>>(4)?.unwrap_or("主 Agent".into())),tool:String::new(),timestamp:r.get(5)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input:num(6)?,cached:num(7)?,cache_write:num(8)?,output:num(9)?,reasoning:num(10)?,total:num(11)?} })
+        Ok(Metric { id:hash(&format!("zcode:model:{request}:{attempt}")),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(2)?),model:label(&r.get::<_,String>(3)?),agent:label(&r.get::<_,Option<String>>(4)?.unwrap_or("主 Agent".into())),tool:String::new(),timestamp:r.get(5)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input:num(6)?,cached:num(7)?,cache_write:num(8)?,output:num(9)?,reasoning:num(10)?,total:num(11)?} })
     }).map_err(|_| "读取 ZCode Token 统计失败")?;
     let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;let mut count=0;
     for row in rows {let e=row.map_err(|_| "读取 ZCode Token 记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp>0 && merge_metric(&tx,&e,true)?{count+=1}}
     let mut tools=source.prepare("SELECT COALESCE(tool_call_id,id),session_id,tool_name,COALESCE(completed_at,started_at,0),COALESCE((SELECT model_id FROM model_usage m WHERE m.session_id=t.session_id AND m.turn_id=t.turn_id ORDER BY m.started_at DESC LIMIT 1),'未知模型'),COALESCE((SELECT agent FROM model_usage m WHERE m.session_id=t.session_id AND m.turn_id=t.turn_id ORDER BY m.started_at DESC LIMIT 1),'主 Agent') FROM tool_usage t WHERE COALESCE(completed_at,started_at,0)>=?1").map_err(|_| "此 ZCode 版本的工具统计暂不支持")?;
-    let rows=tools.query_map([since as i64],|r|Ok(Metric {id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),speed:None,harness_identity:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:label(&r.get::<_,String>(4)?),agent:label(&r.get::<_,String>(5)?),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()})).map_err(|_| "读取 ZCode 工具统计失败")?;
+    let rows=tools.query_map([since as i64],|r|Ok(Metric {id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:label(&r.get::<_,String>(4)?),agent:label(&r.get::<_,String>(5)?),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()})).map_err(|_| "读取 ZCode 工具统计失败")?;
     for row in rows {let e=row.map_err(|_| "读取 ZCode 工具记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp>0 && merge_metric(&tx,&e,true)?{count+=1}}
     // Older ZCode records predate model_usage. Select metrics only and exclude modern rows.
     let legacy_key=format!("{key}:legacy");let mut legacy=cursor(&tx,&legacy_key)?;let legacy_since=legacy.offset.saturating_sub(5000) as i64;
     // Capture source watermarks before scanning, including rows excluded by modern usage.
     let legacy_highwater=source.query_row("SELECT MAX(n) FROM (SELECT MAX(time_updated) AS n FROM message UNION ALL SELECT MAX(time_updated) AS n FROM part)",[],|r|r.get::<_,Option<i64>>(0)).ok().flatten().unwrap_or(0).max(0) as u64;
     let sql="SELECT m.id,m.session_id,COALESCE(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.modelId'),'未知模型'),COALESCE(json_extract(m.data,'$.agent'),'主 Agent'),m.time_created,json_extract(m.data,'$.tokens.input'),json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache.write'),json_extract(m.data,'$.tokens.output'),json_extract(m.data,'$.tokens.reasoning'),json_extract(m.data,'$.tokens.total'),m.time_updated FROM message m WHERE m.time_updated>=?1 AND json_extract(m.data,'$.role')='assistant' AND COALESCE(json_extract(m.data,'$.tokens.output'),0)+COALESCE(json_extract(m.data,'$.tokens.input'),0)>0 AND NOT EXISTS(SELECT 1 FROM model_usage u WHERE u.assistant_message_id=m.id OR (u.assistant_message_id IS NULL AND u.session_id=m.session_id AND u.completed_at=m.time_created AND u.input_tokens=json_extract(m.data,'$.tokens.input') AND u.output_tokens=json_extract(m.data,'$.tokens.output')))";
-    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|{let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);let input=n(5)?;let output=n(8)?;Ok((Metric{id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),speed:None,harness_identity:0,revision:0,session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))}).map_err(|_|"读取 ZCode 历史统计失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|{let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);let input=n(5)?;let output=n(8)?;Ok((Metric{id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))}).map_err(|_|"读取 ZCode 历史统计失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
     let sql="SELECT COALESCE(json_extract(p.data,'$.callID'),p.id),p.session_id,json_extract(p.data,'$.tool'),p.time_created,p.time_updated FROM part p WHERE p.time_updated>=?1 AND json_extract(p.data,'$.type')='tool' AND NOT EXISTS(SELECT 1 FROM tool_usage t WHERE t.tool_call_id=json_extract(p.data,'$.callID'))";
-    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|Ok((Metric{id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),speed:None,harness_identity:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:"未知模型".into(),agent:"未知 Agent".into(),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()},r.get::<_,i64>(4)?))).map_err(|_|"读取 ZCode 历史工具失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史工具失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|Ok((Metric{id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:"未知模型".into(),agent:"未知 Agent".into(),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()},r.get::<_,i64>(4)?))).map_err(|_|"读取 ZCode 历史工具失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史工具失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
     legacy.offset=legacy.offset.max(legacy_highwater);
     save_cursor(&tx,&legacy_key,&legacy)?;
     save_cursor(&tx,&key,&c)?;tx.commit().map_err(|_| "保存 ZCode 统计失败")?; Ok(count)
@@ -522,7 +608,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==&e.source||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
+        if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
     let devices=known_device_names(&db,&o)?;
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
@@ -532,7 +618,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     events.retain(|e|model.as_deref().is_none_or(|m|model_matches(m,e)));
     let token_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tokens").cloned().collect();let tool_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tool").cloned().collect();
     let trae_events:Vec<Metric>=events.iter().filter(|e|e.source=="trae").cloned().collect();
-    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.source.clone()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors })
+    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.activity_source().into()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)
@@ -540,7 +626,8 @@ pub fn collect(dir:&Path)->Result<usize,String>{
 fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     let mut o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
-    let mut errors=Vec::new();let mut count=0;
+    let mut errors=Vec::new();
+    let mut count = multica::collect(&mut db, &o, &mut errors);
     count+=collect_codex_sources(dir,&mut db,&mut o,&mut errors)?;
     for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
@@ -622,7 +709,8 @@ pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),S
     input.codex_ssh_devices=Some(devices);
     input.codex_ssh_host.clear();input.codex_ssh_home.clear();
     if !(5..=3600).contains(&input.collect_interval_seconds) { return Err("采集间隔应为 5–3600 秒".into()); }
-    for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.trae_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
+    input.multica_workspace_root = input.multica_workspace_root.trim().into();
+    for p in [&input.codex_home,&input.zcode_home,&input.harness_home,&input.multica_workspace_root,&input.trae_home,&input.sync_dir]{if !p.is_empty()&&!Path::new(p).is_absolute(){return Err("请选择绝对路径的目录".into())}}
     if !input.sync_dir.is_empty() && (input.sync_dir!=previous.sync_dir || input.device_name!=previous.device_name) {let db=database(state.store.dir())?;db.execute("INSERT OR IGNORE INTO outbox(event_id) SELECT id FROM metrics WHERE local=1",[]).map_err(|_|"初始化同步队列失败")?;}
     save_options(state.store.dir(),&input)?;
     let _=app.emit("activity-updated",());Ok(())

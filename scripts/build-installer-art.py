@@ -1,12 +1,21 @@
-"""Rebuild checked-in NSIS bitmaps from the app icon and CSS palette. Needs Pillow."""
+"""Rebuild checked-in NSIS bitmaps from the app icon and shared theme palette. Needs Pillow."""
 from pathlib import Path
+import json
 import re
+import subprocess
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
-CSS = (ROOT / "src/styles.css").read_text(encoding="utf-8")
-PALETTE = {name: re.search(r"--" + name + r":\s*(#[0-9a-fA-F]{6})", CSS).group(1)
-           for name in ("bg", "surface", "surface-2", "border", "text", "text-2", "blue", "blue-soft")}
+# Resolve the same semantic colours used by the app; styles.css now only imports layers.
+PALETTE = json.loads(subprocess.check_output([
+    "node", "-e",
+    "const load=require('./scripts/lib/source-loader.cjs').createSourceLoader();"
+    "const {themeTokens}=load(require('node:path').resolve('src/lib/appearance/themes'));"
+    "process.stdout.write(JSON.stringify(themeTokens('quota','light')));"
+], cwd=ROOT, encoding="utf-8"))
+for name in ("bg", "surface", "surface-2", "border", "text", "text-2", "blue", "blue-soft"):
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", PALETTE.get(name, "")):
+        raise ValueError(f"Missing or unsupported installer theme colour: {name}")
 S = 3
 
 

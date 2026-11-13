@@ -17,7 +17,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
         &[&show_item, &refresh_item, &separator, &quit_item],
     )?;
 
-    let mut builder = TrayIconBuilder::with_id("quota-tray")
+    let builder = TrayIconBuilder::with_id("quota-tray")
+        .icon(base_icon()?)
         .tooltip("Quota · 余额与额度看板")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -43,33 +44,34 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
             }
         });
 
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
-    }
-
     builder.build(app)?;
     Ok(())
 }
 
+/// 托盘独立使用透明 Q 标志，启动与余额刷新共用同一份内嵌资源。
+fn base_icon() -> tauri::Result<tauri::image::Image<'static>> {
+    tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))
+}
+
 /// 托盘图标状态角标：有余额不足的账户时，在图标右上角叠一个红点。
-/// 图标本身从默认图标（Q logo）的像素数据上实时绘制，不需要额外的资源文件。
+/// 正常与提醒状态都从透明托盘图标绘制，清除提醒也不会恢复白色底板。
 pub fn update_alert(app: &AppHandle, low_count: usize) {
     let Some(tray) = app.tray_by_id("quota-tray") else {
         return;
     };
-    let icon = if low_count > 0 {
-        alert_icon(app)
-    } else {
-        app.default_window_icon().cloned()
+    let Ok(base) = base_icon() else {
+        return;
     };
-    if let Some(icon) = icon {
-        let _ = tray.set_icon(Some(icon));
-    }
+    let icon = if low_count > 0 {
+        alert_icon(base)
+    } else {
+        base
+    };
+    let _ = tray.set_icon(Some(icon));
 }
 
-/// 默认图标 + 右上角红点（带白边，深浅背景都可见）
-fn alert_icon(app: &AppHandle) -> Option<tauri::image::Image<'static>> {
-    let base = app.default_window_icon()?;
+/// 透明图标 + 右上角红点（带白边，深浅背景都可见）
+fn alert_icon(base: tauri::image::Image<'static>) -> tauri::image::Image<'static> {
     let (w, h) = (base.width() as i32, base.height() as i32);
     let mut rgba = base.rgba().to_vec();
 
@@ -105,7 +107,7 @@ fn alert_icon(app: &AppHandle) -> Option<tauri::image::Image<'static>> {
         }
     }
 
-    Some(tauri::image::Image::new_owned(rgba, w as u32, h as u32))
+    tauri::image::Image::new_owned(rgba, w as u32, h as u32)
 }
 
 pub fn show_main(app: &AppHandle) {

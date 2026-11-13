@@ -23,7 +23,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
 
-**当前开发版本为 1.0.3900**。AI 模型页以 Artificial Analysis 综合指数和美元单任务成本对比模型，连接 AA API 后可自动同步新配置。[模型评测与单任务成本](docs/model-benchmarks.md)
+**当前开发版本为 1.0.3901**。AI 模型页以 Artificial Analysis 综合指数和美元单任务成本对比模型，连接 AA API 后可自动同步新配置。[模型评测与单任务成本](docs/model-benchmarks.md)
 
 ## 开始使用
 

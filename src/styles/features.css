@@ -1,10 +1,4 @@
 
-.view-transition { animation: view-slide-in 280ms var(--motion-spring) backwards; }
-html[data-effects="reduced"] .view-transition { animation-name: view-arrive; }
-.view-transition .account-card, .view-transition .usage-cost-summary .card { animation: view-arrive 420ms var(--motion-ease) backwards; }
-.view-transition .account-card:nth-child(2), .usage-cost-summary .card:nth-child(2) { animation-delay: 35ms; }
-.view-transition .account-card:nth-child(3), .usage-cost-summary .card:nth-child(3) { animation-delay: 70ms; }
-.view-transition .account-card:nth-child(n+4) { animation-delay: 100ms; }
 .usage-costs { display: flex; flex-direction: column; gap: 18px; }
 .usage-costs-intro h2 { margin: 0 0 4px; font-size: 21px; letter-spacing: -.025em; }
 .usage-costs-intro p { margin: 0; color: var(--text-2); }
@@ -296,7 +290,7 @@ html[data-effects="reduced"] .view-transition { animation-name: view-arrive; }
 }
 
 .setting-row .txt span {
-  font-size: 11.5px;
+  font-size: var(--text-caption);
   color: var(--text-2);
   line-height: 1.5;
 }
@@ -809,11 +803,6 @@ html[data-color-mode="dark"] { --model-1:#0072b2; --model-1-border:#a6cee4; --mo
 .vendor-cost-brand::after { content: '›'; display: block; color: var(--text-3); font-size: 21px; margin-left: auto; transform: rotate(0deg); transition: transform 260ms var(--motion-spring); }
 .vendor-cost-card[open] .vendor-cost-brand::after { transform: rotate(90deg); }
 .vendor-model-table tbody tr { transition: background 180ms ease; }
-.view-transition .my-usage-range, .view-transition .usage-subscriptions-entry, .view-transition .my-usage-summary .card, .view-transition .vendor-cost-card, .usage-billing-item { animation: view-arrive 440ms var(--motion-ease) backwards; }
-.view-transition .usage-subscriptions-entry { animation-delay: 35ms; }
-.view-transition .my-usage-summary .card:nth-child(2) { animation-delay: 45ms; }
-.view-transition .my-usage-summary .card:nth-child(3) { animation-delay: 75ms; }
-.view-transition .my-usage-summary .card:nth-child(4) { animation-delay: 105ms; }
 .usage-cost-placeholder[role="status"] { animation: usage-breathe 1400ms ease-in-out infinite; }
 @media (hover: hover) {
   .account-card:hover, .vendor-cost-card:hover, .usage-subscriptions-entry:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
@@ -899,4 +888,19 @@ html[data-color-mode="dark"] { --model-1:#0072b2; --model-1-border:#a6cee4; --mo
 .task-row {display:flex;align-items:center;gap:9px;min-height:46px;padding:5px 0;}
 .task-row>div {min-width:0;flex:1;}.task-row b {font-size:13px;font-weight:600;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.task-row span {display:block;margin-top:3px;font-size:12px;color:var(--text-2);}.task-row time {font-size:13px;color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap;}
 .task-idle {font-size:13px;line-height:1.6;color:var(--text-2);padding:16px 0;}
+
+:is(.usage-analysis-heading,.usage-ledger-context,.speed-chart-heading,.speed-models) h2 {
+  font:var(--heading-weight) var(--text-section)/1.4 var(--font-heading);
+  letter-spacing:var(--heading-tracking);
+}
+.balance-value,.stat-value,.usage-kpis strong,.speed-summary strong,.widget-value strong,
+.activity-totals b,.live-model-rate strong,.my-usage-summary strong {
+  font-family:var(--font-numeric);
+  font-variant-numeric:tabular-nums lining-nums;
+}
+.accounts-grid :is(.hint,.acct-provider,.balance-details span,.trend-hint,.subscription-detail),
+.account-group-hint,.account-more-details,.account-data-note,.account-user-note {
+  font-size:var(--text-caption);
+}
+.sync-error-details p { overflow-wrap:anywhere;user-select:text;font-size:var(--text-label);color:var(--text-2); }
 .widget-panel .task-panel {min-height:126px;padding:12px 0;}

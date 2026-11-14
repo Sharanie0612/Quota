@@ -139,7 +139,7 @@ export function SettingsView({
         <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
         <div className="setting-row"><div className="txt"><b>完整采集周期</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,10,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,10,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
         <div className="setting-row"><div className="txt"><b>Codex 本机增量读取</b></div><span>每秒检查，输出完成后记录速度</span></div>
-        {activityError && <Notice tone="warn">{activityError}</Notice>}
+        {activityError && <Notice autoDismiss tone="warn">{activityError}</Notice>}
       </div>
       <div className="card section">
         <h2>
@@ -259,7 +259,7 @@ export function SettingsView({
         <h2>
           <IconGear size={14} /> 备份与迁移
         </h2>
-        {dataExport && <Notice><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
+        {dataExport && <Notice autoDismiss><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
         <div className="setting-row">
           <div className="txt">
             <b>导出备份</b>

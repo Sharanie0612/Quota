@@ -295,7 +295,8 @@ export function AccountSheet({
       title={initial ? `编辑账户 · ${initial.label}` : "添加账户"}
       onClose={onClose}
       wide
-      footer={
+      dismissible={!saving}
+      footer={close =>
         <>
           {initial ? (
             confirmingDelete ? (
@@ -317,7 +318,7 @@ export function AccountSheet({
             )
           ) : null}
           <div className="spacer" />
-          <Button onClick={onClose}>取消</Button>
+          <Button disabled={saving} onClick={close}>取消</Button>
           <Button variant="primary" onClick={submit} disabled={saving || !provider}>
             {saving ? "保存中…" : initial ? "保存" : "保存账户"}
           </Button>

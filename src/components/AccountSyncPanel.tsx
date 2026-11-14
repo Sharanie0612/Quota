@@ -26,7 +26,7 @@ export function AccountSyncPanel() {
   return <details className="card section">
     <summary>账户关联与额外账户{rows.length ? "（" + rows.length + "）" : ""}</summary>
     <p>同一账号只需关联一次，其他电脑会沿用此决定。不同账号请保留为独立账户；登录信息留在本机。</p>
-    {error && <Notice tone="error">{error}</Notice>}
+    {error && <Notice autoDismiss tone="error">{error}</Notice>}
     {rows.map(row => {
       const choices = accounts.filter(a => a.provider === row.provider && a.id !== row.id);
       return <div key={row.id} className="section">

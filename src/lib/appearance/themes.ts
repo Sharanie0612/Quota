@@ -1,10 +1,21 @@
 import geometry from '../../../src-tauri/data/ui-geometry.json';
+import { motionTokens } from '../motion';
 
 export type ThemeId = 'codex' | 'claude' | 'vscode' | 'github' | 'quota';
 
 export type ColorMode = 'system' | 'light' | 'dark';
 
 type Palette = { bg:string; sidebar:string; workspace:string; surface:string; group:string; border:string; strong:string; text:string; primary?:string; secondary:string; muted:string; accent:string; onAccent:string; soft:string };
+
+const cjk = '"PingFang SC", "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif';
+const system = `-apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", ${cjk}`;
+const typography: Record<ThemeId, {body: string; heading: string; weight: string; tracking: string}> = {
+  quota: {body: system, heading: 'var(--font)', weight: '600', tracking: '-.025em'},
+  codex: {body: `"Inter", ${system}`, heading: 'var(--font)', weight: '600', tracking: '-.025em'},
+  claude: {body: system, heading: `Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", ${cjk}`, weight: '500', tracking: '-.015em'},
+  vscode: {body: `-apple-system, BlinkMacSystemFont, "Segoe UI", ${cjk}`, heading: 'var(--font)', weight: '600', tracking: '-.015em'},
+  github: {body: `-apple-system, BlinkMacSystemFont, "Segoe UI", ${cjk}`, heading: 'var(--font)', weight: '600', tracking: '-.02em'},
+};
 
 export const THEMES: {id:ThemeId;name:string;description:string;light:Palette;dark:Palette}[] = [
   {id:'codex',name:'Codex',description:'中性灰阶 · 黑白强调',light:{bg:'#f3f3f3',sidebar:'#f3f3f3',workspace:'#fafafa',surface:'#ffffff',group:'#f0f0f0',border:'#e3e3e3',strong:'#cccccc',text:'#242424',secondary:'#626262',muted:'#727272',accent:'#303030',onAccent:'#ffffff',soft:'#e9e9e9'},dark:{bg:'#171717',sidebar:'#171717',workspace:'#202020',surface:'#292929',group:'#333333',border:'#3b3b3b',strong:'#555555',text:'#ededed',secondary:'#b9b9b9',muted:'#aaaaaa',accent:'#e5e5e5',onAccent:'#202020',soft:'#3d3d3d'}},
@@ -26,6 +37,13 @@ export function themeTokens(theme:ThemeId,mode:'light'|'dark'):Record<string,str
   Object.assign(values,{'radius-window':geometry.window+'px','radius-surface':geometry.surface+'px','radius-control':geometry.control+'px','radius-inset':geometry.inset+'px','radius-xl':geometry.surface+'px','radius-lg':geometry.surface+'px',radius:geometry.control+'px','radius-sm':geometry.inset+'px'});
   values['material-light']='color-mix(in srgb, '+(dark?palette.text:palette.surface)+' '+(dark?'24%':'94%')+', transparent)';
   values['material-shadow']='color-mix(in srgb, '+(dark?palette.bg:palette.text)+' '+(dark?'60%':'12%')+', transparent)';
-  values['font-heading']=theme==='claude'?"Georgia, 'Songti SC', serif":'var(--font)';
+  const type=typography[theme];
+  Object.assign(values,motionTokens,{
+    font:type.body,'font-heading':type.heading,'font-numeric':'var(--font)',
+    mono:'"SF Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace',
+    'heading-weight':type.weight,'heading-tracking':type.tracking,
+    'text-body':'14px','text-label':'13px','text-caption':'12px',
+    'text-title':'26px','text-section':'16px','text-dialog':'20px',
+  });
   return values;
 }

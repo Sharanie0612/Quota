@@ -3,29 +3,51 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, errText, events } from "./api";
 import type { AccountView, Settings } from "./types";
+import { motion } from './motion';
 
 /* ---------------------------------------------------------------- toast */
 
-export type ToastItem = { id: number; text: string; kind: "info" | "error" };
+export type ToastItem = { id: number; text: string; kind: "info" | "error"; leaving?: boolean };
 
 let toastList: ToastItem[] = [];
 const toastSubs = new Set<(list: ToastItem[]) => void>();
 let toastSeq = 1;
+const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
+function publishToasts() { toastSubs.forEach(fn => fn(toastList)); }
+
+export function dismissToast(id: number) {
+  if (!toastList.some(item => item.id === id && !item.leaving)) return;
+  clearTimeout(toastTimers.get(id));
+  toastList = toastList.map(item => item.id === id ? {...item, leaving: true} : item);
+  publishToasts();
+  toastTimers.set(id, setTimeout(() => {
+    toastList = toastList.filter(item => item.id !== id);
+    toastTimers.delete(id);
+    publishToasts();
+  }, motion.exit));
+}
 
 export function toast(text: string, kind: "info" | "error" = "info") {
+  // A repeated result replaces its deadline instead of stacking duplicate messages.
+  const previous = toastList.filter(item => item.text === text && item.kind === kind);
+  for (const item of previous) { clearTimeout(toastTimers.get(item.id)); toastTimers.delete(item.id); }
+  toastList = toastList.filter(item => !previous.includes(item));
   const item: ToastItem = { id: toastSeq++, text, kind };
   toastList = [...toastList, item];
-  toastSubs.forEach((fn) => fn(toastList));
-  setTimeout(() => {
-    toastList = toastList.filter((t) => t.id !== item.id);
-    toastSubs.forEach((fn) => fn(toastList));
-  }, kind === "error" ? 6000 : 3200);
+  while (toastList.length > 3) {
+    const oldest = toastList.shift()!;
+    clearTimeout(toastTimers.get(oldest.id)); toastTimers.delete(oldest.id);
+  }
+  publishToasts();
+  toastTimers.set(item.id, setTimeout(() => dismissToast(item.id), motion.feedback));
 }
 
 export function useToasts(): ToastItem[] {
   const [list, setList] = useState<ToastItem[]>(toastList);
   useEffect(() => {
     toastSubs.add(setList);
+    setList(toastList);
     return () => {
       toastSubs.delete(setList);
     };

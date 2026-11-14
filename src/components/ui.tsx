@@ -1,9 +1,12 @@
 /** 通用 UI 原语：按钮、徽标、开关、分段控件、弹层、提示条 */
-import { Children, cloneElement, isValidElement, useEffect, useId, useRef, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { IconAlert, IconInfo, IconRefresh, IconX } from "./icons";
 import { ToastStack } from "./ToastStack";
 import { useSlidingHighlight } from "../lib/useSlidingHighlight";
 import { WindowControls } from "./WindowControls";
+import { AutoDismiss } from './AutoDismiss';
+import { useAppearance } from '../lib/appearance';
+import { motion } from '../lib/motion';
 
 export function Button({
   children,
@@ -139,21 +142,30 @@ export function Notice({
   tone = "info",
   children,
   actions,
+  autoDismiss = false,
+  dismissKey,
 }: {
   tone?: "info" | "warn" | "error";
   children: ReactNode;
   actions?: ReactNode;
+  autoDismiss?: boolean;
+  dismissKey?: string | number;
 }) {
   const Icon = tone === "info" ? IconInfo : IconAlert;
-  return (
-    <div className={`notice notice-${tone}`} role={tone === "error" ? "alert" : undefined}>
+  const content = (dismiss?: () => void) => (
+    <div className={`notice notice-${tone}`} role={tone === "error" ? "alert" : autoDismiss ? "status" : undefined}>
       <Icon size={14} />
       <div className="notice-text">
         <div>{children}</div>
         {actions ? <div className="notice-actions">{actions}</div> : null}
       </div>
+      {dismiss && <button type="button" className="feedback-close" aria-label="关闭提示" onClick={dismiss}><IconX size={14}/></button>}
     </div>
   );
+  if (!autoDismiss) return content();
+  const text = (nodes: ReactNode): string => Children.toArray(nodes).map(node =>
+    isValidElement<{children?: ReactNode}>(node) ? text(node.props.children) : typeof node === 'string' || typeof node === 'number' ? String(node) : '').join('');
+  return <AutoDismiss key={`${tone}:${dismissKey ?? ''}:${text(children)}`}>{dismiss => content(dismiss)}</AutoDismiss>;
 }
 
 export function Modal({
@@ -163,15 +175,27 @@ export function Modal({
   footer,
   wide,
   maxWidth,
+  dismissible = true,
 }: {
   title: ReactNode;
   onClose: () => void;
   children: ReactNode;
-  footer?: ReactNode;
+  footer?: ReactNode | ((close: () => void) => ReactNode);
   wide?: boolean;
   maxWidth?: number;
+  dismissible?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const appearance = useAppearance();
+  const [closing, setClosing] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const close = () => { if (dismissible) setClosing(true); };
+  useEffect(() => {
+    if (!closing) return;
+    const timer = window.setTimeout(() => { onCloseRef.current(); setClosing(false); }, appearance.reducedMotion ? 0 : motion.exit);
+    return () => window.clearTimeout(timer);
+  }, [closing, appearance.reducedMotion]);
   const titleId = useId();
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -186,9 +210,10 @@ export function Modal({
   }, []);
 
   return (
-    <dialog ref={dialogRef} className="overlay" aria-labelledby={titleId}
-      onCancel={(e) => { e.preventDefault(); onClose(); }}
+    <dialog ref={dialogRef} className="overlay" data-closing={closing} aria-labelledby={titleId}
+      onCancel={(e) => { e.preventDefault(); close(); }}
       onKeyDown={(e) => {
+        if (closing) { e.preventDefault(); return; }
         if (e.key !== "Tab") return;
         const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement | SVGElement>('button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary,[tabindex]'))
           .filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
@@ -201,17 +226,17 @@ export function Modal({
           e.preventDefault(); first.focus();
         }
       }}
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      onMouseDown={(e) => e.target === e.currentTarget && close()}>
       <div className="modal" style={maxWidth || wide ? { maxWidth: maxWidth ?? 620 } : undefined}>
         <div className="modal-head">
           <h2 id={titleId}>{title}</h2>
           <div className="spacer" />
-          <IconButton title="关闭" onClick={onClose} type="button">
+          <IconButton title="关闭" onClick={close} disabled={!dismissible || closing} type="button">
             <IconX size={15} />
           </IconButton>
         </div>
         <div className="modal-body">{children}</div>
-        {footer ? <div className="modal-foot">{footer}</div> : null}
+        {footer ? <div className="modal-foot">{typeof footer === 'function' ? footer(close) : footer}</div> : null}
       </div>
       <ToastStack />
       <div className="window-drag-region" data-tauri-drag-region aria-hidden="true"/>

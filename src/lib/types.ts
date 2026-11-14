@@ -182,6 +182,7 @@ export interface BenchmarkRank {modelId:string;score:number;rank:number;tier:str
 export interface TaskCostModel {
   id: string;
   name: string;
+  modelName: string;
   creator: string;
   releaseDate: string | null;
   index: number;

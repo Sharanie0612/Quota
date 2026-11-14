@@ -3,13 +3,19 @@ function preparePreview(root,snapshot){
   const preview=path.join(root,'dist-mock');fs.mkdirSync(preview,{recursive:true});
   if(!snapshot){
     const seed=JSON.parse(fs.readFileSync(path.join(root,'src-tauri/data/benchmarks.json'),'utf8'));
+    const releases=JSON.parse(fs.readFileSync(path.join(root,'src-tauri/data/model-releases.json'),'utf8')).releases;
+    const dates=new Map(releases.map(release=>[JSON.stringify([release.vendor.toLowerCase(),release.id]),release.releasedAt]));
     const source=seed.sources.find(source=>source.id==='artificial-analysis');
     snapshot={
       origin:'historical',
       indexVersion:source.edition.version,
       checkedAt:source.checkedAt,
       models:seed.profiles.filter(profile=>profile.sourceId===source.id&&profile.version===source.edition.version).map(profile=>({
-        id:profile.id,name:profile.name,creator:profile.vendor,index:profile.index,releaseDate:null,
+        id:profile.id,name:profile.name,
+        modelName:profile.setting&&profile.name.endsWith(' ('+profile.setting+')')
+          ?profile.name.slice(0,-profile.setting.length-3):profile.name,
+        creator:profile.vendor,index:profile.index,
+        releaseDate:dates.get(JSON.stringify([profile.vendor.toLowerCase(),profile.modelId]))??null,
         costPerTask:profile.cost>0?profile.cost:null,
       })),
     };

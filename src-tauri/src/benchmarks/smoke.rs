@@ -38,18 +38,66 @@ pub fn benchmark_smoke_report(
     let result =
         (|| -> Result<(), String> {
             let rows = report["all"].as_array().ok_or("缺少单任务成本和指数坐标")?;
-            if rows.len() != expected.len() || report["taskAxes"] != true {
+            if report["taskAxes"] != true || report["usesClusters"] == true {
+                return Err("模型图的坐标口径或标记不符".into());
+            }
+
+            let mut releases: BTreeMap<(String, String), Vec<_>> = BTreeMap::new();
+            for model in expected.values() {
+                releases
+                    .entry((
+                        model.creator.to_lowercase(),
+                        model.model_name.to_lowercase(),
+                    ))
+                    .or_default()
+                    .push(*model);
+            }
+            let mut dated: Vec<_> = releases
+                .values()
+                .filter_map(|family| {
+                    family
+                        .iter()
+                        .filter_map(|model| model.release_date)
+                        .min()
+                        .map(|date| (date, family))
+                })
+                .collect();
+            dated.sort_by_key(|(date, _)| std::cmp::Reverse(*date));
+            let expected_count = dated.len().min(30);
+            let cutoff = dated
+                .get(expected_count.saturating_sub(1))
+                .map(|(date, _)| *date);
+            if rows.len() != expected_count
+                || report["modelCount"].as_u64() != Some(expected_count as u64)
+            {
                 return Err(format!(
-                    "模型配置或坐标口径不符：{} / {}",
+                    "默认型号数不符：{} / {}",
                     rows.len(),
-                    expected.len()
+                    expected_count
                 ));
             }
+
             let mut seen = HashSet::new();
+            let mut plotted = 0;
             for row in rows {
                 let id = row["id"].as_str().ok_or("缺少配置标识")?;
                 let model = expected.get(id).ok_or("未知测评配置")?;
-                if !seen.insert(id)
+                let family = &releases[&(
+                    model.creator.to_lowercase(),
+                    model.model_name.to_lowercase(),
+                )];
+                let date = family.iter().filter_map(|model| model.release_date).min();
+                if !seen.insert((
+                    model.creator.to_lowercase(),
+                    model.model_name.to_lowercase(),
+                )) || date
+                    .zip(cutoff)
+                    .is_none_or(|(release, limit)| release < limit)
+                    || family.iter().any(|variant| {
+                        (variant.cost_per_task.is_some() && model.cost_per_task.is_none())
+                            || (variant.cost_per_task.is_some() == model.cost_per_task.is_some()
+                                && variant.index > model.index)
+                    })
                     || row["score"]
                         .as_f64()
                         .is_none_or(|score| (score - model.index).abs() > 1e-8)
@@ -58,9 +106,19 @@ pub fn benchmark_smoke_report(
                     )
                     || row["cost"].as_f64().is_some() != model.cost_per_task.is_some()
                 {
-                    return Err(format!("{id} 的指数或单任务成本与快照不符"));
+                    return Err(format!("{id} 的型号、日期、指数或成本与快照不符"));
                 }
-                if model.cost_per_task.is_some() {
+                if let Some(cost) = model.cost_per_task {
+                    plotted += 1;
+                    if row["plotScore"]
+                        .as_f64()
+                        .is_none_or(|score| (score - model.index).abs() > 1e-8)
+                        || row["plotCost"]
+                            .as_f64()
+                            .is_none_or(|value| (value - cost).abs() > cost * 1e-10)
+                    {
+                        return Err(format!("{id} 的散点坐标数据与快照不符"));
+                    }
                     let width = row["width"]
                         .as_f64()
                         .filter(|width| *width >= 500.)
@@ -71,14 +129,19 @@ pub fn benchmark_smoke_report(
                         .ok_or("绘图区过矮")?;
                     if row["x"]
                         .as_f64()
-                        .is_none_or(|x| !(53. ..=width - 29.).contains(&x))
+                        .is_none_or(|x| !(51. ..=width - 23.).contains(&x))
                         || row["y"]
                             .as_f64()
-                            .is_none_or(|y| !(37. ..=height - 63.).contains(&y))
+                            .is_none_or(|y| !(39. ..=height - 60.).contains(&y))
                     {
                         return Err("单任务成本与指数坐标越界".into());
                     }
                 }
+            }
+            if report["plotCount"].as_u64() != Some(plotted)
+                || (plotted > 0 && report["labelCount"].as_u64().unwrap_or(0) == 0)
+            {
+                return Err("图中缺少独立型号点或名称".into());
             }
             if report["libraryRemoved"] != true || report["donutLegendsRemoved"] != true {
                 return Err("产品页面结构不符".into());
@@ -137,18 +200,26 @@ pub fn smoke_if_requested(app: AppHandle) {
         if (++attempts > 150) { clearInterval(timer); report.error = 'UI timeout, step ' + step; send(); return; }
         if (step === 0) { if (!document.querySelector('.task-cost-chart')) go('AI 模型'); step++; return; }
         if (step === 1) {
-          const plot = document.querySelector('.task-cost-chart .scatter-panel > svg');
-          if (!plot || plot.dataset.plotWidth === '1000' && plot.dataset.plotHeight === '440') return;
-          const priced = [...plot.querySelectorAll('.scatter-point')].flatMap(element =>
-            JSON.parse(element.dataset.members).map(point => ({
-              ...point, width:Number(plot.dataset.plotWidth), height:Number(plot.dataset.plotHeight)
-            }))
-          );
-          if (!priced.length) return;
-          const unpriced = [...document.querySelectorAll('.task-cost-unpriced .ladder-score-row')].map(element => ({
-            id:element.dataset.profileId, score:Number(element.dataset.score), cost:null
+          const plot = document.querySelector('.task-cost-chart .task-scatter[data-measured="true"] > svg');
+          if (!plot) return;
+          const points = new Map([...plot.querySelectorAll('.task-plot-point')].map(element => [
+            element.dataset.id, {
+              x: Number(element.dataset.plotX), y: Number(element.dataset.plotY),
+              plotScore: Number(element.dataset.score), plotCost: Number(element.dataset.cost),
+              width: Number(plot.dataset.plotWidth), height: Number(plot.dataset.plotHeight)
+            }
+          ]));
+          const rows = [...document.querySelectorAll('.task-models-list tbody tr')];
+          if (!points.size || !rows.length) return;
+          report.all = rows.map(element => ({
+            id: element.dataset.profileId, score: Number(element.dataset.score),
+            cost: element.dataset.cost === undefined ? null : Number(element.dataset.cost),
+            ...points.get(element.dataset.profileId)
           }));
-          report.all = [...priced, ...unpriced];
+          report.modelCount = Number(document.querySelector('.task-comparison-status [role="status"]').dataset.selected);
+          report.plotCount = points.size;
+          report.labelCount = plot.querySelectorAll('.task-point-label').length;
+          report.usesClusters = Boolean(plot.querySelector('.scatter-badge'));
           report.taskAxes = plot.textContent.includes('Intelligence Index') && plot.textContent.includes('单任务成本（USD · 对数刻度）');
           go('输出速度');
           step++;

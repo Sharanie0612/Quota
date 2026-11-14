@@ -2,13 +2,21 @@
 
 ## 当前图表
 
-Quota 1.0.3900 以 Intelligence Index vs. Cost per Task 为 AI 模型页主图。纵轴使用 AA 发布的综合指数，横轴使用同一完整模型配置的加权美元单任务成本，采用对数刻度。前沿连接当前筛选下成本更低或分数更高的非支配配置。缺少正数成本的配置保留指数并单列。[Artificial Analysis 原图](https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task)
+Quota 1.0.4000 的图表纵轴为 Intelligence Index，横轴为同一配置的加权美元单任务成本（对数轴）。每个型号有独立散点，按厂商着色。标签避让时保留原始坐标；可通过悬停、键盘或表格查看完整型号与数值。绿色虚线表示当前选择中成本更低或分数更高的非支配配置。[Artificial Analysis 原图](https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task)
+
+首次打开时按 AA 已知发布日期选入最新 30 个型号，发布日期未知的型号可手动加入。默认选有可比成本且指数最高的配置，同分时优先成本更低的配置。同型号的推理档位可从表格或详情切换。缺成本的型号在表格保留指数。快照更新会滚动补入新发布型号，手动添加、移除和档位选择在本机保留。
 
 在「AI 模型 → 连接数据源」输入 Artificial Analysis API Key，免费 Key 即可。密钥保存在系统凭据管理器中。Quota 通过 AA 官方接口读取 `evaluations.artificial_analysis_intelligence_index` 和 `artificial_analysis_intelligence_index_cost.cost_per_task.total_cost`。单任务成本来自 AA 按评测权重汇总的任务支出，单位为 USD。[密钥管理](https://artificialanalysis.ai/api-key-management-redirect) · [官方接口](https://artificialanalysis.ai/data-api/docs/reference)
 
-连接后可立即更新。开启「设置 → 自动更新 AI 模型」后，运行中的 Quota 到期自动更新，间隔至少一小时，并根据分页数量给免费配额预留余量。AA 公布并提供指数及成本的配置会进入图表。每次完整分页成功后更新本机 `aa-task-cost.json`，遇到限流、断网或不完整响应时保留上次有效数据。未连接时可查看已有的 AA 历史快照，并通过页面中的来源链接打开 AA 原图。官方 API 返回主、次版本号，历史快照保留原始版本标签。
+连接后可立即更新。开启「设置 → 自动更新 AI 模型」后，运行中的 Quota 到期自动更新，间隔至少一小时，并根据分页数量给免费配额预留余量。每次完整分页成功后更新本机 `aa-task-cost.json`，遇到限流、断网或不完整响应时保留上次有效数据。未连接时使用已有的 AA 历史快照，页面中的来源链接可打开 AA 原图。官方 API 返回主、次版本号，历史快照保留原始版本标签。
 
 当前回归运行 `cargo run --release --locked --example task_cost_checks` 和 `node scripts/verify-benchmark-ui.cjs`。打包后的 `check-benchmark-ui.ps1` 可核对历史快照，也可用 `-TaskCostData` 输入隔离 API 样本。
+
+2026-11-14 在 Windows x64 通过 1.0.3901 → 1.0.4000 的隔离覆盖升级、安装向导完成页、安装版启动以及桌面与开始菜单快捷方式的 ICO 和原启动参数核对。安装版 WebView 分别校验了历史快照默认选中的 30 个型号和隔离 API 快照。浏览器在 1024px 下核对了名称避让，并验证自动补入新型号、保留手动选择及切换推理档位。在线刷新由本机的 AA API Key 取数。
+
+2026-11-14 的公开榜单 HTML 已改变配置字段结构，`benchmark_checks -- --fixtures` 在现有和上一版历史适配器中均停在结构校验。模型页使用官方 API 或本地快照，相关解析与界面检查已通过。
+
+## 1.0.3900 验收记录
 
 2026-11-13 的 Windows x64 隔离验收通过 1.0.3800 覆盖升级、安装版启动和原安装恢复。安装版 WebView 核对了 77 个内置配置、107 个旧版缓存配置及 3 个合成 API 配置的指数和成本。浏览器使用合成响应验证新模型入图、手动刷新与缓存回退。已认证取数需使用 AA API Key 复验。
 

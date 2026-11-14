@@ -87,12 +87,19 @@ async function main(){
   }
   await page.waitForFunction(()=>window.nativeSpeedFreeze.completed===1);speedFreeze.probeCompletedAfterRelease=1;
   await page.waitForFunction(()=>document.documentElement.dataset.colorMode==='light'&&document.documentElement.dataset.material==='frosted');await readyCanvas();checks.push('native frozen-call canvas follows system/contrast colors and emulated DPI resize without waiting for data');
-  await go('AI 模型');await page.getByRole('heading',{name:'Intelligence Index vs. Cost per Task',exact:true}).waitFor();await page.locator('.scatter-point').first().waitFor();
-  const nodes=await page.locator('.scatter-point').evaluateAll(elements=>elements.map(e=>({x:Number(e.dataset.plotX),y:Number(e.dataset.plotY),members:JSON.parse(e.dataset.members)})));
-  for(let i=0;i<nodes.length;i++)for(let j=0;j<i;j++)assert(Math.hypot(nodes[i].x-nodes[j].x,nodes[i].y-nodes[j].y)>=27.9);
-  const ids=nodes.flatMap(n=>n.members.map(m=>m.id));assert.equal(ids.length,new Set(ids).size);await capture('ladder-native');
-  const cluster=page.locator('.scatter-point').filter({has:page.locator('.scatter-badge')}).first();if(await cluster.count()){await cluster.click();await page.getByRole('region',{name:'相近模型'}).waitFor();await capture('ladder-group-native');await page.getByRole('button',{name:'收起相近模型'}).click();}
-  await page.getByRole('button',{name:'展开图表',exact:true}).click();await page.getByRole('dialog',{name:'放大的模型天梯'}).waitFor();await page.keyboard.press('Escape');checks.push('native model points do not overlap; group and expanded view work');
+  await go('AI 模型');
+  await page.getByRole('heading',{name:'Intelligence Index vs. Cost per Task',exact:true}).waitFor();
+  await page.locator('.task-plot-point').first().waitFor();
+  const ids=await page.locator('.task-plot-point').evaluateAll(elements=>elements.map(el=>el.dataset.id));
+  assert.equal(ids.length,new Set(ids).size);
+  assert.equal(await page.locator('.task-models-list tbody tr').count(),30);
+  assert.equal(await page.locator('.scatter-badge').count(),0);
+  assert(await page.locator('.task-point-label').count()>10);
+  await capture('ladder-native');
+  await page.getByRole('button',{name:'放大图表',exact:true}).click();
+  await page.getByRole('dialog',{name:'Intelligence Index vs. Cost per Task'}).waitFor();
+  await page.keyboard.press('Escape');
+  checks.push('native model selection, separate points, names and expanded view');
   await widget.mouse.move(-10,-10);await widget.locator('.widget-handle').hover();await widget.locator('.usage-widget.is-expanded').waitFor();await widget.waitForFunction(()=>document.querySelectorAll('.task-row').length===2);
   assert(!/tokens\/s|片段/.test(await widget.locator('.widget-panel').innerText()));assert(await widget.locator('.widget-panel').evaluate(e=>e.scrollHeight<=e.clientHeight&&e.scrollWidth<=e.clientWidth));await widget.screenshot({path:path.join(out,'widget-native.png'),omitBackground:true,animations:'disabled'});
   const taskInk=await assertInkContrast(widget,'.live-model-phase');

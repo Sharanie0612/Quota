@@ -133,6 +133,7 @@ pub fn run() {
             ai_models::get_ai_models,
             ai_models::refresh_ai_models,
             task_cost::get_task_cost,
+            task_cost::check_task_cost,
             task_cost::refresh_task_cost,
             task_cost::save_task_cost_key,
             benchmarks::smoke::benchmark_smoke_report,

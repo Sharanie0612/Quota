@@ -8,39 +8,27 @@ function overlaps(a: LabelBox, b: LabelBox) {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-/** Move only labels. The dot and leader both start at the measured coordinate. */
-export function placeScatterLabels(points: LabelPoint[], bounds: ChartBounds, preferred: Set<string>) {
-  const positions = new Map<string, { x: number; y: number; left: number; width: number; label: string; leader: boolean }>();
+/** Keep reference labels next to their points and clear of the other marks. */
+export function placeScatterLabels(points: LabelPoint[], bounds: ChartBounds, references: LabelPoint[]) {
+  const positions = new Map<string, { y: number; left: number; width: number; label: string }>();
   const obstacles = points.map(point => ({
     left: point.x - 7, right: point.x + 7, top: point.y - 7, bottom: point.y + 7,
   }));
-  const ordered = [...points].sort((a, b) => Number(preferred.has(b.id)) - Number(preferred.has(a.id))
-    || b.score - a.score || a.cost - b.cost || a.id.localeCompare(b.id));
-  const alternate = [-30, 30, -48, 48, -66, 66, -84, 84, -102, 102, -120, 120];
-  for (const point of ordered) {
-    const label = point.name.length > 29 ? point.name.slice(0, 28) + "…" : point.name;
-    const width = Math.min(200, [...label].reduce((size, char) => size + (char.charCodeAt(0) > 255 ? 13 : 7.1), 0) + 8);
-    const right = point.x + 10, left = point.x - width - 10;
+  for (const point of references) {
+    const label = point.name;
+    const width = [...label].reduce((size, char) => size + (char.charCodeAt(0) > 255 ? 14 : 8.3), 0) + 8;
+    if (width > 215) continue;
+    const right = point.x + 9, left = point.x - width - 9;
     const center = point.x - width / 2;
     const options = [
-      [right, point.y], [left, point.y], [center, point.y - 17], [center, point.y + 17],
-      [right, point.y - 16], [left, point.y - 16], [right, point.y + 16], [left, point.y + 16],
-      [center, point.y - 33], [center, point.y + 33], [right + 10, point.y - 29], [left - 10, point.y + 29],
-      [right + 18, point.y + 34], [left - 18, point.y - 34],
-      ...alternate.flatMap(offset => [
-        [right + 16, point.y + offset], [left - 16, point.y + offset], [center, point.y + offset],
-      ]),
+      [right, point.y], [left, point.y], [center, point.y - 18], [center, point.y + 18],
     ];
     for (const [x, y] of options) {
       const leftEdge = Math.min(bounds.right - width, Math.max(bounds.left, x));
-      const box = { left: leftEdge, right: leftEdge + width, top: y - 8.5, bottom: y + 8.5 };
+      const box = { left: leftEdge, right: leftEdge + width, top: y - 9, bottom: y + 9 };
       if (box.left < bounds.left || box.right > bounds.right || box.top < bounds.top || box.bottom > bounds.bottom
         || obstacles.some(obstacle => overlaps(box, obstacle))) continue;
-      positions.set(point.id, {
-        left: leftEdge, width, y, label,
-        x: Math.min(box.right, Math.max(box.left, point.x)),
-        leader: Math.abs(y - point.y) > 8 || Math.min(Math.abs(box.left - point.x), Math.abs(box.right - point.x)) > 15,
-      });
+      positions.set(point.id, { left: leftEdge, width, y, label });
       obstacles.push(box);
       break;
     }

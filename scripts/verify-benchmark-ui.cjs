@@ -27,7 +27,14 @@ async function plotted(page){
   width:Number(e.ownerSVGElement.dataset.plotWidth),height:Number(e.ownerSVGElement.dataset.plotHeight)
  })));
 }
-async function ids(page){return page.locator('.task-models-list tbody tr').evaluateAll(rows=>rows.map(e=>e.dataset.profileId));}
+async function ids(page){
+ const chart=page.getByRole('tab',{name:'图表',exact:true});
+ const wasChart=await chart.getAttribute('aria-selected')==='true';
+ await page.getByRole('tab',{name:'列表',exact:true}).click();
+ const values=await page.locator('.task-models-list tbody tr').evaluateAll(rows=>rows.map(e=>e.dataset.profileId));
+ if(wasChart) await chart.click();
+ return values;
+}
 async function selectionCount(page,count){
  await page.waitForFunction(n=>Number(document.querySelector('.task-comparison-status [role="status"]')?.dataset.selected)===n,count);
 }
@@ -35,7 +42,7 @@ async function expectPicker(page,chart,name,id,total){
  const picker=page.getByRole('dialog',{name:'选择对比模型'});
  await chart.getByRole('button',{name:'选择模型',exact:true}).click();
  await picker.getByLabel('搜索模型或厂商').fill(name);
- await picker.getByRole('button',{name:'加入 '+name,exact:true}).click();
+ await picker.getByRole('checkbox',{name:'加入 '+name,exact:true}).check();
  await picker.getByRole('button',{name:'完成',exact:true}).click();
  await selectionCount(page,total);
  assert((await ids(page)).includes(id));
@@ -49,7 +56,7 @@ async function main(){
    const page=await browser.newPage({viewport:{width,height:900},colorScheme:mode,reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
    const go=async name=>{await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();await page.getByRole('heading',{name,level:1,exact:true}).waitFor();};
    await go('AI 模型');
-   const chart=page.getByRole('region',{name:'Intelligence Index vs. Cost per Task'});
+   const chart=page.getByRole('region',{name:'模型性价比',exact:true});
    await chart.locator('.task-scatter[data-measured="true"] .task-plot-point').first().waitFor();
    await selectionCount(page,30);
    const rows=await plotted(page);
@@ -69,12 +76,12 @@ async function main(){
    const ratio=(ordered[1].x-ordered[0].x)/Math.log(ordered[1].cost/ordered[0].cost);
    for(const point of ordered.slice(2))assert(Math.abs((point.x-ordered[0].x)/Math.log(point.cost/ordered[0].cost)-ratio)<1e-7);
    assert(Math.hypot(rows.find(p=>p.id==='budget').x-rows.find(p=>p.id==='near').x,rows.find(p=>p.id==='budget').y-rows.find(p=>p.id==='near').y)<2);
-   const frontier=JSON.parse(await chart.locator('.task-frontier-line').getAttribute('data-frontier-ids'));
-   assert.deepEqual(frontier,['tiny','budget','mid-0','mid-1','mid-2','mid-3','mid-4','mid','peak']);
-   assert.match(await chart.locator('svg[data-plot-width]').textContent(),/USD · 对数刻度/);
-   assert.match(await chart.locator('.task-cost-footer').textContent(),/历史快照 v5/);
+   assert.equal(await chart.locator('.task-frontier-line,.task-vendor-legend,.task-models-list').count(),0);
+   assert.match(await chart.locator('svg[data-plot-width]').textContent(),/单任务成本（美元）/);
+   assert.doesNotMatch(await chart.locator('svg[data-plot-width]').textContent(),/[↑→┄]/);
+   assert.match(await chart.locator('.task-cost-footer').textContent(),/历史快照/);
    const labels=await chart.locator('.task-point-label').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return [box.left,box.top,box.right,box.bottom];}));
-   assert(labels.length>=10);
+   assert(labels.length>=2 && labels.length<=5);
    for(let i=0;i<labels.length;i++)for(let j=0;j<i;j++) {
      const [left,top,right,bottom]=labels[i], [otherLeft,otherTop,otherRight,otherBottom]=labels[j];
      assert(!(left<otherRight-1&&right>otherLeft+1&&top<otherBottom-1&&bottom>otherTop+1),'visible labels remain readable');
@@ -91,18 +98,32 @@ async function main(){
    assert.match(await detail.innerText(),/\$5\.0093/);
    assert.match(await detail.innerText(),/58\.1/);
    await page.keyboard.press('Escape');
-   await chart.getByRole('button',{name:'放大图表',exact:true}).click();
-   const full=page.getByRole('dialog',{name:'Intelligence Index vs. Cost per Task'});
-   await full.locator('.task-scatter[data-measured="true"] .task-plot-point').first().waitFor();
+   await detail.waitFor({state:'hidden'});
+   const zoom=chart.getByRole('button',{name:'放大图表',exact:true});
+   await zoom.scrollIntoViewIfNeeded();
+   await zoom.click();
+   const full=page.getByRole('dialog',{name:'模型图表',exact:true});
+   await full.waitFor();
+   await full.locator('.task-scatter[data-measured="true"]').waitFor();
    assert.equal(await full.locator('.task-plot-point').count(),rows.length);
    assert(Number(await full.locator('svg[data-plot-width]').getAttribute('data-plot-width'))>rows[0].width);
    await page.keyboard.press('Escape');
    await chart.locator('.task-plot-point').first().waitFor();
-   const variants=page.getByRole('combobox',{name:'Budget 评测档位'});
+   await page.getByRole('tab',{name:'列表',exact:true}).click();
+   await page.getByRole('button',{name:'Budget',exact:true}).click();
+   const budget=page.getByRole('dialog',{name:/Budget/});
+   const variants=budget.getByLabel('评测档位');
    await variants.selectOption('budget-alt');
+   await budget.getByRole('button',{name:'关闭',exact:true}).last().click();
+   assert((await ids(page)).includes('budget-alt'));
+   await page.getByRole('tab',{name:'图表',exact:true}).click();
    assert.equal((await plotted(page)).find(row=>row.id==='budget-alt').cost,0.02002);
    assert(!(await ids(page)).includes('budget'));
+   await page.getByRole('tab',{name:'列表',exact:true}).click();
+   await page.getByRole('button',{name:'Budget',exact:true}).click();
    await variants.selectOption('budget');
+   await page.keyboard.press('Escape');
+   await page.getByRole('tab',{name:'图表',exact:true}).click();
    await expectPicker(page,chart,'Older Release','older',31);
    assert((await ids(page)).includes('older'));
    await go('设置');
@@ -112,24 +133,26 @@ async function main(){
    const chooser=page.getByRole('dialog',{name:'选择对比模型'});
    await chart.getByRole('button',{name:'选择模型',exact:true}).click();
    await chooser.getByLabel('模型厂商',{exact:true}).selectOption('Lab B');
-   assert.equal(await chooser.getByRole('button',{name:'移除 Older Release',exact:true}).count(),0);
+   assert.equal(await chooser.getByRole('checkbox',{name:'移除 Older Release',exact:true}).count(),0);
    await chooser.getByLabel('仅显示已选').check();
-   assert.equal(await chooser.locator('.model-picker-row[aria-pressed="false"]').count(),0);
-   await chooser.getByRole('button',{name:'移除 Pending Cost',exact:true}).click();
+   assert.equal(await chooser.locator('.model-picker-row input:not(:checked)').count(),0);
+   await chooser.getByRole('checkbox',{name:'移除 Pending Cost',exact:true}).click();
    await chooser.getByRole('button',{name:'完成',exact:true}).click();
    await selectionCount(page,30);
    assert(!(await ids(page)).includes('unpriced'));
-   await chart.getByRole('button',{name:'恢复最新 30 个',exact:true}).click();
+   await chart.getByRole('button',{name:'选择模型',exact:true}).click();
+   await chooser.getByRole('button',{name:'恢复最新 30 个',exact:true}).click();
+   await chooser.getByRole('button',{name:'完成',exact:true}).click();
    assert.deepEqual(new Set(await ids(page)),new Set(selected.map(model=>model.id)));
    await overflow(page);
    await page.screenshot({path:path.join(out,`${mode}-${width}-task-cost.png`),animations:'disabled'});
    if(mode==='light'&&width===1024){
      await expectPicker(page,chart,'Older Release','older',31);
-     const connected={...snapshot,origin:'api',indexVersion:'5.0',models:[...snapshot.models,model('added','Added','Lab A',53,0.45,'2026-11-13')]};
+     const connected={...snapshot,origin:'api',indexVersion:'5.0',checkedAt:'2026-11-13T11:02:00Z',models:[...snapshot.models,model('added','Added','Lab A',53,0.45,'2026-11-13')]};
      await page.evaluate(value=>window.demoNextTaskCost=value,connected);
-     await page.getByRole('button',{name:'连接数据源',exact:true}).click();
-     const connection=page.getByRole('dialog',{name:'Artificial Analysis 数据源'});
-     const key=connection.getByLabel('Artificial Analysis API Key');
+     await page.getByRole('button',{name:'连接 AA',exact:true}).click();
+     const connection=page.getByRole('dialog',{name:'Artificial Analysis'});
+     const key=connection.getByLabel('API Key',{exact:true});
      assert.equal(await key.getAttribute('type'),'password');
      await key.fill('invalid-fixture');
      await connection.getByRole('button',{name:'连接并更新'}).click();
@@ -141,21 +164,32 @@ async function main(){
      assert((await ids(page)).includes('added'));
      assert(!(await ids(page)).includes('boundary'));
      assert((await ids(page)).includes('older'));
-     const fresh={...connected,indexVersion:'5.1',models:[...connected.models,model('fresh','Fresh','New Lab',61,1.23,'2026-11-14')]};
-     await page.evaluate(value=>window.demoPublishTaskCosts(value),fresh);
-     await page.getByText(/API 指数 v5.1/).waitFor();
+     await page.waitForFunction(()=>window.demoTaskCostChecks>=1);
+     const fresh={...connected,indexVersion:'5.1',checkedAt:'2026-11-14T11:05:00Z',models:[...connected.models,model('fresh','Fresh','New Lab',61,1.23,'2026-11-14')]};
+     await page.evaluate(value=>{ window.demoDueTaskCost=value; window.dispatchEvent(new Event('focus')); },fresh);
+     await page.locator(`[data-checked-at="${fresh.checkedAt}"]`).waitFor();
      assert((await ids(page)).includes('fresh'));
      assert((await ids(page)).includes('older'));
      await page.evaluate(value=>window.demoPublishTaskCosts(value,'演示：Artificial Analysis 暂时无法连接'),fresh);
-     await page.getByText(/正在显示上次有效数据/).waitFor();
+     await page.getByText(/已保留上次数据/).waitFor();
      assert((await ids(page)).includes('fresh'));
-     await page.evaluate(value=>window.demoNextTaskCost=value,{...fresh,indexVersion:'5.2'});
+     const manual={...fresh,indexVersion:'5.2',checkedAt:'2026-11-14T11:15:00Z'};
+     await page.evaluate(value=>window.demoNextTaskCost=value,manual);
      await page.getByRole('button',{name:'立即更新',exact:true}).click();
-     await page.getByText(/API 指数 v5.2/).waitFor();
-     assert.equal(await page.getByText(/正在显示上次有效数据/).count(),0);
-     await page.getByRole('button',{name:'管理数据源',exact:true}).click();
+     await page.locator(`[data-checked-at="${manual.checkedAt}"]`).waitFor();
+     assert.equal(await page.getByText(/已保留上次数据/).count(),0);
+     await go('设置');
+     const auto=page.getByRole('button',{name:'模型资料自动更新',exact:true});
+     await auto.click();
+     await page.waitForFunction(()=>document.querySelector('[aria-label="模型资料自动更新"]')?.getAttribute('aria-pressed')==='false');
+     const checksBeforeFocus=await page.evaluate(()=>window.demoTaskCostChecks);
+     await go('AI 模型');
+     await page.getByRole('button',{name:'立即更新',exact:true}).waitFor();
+     await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+     assert.equal(await page.evaluate(()=>window.demoTaskCostChecks),checksBeforeFocus);
+     await page.getByRole('button',{name:'数据源',exact:true}).click();
      await connection.getByRole('button',{name:'断开连接',exact:true}).click();
-     await page.getByRole('button',{name:'连接数据源',exact:true}).waitFor();
+     await page.getByRole('button',{name:'连接 AA',exact:true}).waitFor();
      assert((await ids(page)).includes('fresh'));
    }
    await go('输出速度');await page.waitForFunction(()=>Number(document.querySelector('.speed-plot')?.dataset.callCount)>0);assert.equal(await page.locator('.speed-plot path').count(),0);await page.getByLabel('输出速度模型').selectOption('gpt-6.1-sol');await page.waitForFunction(()=>document.querySelectorAll('.speed-legend button').length===1);

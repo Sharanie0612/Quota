@@ -758,6 +758,14 @@
         case 'save_appearance': window.demoAppearance=args.preferences;emit('appearance-updated',args.preferences);return null;
         case 'get_task_cost':
           return readTaskCosts();
+        case 'check_task_cost':
+          window.demoTaskCostChecks = (window.demoTaskCostChecks ?? 0) + 1;
+          if (window.demoDueTaskCost && (await readTaskCosts()).connected) {
+            const snapshot = window.demoDueTaskCost;
+            window.demoDueTaskCost = null;
+            await window.demoPublishTaskCosts(snapshot);
+          }
+          return null;
         case 'refresh_task_cost': {
           const report = await readTaskCosts();
           if (window.demoNextTaskCost) await window.demoPublishTaskCosts(window.demoNextTaskCost);

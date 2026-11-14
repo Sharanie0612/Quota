@@ -1,5 +1,5 @@
 //! Artificial Analysis Free endpoint contract and local fallback.
-use chrono::Utc;
+use chrono::{TimeDelta, Utc};
 use quota_lib::{
     benchmarks,
     task_cost::{load_snapshot, Origin, Pages},
@@ -40,6 +40,7 @@ fn main() {
     let historical = benchmarks::load(&dir);
     let old = load_snapshot(&dir, &historical).unwrap();
     assert_eq!(old.origin, Origin::Historical);
+    assert!(old.refresh_due(Utc::now()));
     assert!(old.models.len() > 50);
     assert!(old.models.iter().any(|model| model.cost_per_task.is_none()));
     for model in &old.models {
@@ -93,6 +94,9 @@ fn main() {
     assert!(!pages.ingest(&last).unwrap());
     let next = pages.finish(Utc::now()).unwrap();
     assert_eq!(next.index_version, "6.1");
+    assert!(!next.refresh_due(next.checked_at + TimeDelta::minutes(35)));
+    assert!(next.refresh_due(next.checked_at + TimeDelta::minutes(36)));
+    assert!(next.refresh_due(next.checked_at - TimeDelta::seconds(1)));
     assert_eq!(next.models.len(), 4);
     assert_eq!(next.models[0].cost_per_task, Some(0.0837));
     assert_eq!(next.models[1].cost_per_task, None);

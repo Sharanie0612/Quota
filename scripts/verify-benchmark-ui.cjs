@@ -27,12 +27,15 @@ async function plotted(page){
   width:Number(e.ownerSVGElement.dataset.plotWidth),height:Number(e.ownerSVGElement.dataset.plotHeight)
  })));
 }
+async function changeView(page,name){
+ await page.getByRole('button',{name:'图表显示设置',exact:true}).click();
+ await page.getByRole('dialog',{name:'图表显示设置',exact:true}).getByRole('button',{name,exact:true}).click();
+}
 async function ids(page){
- const chart=page.getByRole('tab',{name:'图表',exact:true});
- const wasChart=await chart.getAttribute('aria-selected')==='true';
- await page.getByRole('tab',{name:'列表',exact:true}).click();
+ const wasChart=await page.locator('.task-models-list').count()===0;
+ if(wasChart) await changeView(page,'列表');
  const values=await page.locator('.task-models-list tbody tr').evaluateAll(rows=>rows.map(e=>e.dataset.profileId));
- if(wasChart) await chart.click();
+ if(wasChart) await changeView(page,'图表');
  return values;
 }
 async function selectionCount(page,count){
@@ -56,7 +59,7 @@ async function main(){
    const page=await browser.newPage({viewport:{width,height:900},colorScheme:mode,reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
    const go=async name=>{await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name,exact:true}).click();await page.getByRole('heading',{name,level:1,exact:true}).waitFor();};
    await go('AI 模型');
-   const chart=page.getByRole('region',{name:'模型性价比',exact:true});
+   const chart=page.getByRole('region',{name:'Intelligence Index vs. Cost per Task',exact:true});
    await chart.locator('.task-scatter[data-measured="true"] .task-plot-point').first().waitFor();
    await selectionCount(page,30);
    const rows=await plotted(page);
@@ -70,18 +73,19 @@ async function main(){
    for(const row of rows){
      assert.equal(row.score,expected.get(row.id).index);
      assert.equal(row.cost,expected.get(row.id).costPerTask);
-     assert(Number.isFinite(row.x)&&Number.isFinite(row.y)&&row.x>=51&&row.x<=row.width-23&&row.y>=39&&row.y<=row.height-60);
+     assert(Number.isFinite(row.x)&&Number.isFinite(row.y)&&row.x>=60&&row.x<=row.width-15&&row.y>=15&&row.y<=row.height-51);
    }
    const ordered=[...rows].sort((a,b)=>a.cost-b.cost);
    const ratio=(ordered[1].x-ordered[0].x)/Math.log(ordered[1].cost/ordered[0].cost);
    for(const point of ordered.slice(2))assert(Math.abs((point.x-ordered[0].x)/Math.log(point.cost/ordered[0].cost)-ratio)<1e-7);
    assert(Math.hypot(rows.find(p=>p.id==='budget').x-rows.find(p=>p.id==='near').x,rows.find(p=>p.id==='budget').y-rows.find(p=>p.id==='near').y)<2);
-   assert.equal(await chart.locator('.task-frontier-line,.task-vendor-legend,.task-models-list').count(),0);
-   assert.match(await chart.locator('svg[data-plot-width]').textContent(),/单任务成本（美元）/);
+   assert.equal(await chart.locator('.task-attractive-area,.task-expensive-area,.task-frontier-line').count(),3);
+   assert.equal(await chart.locator('.task-creator-legend button').count(),new Set([...expected.values()].map(value=>value.creator)).size);
+   assert.match(await chart.locator('svg[data-plot-width]').textContent(),/Cost per Task \(USD, Log Scale\)/);
    assert.doesNotMatch(await chart.locator('svg[data-plot-width]').textContent(),/[↑→┄]/);
-   assert.match(await chart.locator('.task-cost-footer').textContent(),/历史快照/);
+   assert.match(await page.locator('.task-source-status').textContent(),/历史快照/);
    const labels=await chart.locator('.task-point-label').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return [box.left,box.top,box.right,box.bottom];}));
-   assert(labels.length>=2 && labels.length<=5);
+   assert(labels.length>=6 && labels.length<=rows.length);
    for(let i=0;i<labels.length;i++)for(let j=0;j<i;j++) {
      const [left,top,right,bottom]=labels[i], [otherLeft,otherTop,otherRight,otherBottom]=labels[j];
      assert(!(left<otherRight-1&&right>otherLeft+1&&top<otherBottom-1&&bottom>otherTop+1),'visible labels remain readable');
@@ -99,9 +103,7 @@ async function main(){
    assert.match(await detail.innerText(),/58\.1/);
    await page.keyboard.press('Escape');
    await detail.waitFor({state:'hidden'});
-   const zoom=chart.getByRole('button',{name:'放大图表',exact:true});
-   await zoom.scrollIntoViewIfNeeded();
-   await zoom.click();
+   await changeView(page,'放大图表');
    const full=page.getByRole('dialog',{name:'模型图表',exact:true});
    await full.waitFor();
    await full.locator('.task-scatter[data-measured="true"]').waitFor();
@@ -109,21 +111,21 @@ async function main(){
    assert(Number(await full.locator('svg[data-plot-width]').getAttribute('data-plot-width'))>rows[0].width);
    await page.keyboard.press('Escape');
    await chart.locator('.task-plot-point').first().waitFor();
-   await page.getByRole('tab',{name:'列表',exact:true}).click();
+   await changeView(page,'列表');
    await page.getByRole('button',{name:'Budget',exact:true}).click();
    const budget=page.getByRole('dialog',{name:/Budget/});
    const variants=budget.getByLabel('评测档位');
    await variants.selectOption('budget-alt');
    await budget.getByRole('button',{name:'关闭',exact:true}).last().click();
    assert((await ids(page)).includes('budget-alt'));
-   await page.getByRole('tab',{name:'图表',exact:true}).click();
+   await changeView(page,'图表');
    assert.equal((await plotted(page)).find(row=>row.id==='budget-alt').cost,0.02002);
    assert(!(await ids(page)).includes('budget'));
-   await page.getByRole('tab',{name:'列表',exact:true}).click();
+   await changeView(page,'列表');
    await page.getByRole('button',{name:'Budget',exact:true}).click();
    await variants.selectOption('budget');
    await page.keyboard.press('Escape');
-   await page.getByRole('tab',{name:'图表',exact:true}).click();
+   await changeView(page,'图表');
    await expectPicker(page,chart,'Older Release','older',31);
    assert((await ids(page)).includes('older'));
    await go('设置');
@@ -147,6 +149,21 @@ async function main(){
    await overflow(page);
    await page.screenshot({path:path.join(out,`${mode}-${width}-task-cost.png`),animations:'disabled'});
    if(mode==='light'&&width===1024){
+     const svgDownload=page.waitForEvent('download');
+     await chart.getByRole('button',{name:'下载图表',exact:true}).click();
+     const download=await svgDownload;
+     assert.equal(download.suggestedFilename(),'Quota-AA-Intelligence-vs-Cost.svg');
+     const svg=fs.readFileSync(await download.path(),'utf8');
+     const svgSummary=await page.evaluate(source=>{
+       const doc=new DOMParser().parseFromString(source,'image/svg+xml');
+       return {root:doc.documentElement.localName,points:doc.querySelectorAll('.task-point-mark').length};
+     },svg);
+     assert.deepEqual(svgSummary,{root:'svg',points:rows.length});
+     await chart.getByRole('button',{name:'下载数据',exact:true}).click();
+     await page.waitForFunction(()=>!!window.demoExport);
+     const csv=await page.evaluate(()=>window.demoExport.contents);
+     assert(csv.includes('Intelligence Index')&&csv.includes('5.0093'));
+     assert.equal(csv.trim().split('\r\n').length,31);
      await expectPicker(page,chart,'Older Release','older',31);
      const connected={...snapshot,origin:'api',indexVersion:'5.0',checkedAt:'2026-11-13T11:02:00Z',models:[...snapshot.models,model('added','Added','Lab A',53,0.45,'2026-11-13')]};
      await page.evaluate(value=>window.demoNextTaskCost=value,connected);

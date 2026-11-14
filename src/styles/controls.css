@@ -275,7 +275,7 @@ textarea.input:focus {
   place-items: center;
   padding: 24px;
   z-index: 50;
-  animation: fade 0.16s ease;
+  animation: fade 240ms var(--motion-ease);
 }
 
 .modal {
@@ -285,10 +285,11 @@ textarea.input:focus {
   overflow-y: auto;
   box-shadow: var(--shadow-pop);
   border: 1px solid var(--border);
-  animation: pop 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: pop 300ms var(--motion-spring);
   border-radius: var(--radius-surface);
   background: var(--surface);
 }
+html[data-effects="reduced"] .modal { animation: fade 160ms var(--motion-ease); }
 
 .modal-head {
   position: sticky;

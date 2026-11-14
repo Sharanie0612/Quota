@@ -142,7 +142,7 @@
   display: flex;
   height: 100vh;
   padding: 12px;
-  gap: 12px; border-radius: var(--radius-window); background: var(--bg); overflow: hidden; isolation: isolate; }
+  gap: 12px; border-radius: var(--radius-window); background: var(--bg); overflow: clip; isolation: isolate; }
 .main {
   flex: 1;
   display: flex;

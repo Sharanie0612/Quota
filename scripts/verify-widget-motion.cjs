@@ -21,7 +21,7 @@ async function main(){
  root.props.onMouseLeave();await advance(130);assert.equal(states[0],false);assert.deepEqual(nativeCalls,[true]);
  root.props.onMouseEnter();assert.equal(states[0],true,'re-enter reverses in the same event, without waiting for the exit');await flush();
  await advance(400);assert.equal(states[0],true);assert.deepEqual(nativeCalls,[true],'interrupted collapse must not shrink or resize again');
- root.props.onMouseLeave();await advance(119);assert.equal(states[0],true);
+ root.props.onMouseLeave();await advance(94);assert.equal(states[0],true);
  await advance(2);assert.equal(states[0],false);assert.deepEqual(nativeCalls,[true]);
  root.props.onMouseLeave();await advance(121);assert.deepEqual(nativeCalls,[true],'duplicate leave/blur must not cut off the fade');
  end('opacity');end('clip-path',true);await flush();assert.deepEqual(nativeCalls,[true],'text fades must not truncate the surface animation');
@@ -29,7 +29,7 @@ async function main(){
  end();await flush();assert.deepEqual(nativeCalls,[true,false],'native clip closes only when the surface finishes');
  root.props.onMouseEnter();await flush();assert.equal(states[0],true);assert.deepEqual(nativeCalls,[true,false,true]);
  end();await flush();assert.equal(states[0],true,'late exit event must not collapse a reopened surface');
- root.props.onMouseLeave();await advance(120+419);assert.deepEqual(nativeCalls,[true,false,true]);
+ root.props.onMouseLeave();await advance(95+439);assert.deepEqual(nativeCalls,[true,false,true]);
  await advance(2);assert.deepEqual(nativeCalls,[true,false,true,false],'fallback closes a hidden view that receives no transitionend');
  console.log('PASS immediate reversal, debounce, no redundant native resize, actual surface completion, child event isolation, hidden-view fallback, reopen');
 }

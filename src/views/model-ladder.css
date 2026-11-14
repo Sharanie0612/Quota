@@ -7,8 +7,7 @@
 }
 
 .task-page-heading,
-.task-cost-heading,
-.task-cost-footer {
+.task-cost-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -16,9 +15,7 @@
   gap: 12px 20px;
 }
 
-.task-model-actions,
-.task-comparison-status,
-.task-source-status {
+.task-model-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -26,29 +23,82 @@
 }
 
 .task-page-heading h1 { margin: 0; font-size: 28px; font-weight: 650; }
-.task-cost-chart { min-width: 0; padding: 20px 22px 10px; }
-.task-cost-heading { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-.task-cost-heading h2 { margin: 0; font-size: 19px; font-weight: 650; }
-.task-cost-heading .seg button { font-size: 14px; }
+.task-cost-chart {
+  --aa-background: white;
+  --aa-text: #1f1f1f;
+  --aa-muted: #666;
+  --aa-border: #e7e7e7;
+  --aa-controls: #f0f1f3;
+  --aa-green: color-mix(in srgb, lightgreen 25%, var(--aa-background));
+  --aa-neutral: color-mix(in srgb, #ebebeb 35%, var(--aa-background));
+  min-width: 0;
+  padding: 18px;
+  background: var(--aa-background);
+  border: 1px solid var(--aa-border);
+  border-radius: var(--radius-surface);
+  color: var(--aa-text);
+  font-family: Arial, var(--font);
+}
+html[data-color-mode="dark"] .task-cost-chart {
+  --aa-background: var(--surface);
+  --aa-text: var(--text);
+  --aa-muted: var(--text-2);
+  --aa-border: var(--border);
+  --aa-controls: var(--surface-3);
+  --aa-green: color-mix(in srgb, var(--green) 20%, var(--surface));
+  --aa-neutral: var(--surface-3);
+}
+.task-cost-heading { align-items: flex-start; flex-wrap: nowrap; gap: 16px; }
+.task-cost-heading h2 {
+  margin: 0;
+  font: 400 21px/1.26 Georgia, "Times New Roman", serif;
+  letter-spacing: -.03em;
+}
+.task-cost-heading p { max-width: 66ch; margin: 5px 0 0; color: var(--aa-muted); font-size: 12px; line-height: 1.38; }
 .task-model-actions .btn { font-size: 14px; }
-.task-plot-panel { padding-top: 16px; }
+.task-chart-controls { display: grid; justify-items: end; row-gap: 7px; }
+.task-chart-tools { display: flex; align-items: center; gap: 4px; }
+.task-chart-controls .btn { height: 32px; border-radius: var(--radius-inset); color: var(--aa-text); border-color: var(--aa-border); }
+.task-chart-controls .task-chart-icon { width: 32px; padding: 0; background: var(--aa-background); }
+.task-chart-controls .task-model-count { min-width: min(272px, 19vw); padding-inline: 12px; justify-content: space-between; background: var(--aa-controls); }
+.task-chart-controls .btn:hover:not(:disabled) { border-color: var(--aa-muted); }
+.task-chart-controls .btn:disabled { opacity: .48; }
+.task-plot-panel { padding-top: 25px; }
+.task-plot-key, .task-creator-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0 7px; }
+.task-plot-key button, .task-creator-legend button {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  border: 0; padding: 3px 2px; background: transparent; cursor: pointer; font-size: 13px;
+}
+.task-plot-key button[aria-pressed="false"] { color: var(--aa-muted); text-decoration: line-through; }
+.task-plot-key .task-key-area { width: 15px; height: 11px; border: 1px solid color-mix(in srgb, lightgreen 63%, transparent); border-radius: 2px; background: var(--aa-green); }
+.task-plot-key .task-key-line { width: 20px; height: 0; border-top: 2px dotted currentColor; }
+.task-creator-legend { margin-top: 3px; }
+.task-creator-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.task-creator-legend button:hover { text-decoration: underline; }
+.task-plot-source { display: flex; justify-content: flex-end; }
+.task-plot-source .btn { height: 23px; padding: 0 3px; font: 600 15px Georgia, "Times New Roman", serif; color: var(--aa-muted); }
 
 .task-scatter > svg {
   width: 100%;
-  height: clamp(385px, 49vh, 570px);
+  height: clamp(376px, 45vh, 520px);
   max-height: none;
 }
 
-.task-axis-caption { fill: var(--text); font-size: 14px; font-weight: 550; }
-.task-axis-tick { fill: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
-.task-plot-frame { fill: none; stroke: var(--border-strong); stroke-width: 1; }
-.task-plot-grid { stroke: var(--border); stroke-width: 1; opacity: .75; }
+.task-scatter { background: var(--aa-background, var(--surface)); }
+.task-axis-caption { fill: var(--aa-text, var(--text)); font-size: 13px; }
+.task-axis-tick { fill: var(--aa-muted, var(--text-2)); font-size: 11px; font-variant-numeric: tabular-nums; }
+.task-axis-mark { stroke: var(--aa-muted, var(--text-2)); stroke-width: 1; }
+.task-attractive-area { fill: var(--aa-green, var(--green-soft)); }
+.task-expensive-area { fill: var(--aa-neutral, var(--surface-3)); }
+.task-frontier-line { fill: none; stroke: var(--aa-text, var(--text)); stroke-width: 2; stroke-dasharray: 2 4; stroke-linecap: round; pointer-events: none; }
 .task-plot-point { cursor: pointer; outline: none; }
+.task-plot-point[data-emphasis="false"] { opacity: .23; }
 .task-point-hit { fill: transparent; }
-.task-point-mark { fill: var(--border-strong); stroke: var(--surface); stroke-width: 1; }
-.task-reference-point .task-point-mark { fill: var(--blue); }
-.task-point-hover { fill: var(--blue); stroke: var(--surface); stroke-width: 1.5; pointer-events: none; }
-.task-point-label { font-size: 13px; font-weight: 600; fill: var(--text); pointer-events: none; }
+.task-point-mark { fill: var(--point-color); stroke: var(--aa-background, var(--surface)); stroke-width: .5; }
+html[data-color-mode="dark"] .task-point-mark { fill: color-mix(in srgb, var(--point-color) 72%, white); }
+.task-plot-point:is(:hover, :focus-visible) .task-point-mark { stroke: var(--aa-text, var(--text)); stroke-width: 2; }
+.task-point-label { font-size: 11.5px; font-weight: 400; fill: var(--aa-text, var(--text)); stroke: var(--aa-background, var(--surface)); stroke-width: 2; paint-order: stroke; stroke-linejoin: round; pointer-events: none; }
+.task-label-leader { stroke: var(--aa-muted, var(--text-2)); opacity: .42; pointer-events: none; }
 .task-cost-tooltip {
   min-width: min(233px, 100%);
   max-width: min(270px, 100%);
@@ -58,15 +108,11 @@
 }
 .task-cost-tooltip strong { color: var(--text); }
 
-.task-cost-footer {
-  min-height: 48px;
-  border-top: 1px solid var(--border);
-  padding-top: 6px;
+.task-source-status {
   color: var(--text-2);
   font-size: 13px;
 }
 
-.task-cost-footer .btn { font-size: inherit; }
 .task-source-status time { font-variant-numeric: tabular-nums; }
 .task-source-status > span { white-space: nowrap; }
 .task-sync-error {
@@ -86,7 +132,7 @@
   font-size: 16px;
 }
 
-.task-models-list { min-width: 0; min-height: 330px; max-height: min(55vh, 580px); overflow: auto; }
+.task-models-list { min-width: 0; min-height: 330px; max-height: min(55vh, 580px); overflow: auto; margin-top: 18px; }
 .task-models-list table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
 .task-models-list th, .task-models-list td { padding: 10px 12px; }
 .task-models-list tr:not(:last-child) > :is(th, td) { border-bottom: 1px solid var(--border); }
@@ -151,18 +197,25 @@
 .task-model-details dt { color: var(--text-2); }
 .task-model-details dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .task-source-version { margin-top: 0; color: var(--text-2); font-size: 14px; }
+.task-display-options { display: grid; gap: 12px; }
+.task-display-options label { display: flex; gap: 8px; align-items: center; }
+.task-display-options input { accent-color: var(--blue); }
+.task-display-actions { margin: 20px 0 12px; }
 
 .activity-summary > .activity-summary-secondary { cursor: default; }
 .activity-summary > .activity-summary-secondary b { font-size: 19px; color: var(--text-2); }
 
 @media (max-width: 1100px) {
-  .task-cost-chart { padding-inline: 16px; }
+  .task-cost-chart { padding-inline: 15px; }
+  .task-cost-heading h2 { font-size: 20px; }
   .main-wide .content { padding: 20px; }
 }
 
 @media (forced-colors: active) {
+  .task-cost-chart { --aa-background: Canvas; --aa-text: CanvasText; --aa-muted: CanvasText; --aa-border: ButtonText; }
+  .task-attractive-area, .task-expensive-area { display: none; }
   .task-point-mark { fill: CanvasText; stroke: Canvas; }
-  .task-reference-point .task-point-mark, .task-point-hover { fill: LinkText; stroke: Canvas; }
+  .task-plot-point:focus-visible .task-point-mark { fill: LinkText; stroke: CanvasText; }
   .task-point-label, .task-axis-caption, .task-axis-tick { fill: CanvasText; }
-  .task-plot-frame, .task-plot-grid { stroke: CanvasText; }
+  .task-axis-mark, .task-frontier-line { stroke: CanvasText; }
 }

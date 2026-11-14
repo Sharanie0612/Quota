@@ -1,4 +1,4 @@
-/* A single material plane for navigation; content and ordinary controls stay solid. */
+/* Floating navigation refracts the live workspace below it. */
 :root {
   --material-fill:var(--surface);
   --material-filter:none;
@@ -7,7 +7,7 @@
   --material-rim-opacity:0;
 }
 .app {
-  background:radial-gradient(ellipse at 0% 0%,color-mix(in srgb,var(--blue) 26%,var(--bg)),transparent 52%),radial-gradient(ellipse at 8% 76%,color-mix(in srgb,var(--blue) 14%,var(--bg)),transparent 40%),linear-gradient(135deg,var(--bg),var(--surface-2) 72%);
+  background-image:linear-gradient(125deg,var(--bg),var(--surface-2) 74%);
 }
 .material-plane {
   position:relative;
@@ -17,7 +17,6 @@
   backdrop-filter:var(--material-filter);
   -webkit-backdrop-filter:var(--material-filter);
   box-shadow:var(--material-depth);
-  clip-path:inset(0 round var(--radius-surface));
 }
 .material-plane > .material-defs {position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;}
 .material-plane[data-lens="ready"] {backdrop-filter:var(--material-filter) var(--material-lens);-webkit-backdrop-filter:var(--material-filter) var(--material-lens);}
@@ -29,7 +28,7 @@
   inset:0;
   border-radius:inherit;
   padding:1px;
-  background:conic-gradient(from var(--rim-angle,145deg),var(--material-light),transparent 20%,var(--material-light) 46%,transparent 64%,var(--material-light) 92%);
+  background:conic-gradient(from var(--rim-angle,138deg),var(--material-light),transparent 22%,color-mix(in srgb,var(--text) 28%,transparent) 44%,transparent 67%,var(--material-light) 94%);
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
   mask-composite:exclude;
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
@@ -41,21 +40,29 @@
 }
 .material-plane > * {position:relative;z-index:1;}
 html[data-material="liquid"] .app {
-  --material-fill:color-mix(in srgb,var(--surface) 14%,transparent);
-  --material-filter:blur(2px) saturate(1.2);
+  background-image:
+    radial-gradient(ellipse at 5% 0%,color-mix(in srgb,var(--blue) 24%,var(--bg)),transparent 56%),
+    radial-gradient(ellipse at 14% 104%,color-mix(in srgb,var(--blue) 13%,var(--surface)),transparent 53%),
+    linear-gradient(125deg,var(--bg),var(--surface-2) 72%);
+  --material-fill:linear-gradient(164deg,color-mix(in srgb,var(--material-light) 37%,transparent),transparent 50%),color-mix(in srgb,var(--surface) 56%,transparent);
+  --material-filter:blur(4px) saturate(1.35);
   --material-edge:color-mix(in srgb,var(--material-light) 65%,var(--border));
-  --material-depth:0 8px 24px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 55%,transparent);
-  --material-rim-opacity:.78;
+  --material-depth:0 12px 26px -12px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--text) 16%,transparent);
+  --material-rim-opacity:.92;
 }
-html[data-material="liquid"] .sidebar {--material-fill:color-mix(in srgb,var(--bg-sidebar) 10%,transparent);}
+html[data-material="liquid"] .sidebar {
+  --material-fill:linear-gradient(153deg,color-mix(in srgb,var(--material-light) 43%,transparent),transparent 61%),color-mix(in srgb,var(--bg-sidebar) 46%,transparent);
+}
+html[data-material="liquid"] .workspace-toolbar,
+html[data-material="liquid"] .sidebar { box-shadow:var(--material-depth),0 0 1px color-mix(in srgb,var(--text) 28%,transparent); }
 html:is([data-material="liquid"],[data-material="frosted"]) .main {background:transparent;}
 .content {background:var(--surface-2);}
 /* Content can pass behind the floating navigation only while scrolling. */
 html:is([data-material="liquid"],[data-material="frosted"]) .workspace-toolbar {position:absolute;left:12px;right:12px;top:12px;margin:0;z-index:3;}
 html:is([data-material="liquid"],[data-material="frosted"]) .main > .content {padding-top:91px;background:linear-gradient(var(--bg),var(--surface-2) 150px);background-attachment:local;}
 html[data-material="liquid"] .motion-highlight {
-  background:linear-gradient(150deg,var(--material-light),transparent 38%,transparent 72%,color-mix(in srgb,var(--material-light) 36%,transparent)),color-mix(in srgb,var(--surface) 56%,transparent);
-  box-shadow:0 3px 10px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--border) 70%,transparent);
+  background:linear-gradient(150deg,var(--material-light),transparent 38%,transparent 72%,color-mix(in srgb,var(--material-light) 36%,transparent)),color-mix(in srgb,var(--surface) 73%,transparent);
+  box-shadow:0 4px 11px var(--material-shadow),inset 0 1px 0 var(--material-light),inset 0 -1px 0 color-mix(in srgb,var(--text) 14%,transparent);
 }
 html[data-material="liquid"] .nav-item:active {background:color-mix(in srgb,var(--surface) 58%,transparent);}
 html[data-material="liquid"] .nav-item:not(.active) {color:color-mix(in srgb,var(--text-2) 72%,var(--text));}

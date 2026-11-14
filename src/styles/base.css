@@ -18,6 +18,10 @@ body {
   user-select: none;
 }
 
+html[data-window="main"], html[data-window="main"] body, html[data-window="main"] #root {
+  background: transparent;
+}
+
 button,
 input,
 select,
@@ -93,7 +97,9 @@ dialog.overlay {
   margin: 0;
   border: 0;
   color: var(--text);
+  border-radius: var(--radius-window);
 }
+html:has(.app[data-window-shape="square"]) dialog.overlay { border-radius: 0; }
 dialog.overlay:not([open]) { display: none; }
 dialog.overlay::backdrop { background: transparent; }
 :root {

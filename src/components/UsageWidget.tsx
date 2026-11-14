@@ -40,8 +40,9 @@ export function UsageWidget() {
   const interrupt=useRef<(()=>void)|null>(null);
   const settle=()=>new Promise<void>(resolve=>{
     const done=()=>{clearTimeout(timeout);interrupt.current=null;resolve();};
-    // CSS completion is authoritative; the timer covers hidden/disabled views.
-    const timeout=setTimeout(done,matchMedia('(prefers-reduced-motion: reduce)').matches?0:420);
+    // Keep the native input area open until the visible panel reaches the handle.
+    const reduced = matchMedia('(prefers-reduced-motion: reduce), (forced-colors: active)').matches;
+    const timeout=setTimeout(done,reduced?0:440);
     interrupt.current=done;
   });
   const expand=async(next:boolean)=>{
@@ -81,7 +82,7 @@ export function UsageWidget() {
     catch(e){if(live.current)setError(errText(e));}
     finally{working.current=false;}
   };
-  const collapse=(force=false)=>{clearTimeout(timer.current);timer.current=setTimeout(()=>{if(!dragging.current&&(force||(!hovered.current&&!root.current?.contains(document.activeElement)))){if(force&&root.current?.contains(document.activeElement))(document.activeElement as HTMLElement)?.blur();void expand(false);}},120);};
+  const collapse=(force=false)=>{clearTimeout(timer.current);timer.current=setTimeout(()=>{if(!dragging.current&&(force||(!hovered.current&&!root.current?.contains(document.activeElement)))){if(force&&root.current?.contains(document.activeElement))(document.activeElement as HTMLElement)?.blur();void expand(false);}},95);};
   useEffect(()=>{
     live.current=true;let stopped=false;let loading=false;
     const load=async()=>{if(loading||!enabled.current)return;loading=true;try{const value=await api.getWidgetUsage();if(!stopped){setUsage(value);setError('');}}catch(e){if(!stopped)setError(errText(e));}finally{loading=false;}};

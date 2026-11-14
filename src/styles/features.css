@@ -1,5 +1,6 @@
 
-.view-transition { animation: view-arrive 320ms var(--motion-ease) backwards; }
+.view-transition { animation: view-slide-in 280ms var(--motion-spring) backwards; }
+html[data-effects="reduced"] .view-transition { animation-name: view-arrive; }
 .view-transition .account-card, .view-transition .usage-cost-summary .card { animation: view-arrive 420ms var(--motion-ease) backwards; }
 .view-transition .account-card:nth-child(2), .usage-cost-summary .card:nth-child(2) { animation-delay: 35ms; }
 .view-transition .account-card:nth-child(3), .usage-cost-summary .card:nth-child(3) { animation-delay: 70ms; }

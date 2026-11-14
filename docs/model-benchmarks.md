@@ -2,15 +2,25 @@
 
 ## 当前图表
 
-Quota 1.0.4001 的图表纵轴为 Intelligence Index，横轴为同一配置的加权美元单任务成本（对数轴）。每个有成本数据的型号保留独立散点，图上最多标出五个代表名称。悬停或聚焦可查看任一散点的型号和数值，切到「列表」可查看完整名单。在型号详情中可切换评测档位。[Artificial Analysis 原图](https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task)
+Quota 1.0.4100 按 AA 的 Intelligence Index vs. Cost per Task 图表布局绘制。纵轴为 Intelligence Index，横轴为同一配置的加权美元单任务成本（对数轴）。厂商颜色、优选象限和帕累托线随选中型号绘制。图中的散点使用原始坐标，遇到名称密集时限制重叠。悬停或聚焦可查看数值，「图表显示设置」含标签、优选象限、帕累托线、完整列表和放大图表。点击型号可查详情及切换评测档位。[Artificial Analysis 原图](https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task)
 
 首次打开时按 AA 已知发布日期选入最新 30 个型号，发布日期未知的型号可手动加入。默认选有可比成本且指数最高的配置，同分时优先成本更低的配置。缺成本的型号在列表保留指数。快照更新会滚动补入新发布型号，手动添加、移除和档位选择在本机保留。
 
 在「AI 模型 → 连接 AA」输入 Artificial Analysis API Key，免费 Key 即可。密钥保存在系统凭据管理器中。Quota 通过 AA 官方接口读取 `evaluations.artificial_analysis_intelligence_index` 和 `artificial_analysis_intelligence_index_cost.cost_per_task.total_cost`。单任务成本来自 AA 按评测权重汇总的任务支出，单位为 USD。[密钥管理](https://artificialanalysis.ai/api-key-management-redirect) · [官方接口](https://artificialanalysis.ai/data-api/docs/reference)
 
-连接后可立即拉取 AA 已发布的数据。AA 接口采用请求应答方式，免费额度每 24 小时为 100 次请求。开启「设置 → 自动更新 AI 模型」后，Quota 运行时按上次分页量和每日 80 次自动请求预算计算间隔，例如两页约 36 分钟。打开模型页或切回窗口时也会检查到期状态。每次完整分页成功后更新本机 `aa-task-cost.json`，遇到限流遵守 AA 的重试等待时间，断网或数据不完整时保留上次有效快照。页面显示当前快照时间。[AA 配额说明](https://artificialanalysis.ai/data-api/docs#rate-limits)
+连接后可立即拉取 AA 已发布的数据。AA 接口采用请求应答方式，免费额度每 24 小时为 100 次请求。开启「设置 → 自动更新 AI 模型」后，Quota 运行时按上次分页量和每日 80 次自动请求预算计算间隔，例如四页约 72 分钟。打开模型页或切回窗口时也会检查到期状态。每次完整分页成功后更新本机 `aa-task-cost.json`，遇到限流遵守 AA 的重试等待时间，断网或数据不完整时保留上次有效快照。页面显示连接状态和快照更新时间。[AA 配额说明](https://artificialanalysis.ai/data-api/docs#rate-limits)
 
 当前回归运行 `cargo run --release --locked --example task_cost_checks` 和 `node scripts/verify-benchmark-ui.cjs`。打包后的 `check-benchmark-ui.ps1` 可核对历史快照，也可用 `-TaskCostData` 输入隔离 API 样本。
+
+## 1.0.4100 验收记录
+
+Windows 10 x64 的隔离配置用现有系统凭据完成 AA 自动刷新，写入 4 页共 128 个配置的快照。默认选中的 30 个型号里，有 27 个具备可比成本并绘制为散点。浏览器回归覆盖 1024px 和 1360px 布局、深浅主题、图表和 CSV 导出、手选持久化、到期更新及失败时保留快照。
+
+实际安装器完成 1.0.4001 → 1.0.4100 的隔离覆盖升级，核对安装向导结束页、程序启动、WebView2 DLL、原 Quota 图标和快捷方式参数。原生测试覆盖浮动、最大化、全屏、分屏几何与还原，以及任务窗双边停靠、命中区域、托盘和退出。
+
+桌面合成验收用对比背景核对激活和失焦圆角。实际鼠标操作覆盖主窗边缘缩放、应用切换时的悬浮窗置顶、连续展开与收起。Multica 与 Codex 的增量和旧数据回放使用隔离样本复核。
+
+## 1.0.4001 验收记录
 
 2026-11-14 在 Windows x64 验证了 1.0.4000 → 1.0.4001 隔离覆盖升级，确认安装向导完成、快捷方式仍用新版 ICO、个人资料文件哈希一致。安装版 WebView 核对历史快照的 30 个型号和隔离 API 快照。浏览器覆盖 1024px 深浅主题、切换图表与列表、到期检查、手动更新和断网保留快照。本机 AA API Key 尚未配置，联网数据使用隔离样本验证。
 

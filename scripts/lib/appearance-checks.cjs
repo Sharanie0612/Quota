@@ -8,7 +8,7 @@ async function assertSurfaces(page,frosted){
   });
   const expected=frosted==='solid'?'solid':frosted?'frosted':'liquid';
   assert.equal(state.material,expected);
-  assert(!state.body.background.startsWith('rgba'),JSON.stringify(state.body));
+  assert.equal(state.body.background,'rgba(0, 0, 0, 0)',JSON.stringify(state.body));
   assert.equal(state.app.radius,geometry.window+'px');
   assert.equal(state.main.filter,'none');assert.equal(state.main.radius,geometry.surface+'px');
   for(const layer of [state.sidebar,state.toolbar]){assert.equal(layer.radius,geometry.surface+'px');if(expected==='solid')assert.equal(layer.filter,'none');else assert.match(layer.filter,/blur/);}

@@ -101,6 +101,9 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == "main" && matches!(event, WindowEvent::Focused(true)) {
+                let _ = widget::raise(window.app_handle());
+            }
             if window.label() == "main" && matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_) | WindowEvent::ScaleFactorChanged { .. }) {
                 let _ = window_frame::update(window);
             }
@@ -138,6 +141,7 @@ pub fn run() {
             task_cost::save_task_cost_key,
             benchmarks::smoke::benchmark_smoke_report,
             window_frame::get_main_window_state,
+            window_frame::begin_main_window_resize,
             widget::get_widget_options,
             commands::get_main_window_chrome,
             widget::save_widget_options,

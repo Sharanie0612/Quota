@@ -38,7 +38,7 @@ pub fn benchmark_smoke_report(
     let result =
         (|| -> Result<(), String> {
             let rows = report["all"].as_array().ok_or("缺少单任务成本和指数坐标")?;
-            if report["taskAxes"] != true || report["cleanChart"] != true {
+            if report["taskAxes"] != true || report["aaChart"] != true {
                 return Err("模型图的坐标口径或标记不符".into());
             }
 
@@ -129,17 +129,17 @@ pub fn benchmark_smoke_report(
                         .ok_or("绘图区过矮")?;
                     if row["x"]
                         .as_f64()
-                        .is_none_or(|x| !(51. ..=width - 23.).contains(&x))
+                        .is_none_or(|x| !(60. ..=width - 15.).contains(&x))
                         || row["y"]
                             .as_f64()
-                            .is_none_or(|y| !(39. ..=height - 60.).contains(&y))
+                            .is_none_or(|y| !(15. ..=height - 51.).contains(&y))
                     {
                         return Err("单任务成本与指数坐标越界".into());
                     }
                 }
             }
             if report["plotCount"].as_u64() != Some(plotted)
-                || report["labelCount"].as_u64().is_none_or(|count| count > 5)
+                || report["labelCount"].as_u64().is_none_or(|count| count > plotted as u64)
             {
                 return Err("图中缺少独立型号点或名称".into());
             }
@@ -213,14 +213,21 @@ pub fn smoke_if_requested(app: AppHandle) {
           report.points = [...points.entries()];
           report.plotCount = points.size;
           report.labelCount = plot.querySelectorAll('.task-point-label').length;
-          report.cleanChart = !document.querySelector('.task-vendor-legend,.task-models-list')
-            && !plot.querySelector('.scatter-badge,.task-frontier-line,.task-label-leader');
-          report.taskAxes = plot.textContent.includes('Intelligence Index') && plot.textContent.includes('单任务成本（美元）');
-          button('列表')?.click();
+          report.aaChart = Boolean(document.querySelector('.task-creator-legend button'))
+            && Boolean(plot.querySelector('.task-attractive-area')) && !plot.querySelector('.scatter-badge');
+          report.taskAxes = plot.textContent.includes('Intelligence Index') && plot.textContent.includes('Cost per Task (USD, Log Scale)');
+          document.querySelector('button[aria-label="图表显示设置"]')?.click();
           step++;
           return;
         }
         if (step === 2) {
+          const list = button('列表');
+          if (!list) return;
+          list.click();
+          step++;
+          return;
+        }
+        if (step === 3) {
           const rows = [...document.querySelectorAll('.task-models-list tbody tr')];
           if (!rows.length) return;
           const points = new Map(report.points);
@@ -235,14 +242,14 @@ pub fn smoke_if_requested(app: AppHandle) {
           step++;
           return;
         }
-        if (step === 3) {
+        if (step === 4) {
           const days = button('7天');
           if (!days) return;
           days.click();
           step++;
           return;
         }
-        if (step === 4) {
+        if (step === 5) {
           if (!document.querySelector('.speed-summary') || !document.querySelector('.speed-plot')) return;
           report.speed = ['.speed-average-value', '.speed-sample-value', '.speed-latest-value']
             .map(selector => Number(document.querySelector(selector).textContent.replaceAll(',', '')));

@@ -60,16 +60,79 @@ mod chrome {
     use super::ChromeCounters;
     use std::sync::{atomic::Ordering::Relaxed, Arc};
     use windows_sys::Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Graphics::Gdi::{RedrawWindow, RDW_ALLCHILDREN, RDW_INVALIDATE, RDW_UPDATENOW},
         UI::{
+            HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi},
+            Input::KeyboardAndMouse::{GetAsyncKeyState, ReleaseCapture, VK_LBUTTON, VK_RBUTTON},
             Shell::{DefSubclassProc, GetWindowSubclass, RemoveWindowSubclass, SetWindowSubclass},
-            WindowsAndMessaging::{IsIconic, WM_NCACTIVATE, WM_NCDESTROY, WM_NCPAINT},
+            WindowsAndMessaging::{
+                FindWindowExW, GetCursorPos, GetSystemMetrics, GetWindowRect, IsIconic, PostMessageW,
+                SendMessageW, ShowWindow, HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT, HTLEFT, HTRIGHT, HTTOP,
+                HTTOPLEFT, HTTOPRIGHT, SM_CXSIZEFRAME, SM_CYSIZEFRAME, SM_SWAPBUTTON, SW_HIDE,
+                WM_ACTIVATE, WM_APP, WM_NCACTIVATE, WM_NCDESTROY, WM_NCLBUTTONDOWN, WM_NCPAINT,
+                WM_SHOWWINDOW, WM_SIZE,
+            },
         },
     };
     const ID: usize = 0x5155_4f54;
     // These custom-frame messages are also handled by Chromium's HWND handler.
     const WM_NCUAHDRAWCAPTION: u32 = 0x00ae;
     const WM_NCUAHDRAWFRAME: u32 = 0x00af;
+    const REPAINT_AFTER_ACTIVATION: u32 = WM_APP + 0x151;
+
+    /// Tauri's Win32 resize child can draw rectangular pixels through a
+    /// transparent WebView. The native edge command handles resizing instead.
+    fn hide_resize_overlay(hwnd: HWND) {
+        use std::ptr::null;
+        use windows_sys::core::w;
+
+        let child = unsafe {
+            FindWindowExW(hwnd, std::ptr::null_mut(), w!("TAURI_DRAG_RESIZE_BORDERS"), null())
+        };
+        if !child.is_null() {
+            unsafe { ShowWindow(child, SW_HIDE); }
+        }
+    }
+
+    pub fn resize_from_cursor(window: &tauri::Window) -> Result<(), String> {
+        use windows_sys::Win32::Foundation::POINT;
+
+        let hwnd = window.hwnd().map_err(|_| "无法读取主窗口句柄")?.0 as HWND;
+        let button = if unsafe { GetSystemMetrics(SM_SWAPBUTTON) } == 0 { VK_LBUTTON } else { VK_RBUTTON };
+        let active = unsafe { GetAsyncKeyState(i32::from(button)) } < 0;
+        let mut cursor = POINT::default();
+        let mut rect = RECT::default();
+        if !active
+            || unsafe { GetCursorPos(&mut cursor) } == 0
+            || unsafe { GetWindowRect(hwnd, &mut rect) } == 0
+            || cursor.x < rect.left || cursor.x >= rect.right
+            || cursor.y < rect.top || cursor.y >= rect.bottom
+        {
+            return Ok(());
+        }
+        let dpi = unsafe { GetDpiForWindow(hwnd) }.max(96);
+        let bx = unsafe { GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi) };
+        let by = unsafe { GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi) };
+        let horizontal = if cursor.x < rect.left + bx { HTLEFT }
+            else if cursor.x >= rect.right - bx { HTRIGHT } else { 0 };
+        let vertical = if cursor.y < rect.top + by { HTTOP }
+            else if cursor.y >= rect.bottom - by { HTBOTTOM } else { 0 };
+        let hit = match (horizontal, vertical) {
+            (HTLEFT, HTTOP) => HTTOPLEFT,
+            (HTRIGHT, HTTOP) => HTTOPRIGHT,
+            (HTLEFT, HTBOTTOM) => HTBOTTOMLEFT,
+            (HTRIGHT, HTBOTTOM) => HTBOTTOMRIGHT,
+            (0, 0) => return Ok(()),
+            _ => horizontal + vertical,
+        };
+        let position = (cursor.x as u16 as u32 | ((cursor.y as u16 as u32) << 16)) as LPARAM;
+        unsafe {
+            ReleaseCapture();
+            SendMessageW(hwnd, WM_NCLBUTTONDOWN, hit as WPARAM, position);
+        }
+        Ok(())
+    }
 
     unsafe extern "system" fn procedure(
         hwnd: HWND,
@@ -83,6 +146,15 @@ mod chrome {
             return unsafe { DefSubclassProc(hwnd, message, wparam, lparam) };
         }
         let counters = unsafe { &*(data as *const ChromeCounters) };
+        if message == REPAINT_AFTER_ACTIVATION {
+            if unsafe { IsIconic(hwnd) } == 0 {
+                unsafe {
+                    RedrawWindow(hwnd, std::ptr::null(), std::ptr::null_mut(),
+                        RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW);
+                }
+            }
+            return 0;
+        }
         if message == WM_NCDESTROY {
             unsafe {
                 RemoveWindowSubclass(hwnd, Some(procedure), ID);
@@ -112,7 +184,15 @@ mod chrome {
                 _ => {}
             }
         }
-        unsafe { DefSubclassProc(hwnd, message, wparam, lparam) }
+        let result = unsafe { DefSubclassProc(hwnd, message, wparam, lparam) };
+        if message == WM_SIZE || message == WM_SHOWWINDOW && wparam != 0 {
+            hide_resize_overlay(hwnd);
+        }
+        if message == WM_ACTIVATE && unsafe { IsIconic(hwnd) } == 0 {
+            // Repaint once Windows finishes updating the activation frame.
+            unsafe { PostMessageW(hwnd, REPAINT_AFTER_ACTIVATION, 0, 0); }
+        }
+        result
     }
 
     pub fn install(window: &tauri::Window, counters: Arc<ChromeCounters>) -> Result<(), String> {
@@ -125,6 +205,7 @@ mod chrome {
             return Err("无法安装主窗口边框保护".into());
         }
         counters.installed.store(true, Relaxed);
+        hide_resize_overlay(hwnd);
         Ok(())
     }
 
@@ -172,58 +253,7 @@ pub struct State {
 }
 
 #[derive(Default)]
-struct Applied(std::sync::Mutex<Option<(u32, u32, u32, State)>>);
-
-#[cfg(windows)]
-fn region_matches(window: &Window, width: u32, height: u32, square: bool) -> bool {
-    use windows_sys::Win32::{
-        Foundation::RECT,
-        Graphics::Gdi::{
-            CreateRectRgn, DeleteObject, GetRgnBox, GetWindowRgn, PtInRegion, COMPLEXREGION,
-            SIMPLEREGION,
-        },
-    };
-    let Ok(hwnd) = window.hwnd() else {
-        return false;
-    };
-    let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
-    if region.is_null() {
-        return false;
-    }
-    let kind = unsafe { GetWindowRgn(hwnd.0 as _, region) };
-    let mut bounds = RECT {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    };
-    unsafe {
-        GetRgnBox(region, &mut bounds);
-    }
-    let matches = if square {
-        // No custom region, or Windows' rectangular maximized work-area clip.
-        kind == 0 || kind == SIMPLEREGION
-    } else {
-        kind == COMPLEXREGION
-            && bounds.left == 0
-            && bounds.top == 0
-            && (width as i32..=width as i32 + 1).contains(&bounds.right)
-            && (height as i32..=height as i32 + 1).contains(&bounds.bottom)
-            && [
-                (0, 0),
-                (width as i32 - 1, 0),
-                (0, height as i32 - 1),
-                (width as i32 - 1, height as i32 - 1),
-            ]
-            .iter()
-            .all(|&(x, y)| unsafe { PtInRegion(region, x, y) } == 0)
-            && unsafe { PtInRegion(region, width as i32 / 2, height as i32 / 2) } != 0
-    };
-    unsafe {
-        DeleteObject(region as _);
-    }
-    matches
-}
+struct Applied(std::sync::Mutex<Option<State>>);
 
 /// A window occupying a work-area corner or edge-to-edge tile has square corners.
 /// Coordinates are physical pixels; monitor origins may be negative.
@@ -239,7 +269,7 @@ pub fn tiled(rect: (i32, i32, u32, u32), area: (i32, i32, u32, u32), scale: f64)
     (top && bottom) || (left && right) || ((left || right) && (top || bottom))
 }
 
-fn state(window: &Window) -> Result<(u32, u32, u32, State), String> {
+fn state(window: &Window) -> Result<State, String> {
     let size = window.outer_size().map_err(|_| "无法读取窗口大小")?;
     let pos = window.outer_position().map_err(|_| "无法读取窗口位置")?;
     let scale = window.scale_factor().map_err(|_| "无法读取窗口缩放")?;
@@ -262,89 +292,24 @@ fn state(window: &Window) -> Result<(u32, u32, u32, State), String> {
                 scale,
             )
         });
-    static LOGICAL_RADIUS:std::sync::LazyLock<f64>=std::sync::LazyLock::new(||{
-        let geometry:serde_json::Value=serde_json::from_str(include_str!("../data/ui-geometry.json")).expect("embedded UI geometry must be valid");
-        geometry["window"].as_f64().filter(|r|r.is_finite()&&(8.0..=40.0).contains(r)).expect("embedded window radius must be valid")
-    });
-    let radius = (*LOGICAL_RADIUS * scale).round().max(1.0) as u32;
-    Ok((
-        size.width,
-        size.height,
-        radius,
-        State {
-            maximized,
-            fullscreen,
-            square: maximized || fullscreen || snapped,
-        },
-    ))
+    Ok(State {
+        maximized,
+        fullscreen,
+        square: maximized || fullscreen || snapped,
+    })
 }
 
 pub fn update(window: &Window) -> Result<State, String> {
-    #[cfg(windows)]
-    {
-        use windows_sys::Win32::{
-            System::Threading::GetCurrentThreadId,
-            UI::WindowsAndMessaging::GetWindowThreadProcessId,
-        };
-        let hwnd = window.hwnd().map_err(|_| "无法读取窗口句柄")?;
-        if unsafe { GetCurrentThreadId() }
-            != unsafe { GetWindowThreadProcessId(hwnd.0 as _, std::ptr::null_mut()) }
-        {
-            return Err("窗口外观必须在窗口线程更新".into());
+    // Tao provides a per-pixel alpha surface on Windows. Chromium owns the
+    // visible curve, so a binary HWND region cannot cut off its edge pixels.
+    let next = state(window)?;
+    if let Some(applied) = window.app_handle().try_state::<Applied>() {
+        let mut previous = applied.0.lock().map_err(|_| "窗口外观暂不可用")?;
+        if *previous != Some(next) {
+            *previous = Some(next);
+            drop(previous);
+            let _ = window.emit("main-window-state", next);
         }
-    }
-    let (width, height, radius, next) = state(window)?;
-    let app = window.app_handle();
-    let Some(applied) = app.try_state::<Applied>() else {
-        return Ok(next);
-    };
-    let mut previous = applied.0.lock().map_err(|_| "窗口外观暂不可用")?;
-    if *previous == Some((width, height, radius, next)) {
-        #[cfg(windows)]
-        let matches = region_matches(window, width, height, next.square);
-        #[cfg(not(windows))]
-        let matches = true;
-        if matches {
-            return Ok(next);
-        }
-    }
-    #[cfg(windows)]
-    {
-        use windows_sys::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
-        let hwnd = window.hwnd().map_err(|_| "无法读取窗口句柄")?;
-        let region = if next.square {
-            std::ptr::null_mut()
-        } else {
-            let region = unsafe {
-                CreateRoundRectRgn(
-                    0,
-                    0,
-                    width as i32 + 1,
-                    height as i32 + 1,
-                    radius as i32 * 2,
-                    radius as i32 * 2,
-                )
-            };
-            if region.is_null() {
-                return Err("无法创建圆角窗口区域".into());
-            }
-            region
-        };
-        // Windows takes ownership on success; release the region ourselves on failure.
-        if unsafe { SetWindowRgn(hwnd.0 as _, region, 1) } == 0 {
-            if !region.is_null() {
-                unsafe {
-                    DeleteObject(region as _);
-                }
-            }
-            return Err("无法更新窗口圆角".into());
-        }
-    }
-    let changed = previous.map_or(true, |(_, _, _, old)| old != next);
-    *previous = Some((width, height, radius, next));
-    drop(previous);
-    if changed {
-        let _ = window.emit("main-window-state", next);
     }
     Ok(next)
 }
@@ -374,7 +339,20 @@ pub fn get_main_window_state(app: tauri::AppHandle) -> Result<State, String> {
         .ok_or("主窗口尚未准备好")?
         .as_ref()
         .window();
-    state(&window).map(|(_, _, _, state)| state)
+    state(&window)
+}
+
+#[tauri::command]
+pub fn begin_main_window_resize(window: tauri::Window) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("只能调整 Quota 主窗口".into());
+    }
+    if window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false) {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    chrome::resize_from_cursor(&window)?;
+    Ok(())
 }
 
 /// Explicit, isolated runtime check, mirroring the existing widget smoke workflow.
@@ -402,9 +380,7 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
         use tauri::{PhysicalPosition, PhysicalSize};
         use windows_sys::Win32::{
             Foundation::RECT,
-            Graphics::Gdi::{
-                CreateRectRgn, DeleteObject, GetRgnBox, GetWindowRgn, PtInRegion, COMPLEXREGION,
-            },
+            Graphics::Gdi::{CreateRectRgn, DeleteObject, GetRgnBox, GetWindowRgn, PtInRegion, COMPLEXREGION},
         };
         let pause = || std::thread::sleep(std::time::Duration::from_millis(500));
         std::thread::sleep(std::time::Duration::from_secs(2));
@@ -433,40 +409,42 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
                 let current = window.clone();
                 window.run_on_main_thread(move || {
                     let result = (|| -> Result<(State,bool,serde_json::Value),String> {
-                let shape = update(&current)?;
-                let size = current.outer_size().map_err(|_| "窗口大小不可用")?;
-                let hwnd = current.hwnd().map_err(|_| "窗口句柄不可用")?;
-                let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
-                if region.is_null() { return Err("测试区域不可用".into()); }
-                let kind = unsafe { GetWindowRgn(hwnd.0 as _, region) };
-                let mut bounds = RECT {
-                    left: 0,
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                };
-                unsafe {
-                    GetRgnBox(region, &mut bounds);
-                }
-                // A maximized window may have a rectangular work-area clip
-                // starting at (8,8). An excluded outer (0,0) isn't a curve.
-                let rounded = kind == COMPLEXREGION
-                    && unsafe { PtInRegion(region, bounds.left, bounds.top) } == 0
-                    && unsafe { PtInRegion(region, size.width as i32 / 2, size.height as i32 / 2) }
-                        != 0;
-                unsafe {
-                    DeleteObject(region as _);
-                }
-                Ok((shape,rounded,serde_json::json!({"state": shape, "width":size.width,"height":size.height,"nativeRounded":rounded,"nativeRegionKind":kind,"nativeRegionBounds":[bounds.left,bounds.top,bounds.right,bounds.bottom]})))
+                        let shape = update(&current)?;
+                        let size = current.outer_size().map_err(|_| "窗口大小不可用")?;
+                        let hwnd = current.hwnd().map_err(|_| "窗口句柄不可用")?;
+                        let region = unsafe { CreateRectRgn(0, 0, 0, 0) };
+                        if region.is_null() {
+                            return Err("测试区域不可用".into());
+                        }
+                        let kind = unsafe { GetWindowRgn(hwnd.0 as _, region) };
+                        let mut bounds = RECT::default();
+                        unsafe { GetRgnBox(region, &mut bounds); }
+                        // DWM can report a complex composition region even without
+                        // an application-supplied clip. The old GDI curve removed
+                        // all four corners while retaining the center.
+                        let corners = [
+                            (bounds.left, bounds.top),
+                            (bounds.right - 1, bounds.top),
+                            (bounds.left, bounds.bottom - 1),
+                            (bounds.right - 1, bounds.bottom - 1),
+                        ].map(|(x, y)| unsafe { PtInRegion(region, x, y) } != 0);
+                        let center = unsafe { PtInRegion(region, size.width as i32 / 2, size.height as i32 / 2) } != 0;
+                        let clips_all_corners = kind == COMPLEXREGION && center && !corners.into_iter().any(|inside| inside);
+                        unsafe { DeleteObject(region as _); }
+                        Ok((shape, clips_all_corners, serde_json::json!({
+                            "state":shape,"width":size.width,"height":size.height,
+                            "nativeRegionKind":kind, "regionCorners":corners,
+                            "nativeRegionBounds":[bounds.left,bounds.top,bounds.right,bounds.bottom]
+                        })))
                     })();
                     let _ = send.send(result);
                 }).map_err(|_| "无法在窗口线程验证区域")?;
-                let (shape, rounded, mut row) = receive
+                let (shape, native_curve, mut row) = receive
                     .recv_timeout(std::time::Duration::from_secs(3))
                     .map_err(|_| "原生区域验证超时")??;
                 row["mode"] = serde_json::json!(name);
                 samples.push(row);
-                if shape.square != square || rounded == square {
+                if shape.square != square || (!square && native_curve) {
                     return Err(format!("{name} 窗口形状不符"));
                 }
                 Ok(())

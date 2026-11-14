@@ -1,4 +1,5 @@
 const assert=require('node:assert/strict'),path=require('node:path');
+const geometry=require('../src-tauri/data/ui-geometry.json');
 const load=require('./lib/source-loader.cjs').createSourceLoader();
 const {normalizePreferences,newerPreferences,defaultPreferences,resolveEffects}=load(path.join(__dirname,'../src/lib/appearance/preferences'));
 const {THEMES,themeTokens}=load(path.join(__dirname,'../src/lib/appearance/themes'));
@@ -22,7 +23,7 @@ assert.deepEqual(resolveEffects(current,{...normal,motion:true}),{material:'liqu
 assert.deepEqual(resolveEffects(current,{...normal,contrast:true}),{material:'solid',reducedMotion:true});
 for(const theme of THEMES)for(const mode of ['light','dark']){
   const tokens=themeTokens(theme.id,mode);
-  for(const [key,value] of Object.entries({window:16,surface:16,control:10,inset:8}))assert.equal(tokens['radius-'+key],value+'px');
+  for(const [key,value] of Object.entries(geometry))assert.equal(tokens['radius-'+key],value+'px');
   for(const key of ['bg','surface','text','text-2','text-3','blue','on-primary'])assert(tokens[key]);
 }
 assert.equal(resolveWindowKind('?window=usage-widget'),'usage-widget');

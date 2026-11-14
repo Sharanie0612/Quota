@@ -1,5 +1,6 @@
-:root { --motion-ease:cubic-bezier(.2,.8,.2,1); --motion-spring:cubic-bezier(.2,.8,.2,1); }
+:root { --motion-ease:cubic-bezier(.2,.8,.2,1); --motion-spring:cubic-bezier(.22,.76,.23,1); }
 @keyframes view-arrive {from {opacity:0;}to {opacity:1;}}
+@keyframes view-slide-in {from {opacity:0;transform:translateY(7px);}to {opacity:1;transform:translateY(0);}}
 .motion-seg,.sidebar-nav { position:relative;isolation:isolate; }
 .motion-highlight { position:absolute;z-index:0;left:0;top:0;width:var(--highlight-width,0);height:var(--highlight-height,0);transform:translate(var(--highlight-x,0),var(--highlight-y,0));border-radius:var(--radius-inset);background:var(--surface);box-shadow:var(--shadow-card);pointer-events:none; }
 .sidebar-nav .motion-highlight {border-radius:var(--radius-control);}

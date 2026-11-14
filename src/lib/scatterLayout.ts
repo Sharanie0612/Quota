@@ -10,25 +10,27 @@ function overlaps(a: LabelBox, b: LabelBox) {
 
 /** Keep reference labels next to their points and clear of the other marks. */
 export function placeScatterLabels(points: LabelPoint[], bounds: ChartBounds, references: LabelPoint[]) {
-  const positions = new Map<string, { y: number; left: number; width: number; label: string }>();
+  const positions = new Map<string, { y: number; left: number; width: number; label: string; anchorX: number }>();
   const obstacles = points.map(point => ({
     left: point.x - 7, right: point.x + 7, top: point.y - 7, bottom: point.y + 7,
   }));
   for (const point of references) {
-    const label = point.name;
-    const width = [...label].reduce((size, char) => size + (char.charCodeAt(0) > 255 ? 14 : 8.3), 0) + 8;
-    if (width > 215) continue;
+    const label = point.name.length > 42 ? point.name.slice(0, 41) + "…" : point.name;
+    const width = [...label].reduce((size, char) => size + (char.charCodeAt(0) > 255 ? 12 : /[ilI., ()1]/.test(char) ? 3.8 : /[MW@]/.test(char) ? 9.6 : 6.1), 0) + 5;
     const right = point.x + 9, left = point.x - width - 9;
     const center = point.x - width / 2;
     const options = [
-      [right, point.y], [left, point.y], [center, point.y - 18], [center, point.y + 18],
+      [right, point.y], [left, point.y], [center, point.y - 16], [center, point.y + 16],
+      [right, point.y - 16], [left, point.y - 16], [right, point.y + 16], [left, point.y + 16],
+      [center, point.y - 31], [center, point.y + 31],
     ];
     for (const [x, y] of options) {
       const leftEdge = Math.min(bounds.right - width, Math.max(bounds.left, x));
-      const box = { left: leftEdge, right: leftEdge + width, top: y - 9, bottom: y + 9 };
+      const box = { left: leftEdge, right: leftEdge + width, top: y - 7, bottom: y + 7 };
       if (box.left < bounds.left || box.right > bounds.right || box.top < bounds.top || box.bottom > bounds.bottom
         || obstacles.some(obstacle => overlaps(box, obstacle))) continue;
-      positions.set(point.id, { left: leftEdge, width, y, label });
+      const anchorX = Math.max(box.left, Math.min(point.x, box.right));
+      positions.set(point.id, { left: leftEdge, width, y, label, anchorX });
       obstacles.push(box);
       break;
     }

@@ -20,6 +20,21 @@ export function WindowControls() {
     void unlisten.then(() => invoke<State>('get_main_window_state')).then(apply).catch(() => undefined);
     return () => { live = false; void unlisten.then(fn => fn()).catch(() => undefined); };
   }, []);
+  useEffect(() => {
+    if (!/Windows/.test(navigator.userAgent) || !("__TAURI_INTERNALS__" in window)) return;
+    // An expanded side window never receives this main-window listener.
+    // Keep the native Windows sizing loop for physical mouse dragging.
+    const resize = (event: PointerEvent) => {
+      if (!event.isTrusted || event.pointerType !== "mouse" || event.button !== 0) return;
+      const edge = 8;
+      if (event.clientX >= edge && event.clientX < innerWidth - edge
+        && event.clientY >= edge && event.clientY < innerHeight - edge) return;
+      if (document.querySelector("dialog[open]")) return;
+      void invoke("begin_main_window_resize").catch(() => undefined);
+    };
+    window.addEventListener("pointerdown", resize, true);
+    return () => window.removeEventListener("pointerdown", resize, true);
+  }, []);
   const run = (action: 'minimize' | 'toggleMaximize' | 'close') => {
     void getCurrentWindow()[action]().catch(error => toast(errText(error), 'error'));
   };

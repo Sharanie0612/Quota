@@ -1,9 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { ModelCostChart, type ComparisonPoint } from "../components/ModelCostChart";
+import { save } from "@tauri-apps/plugin-dialog";
+import { ModelCostChart, chartCreatorColor, type ComparisonPoint } from "../components/ModelCostChart";
 import { ModelLogo } from "../components/ModelLogo";
-import { Button, Field, Modal, Notice, Seg } from "../components/ui";
-import { api, errText } from "../lib/api";
+import { IconAdjust, IconArrowUpRight, IconChoose, IconFilter, IconImage, IconLink, IconTable } from "../components/icons";
+import { Button, Field, Modal, Notice } from "../components/ui";
+import { api, copyText, errText } from "../lib/api";
+import { toast } from "../lib/store";
+import { reportCsv } from "../lib/usageAnalytics";
 import {
   configurationLabel, latestModelCount, matchesModel, modelFamiliesForComparison, restoreComparison,
   selectedComparison, selectedConfiguration, type ModelFamily,
@@ -13,17 +17,47 @@ import "./model-ladder.css";
 
 const aaChart = "https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task";
 const aaKeys = "https://artificialanalysis.ai/api-key-management-redirect";
+const chartTitle = "Intelligence Index vs. Cost per Task";
 const storageKey = "quota-model-comparison-v1";
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
 const syncTime = new Intl.DateTimeFormat("zh-CN", { dateStyle: "short", timeStyle: "short", hour12: false });
 const formatCost = (cost: number) => cost < 0.0001 ? `$${cost.toExponential(3)}` : usd.format(cost);
 type ComparedModel = { family: ModelFamily; configuration: TaskCostModel };
-type OpenPanel = "picker" | "chart" | "source" | null;
+type OpenPanel = "picker" | "chart" | "source" | "display" | null;
 type ModelView = "chart" | "list";
 
 function readSelection() {
   try { return restoreComparison(localStorage.getItem(storageKey)); }
   catch { return restoreComparison(null); }
+}
+
+function saveChartImage(surface: HTMLElement | null) {
+  if (!surface) return;
+  const chart = surface.querySelector("svg");
+  if (!chart) return;
+  const clone = chart.cloneNode(true) as SVGSVGElement;
+  const styles = ["fill", "stroke", "stroke-width", "stroke-linejoin", "stroke-dasharray", "opacity", "paint-order",
+    "font-size", "font-family", "font-weight", "color"];
+  const original = [chart, ...chart.querySelectorAll("*")];
+  [clone, ...clone.querySelectorAll<SVGElement>("*")].forEach((node, index) => {
+    const computed = getComputedStyle(original[index]);
+    styles.forEach(property => node.style.setProperty(property, computed.getPropertyValue(property)));
+  });
+  const { width, height } = chart.viewBox.baseVal;
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
+  const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  background.setAttribute("width", "100%");
+  background.setAttribute("height", "100%");
+  background.setAttribute("fill", getComputedStyle(surface).backgroundColor);
+  clone.prepend(background);
+  const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "Quota-AA-Intelligence-vs-Cost.svg";
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function DataConnection({ connected, snapshot, onClose, onSave }: {
@@ -77,17 +111,18 @@ function DataConnection({ connected, snapshot, onClose, onSave }: {
   </Modal>;
 }
 
-function ModelPicker({ families, vendors, selectedIds, canReset, onToggle, onReset, onClose }: {
+function ModelPicker({ families, vendors, selectedIds, canReset, initialVendor, onToggle, onReset, onClose }: {
   families: ModelFamily[];
   vendors: string[];
   selectedIds: Set<string>;
   canReset: boolean;
+  initialVendor: string;
   onToggle: (id: string) => void;
   onReset: () => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
-  const [vendor, setVendor] = useState("");
+  const [vendor, setVendor] = useState(initialVendor);
   const [onlySelected, setOnlySelected] = useState(false);
   const [limit, setLimit] = useState(60);
   const matches = families.filter(family => matchesModel(family, search, vendor)
@@ -159,10 +194,16 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   const [view, setView] = useState<ModelView>("chart");
   const [activeModel, setActiveModel] = useState<string | null>(null);
   const [panel, setPanel] = useState<OpenPanel>(null);
+  const [pickerVendor, setPickerVendor] = useState("");
+  const [hoveredCreator, setHoveredCreator] = useState<string | null>(null);
+  const [labelsVisible, setLabelsVisible] = useState(true);
+  const [frontierVisible, setFrontierVisible] = useState(true);
+  const [quadrantVisible, setQuadrantVisible] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const request = useRef(0);
+  const chartSurface = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -237,6 +278,7 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   })), [selected, selection]);
   const points = useMemo<ComparisonPoint[]>(() => visible.flatMap(row => row.configuration.costPerTask === null
     ? [] : [{ ...row, cost: row.configuration.costPerTask }]), [visible]);
+  const plottedCreators = useMemo(() => [...new Set([...points].sort((a, b) => a.cost - b.cost).map(row => row.family.creator))], [points]);
   const detail = visible.find(row => row.family.id === detailId);
   const connected = report?.connected ?? false;
   const failure = error || report?.error;
@@ -266,14 +308,35 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
     setDetailId(id);
   }
 
-  const canvas = <ModelCostChart rows={points} formatCost={formatCost} selectedId={activeModel} onSelect={inspect}/>;
+  function openPicker(creator = "") {
+    setPickerVendor(creator);
+    setPanel("picker");
+  }
+
+  async function exportModels() {
+    try {
+      const path = await save({ title: "导出模型数据", defaultPath: "Quota-AA-Models.csv", filters: [{ name: "CSV", extensions: ["csv"] }] });
+      if (!path) return;
+      await api.exportReportCsv(path, reportCsv(["模型", "厂商", "发布日期", "Intelligence Index", "USD / 任务"],
+        visible.map(({ family, configuration }) => [configuration.name, family.creator, family.releaseDate, configuration.index, configuration.costPerTask])));
+    } catch (failure) {
+      toast(errText(failure), "error");
+    }
+  }
+
+  const chartOptions = { rows: points, formatCost, selectedId: activeModel, onSelect: inspect,
+    labelsVisible, frontierVisible, quadrantVisible, hoveredCreator };
 
   const emptyChart = visible.length ? "已选模型暂无单任务成本" : "选择模型开始对比";
   const placeholder = !report && !error ? "正在读取模型" : emptyChart;
   return <div className="content-inner visual-model-page" data-task-cost-origin={snapshot?.origin}>
     <header className="task-page-heading">
       <h1>AI 模型</h1>
-      <div className="task-model-actions">
+      <div className="task-model-actions task-source-status">
+        {snapshot && <span data-checked-at={snapshot.checkedAt} role="status">
+          {snapshot.origin === "api" && connected && !failure ? "AA 已连接" : snapshot.origin === "api" ? "缓存数据" : "历史快照"}
+          {" · "}<time dateTime={snapshot.checkedAt}>{syncTime.format(new Date(snapshot.checkedAt))}</time>
+        </span>}
         {connected && <Button onClick={() => void refresh()} disabled={busy}>{busy ? "正在更新…" : "立即更新"}</Button>}
         <Button variant={connected ? "quiet" : "default"} onClick={() => setPanel("source")}>
           {connected ? "数据源" : "连接 AA"}
@@ -283,20 +346,57 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
     {failure && <div className="task-sync-error" role="alert">
       {failure}{snapshot && "。已保留上次数据。"}
     </div>}
-    <section className="card task-cost-chart" aria-label="模型性价比">
+    <section className="task-cost-chart" aria-labelledby="task-cost-heading">
       <header className="task-cost-heading">
-        <h2>模型性价比</h2>
-        <div className="task-model-actions">
-          <Seg value={view} options={[{ value: "chart", label: "图表" }, { value: "list", label: "列表" }]} onChange={setView}/>
-          {view === "chart" && points.length > 0 && <Button variant="quiet" onClick={() => setPanel("chart")}>放大图表</Button>}
-          <Button variant="primary" disabled={!families.length} onClick={() => setPanel("picker")}>
-            选择模型
-          </Button>
+        <div>
+          <h2 id="task-cost-heading">{chartTitle}</h2>
+          <p>Artificial Analysis Intelligence Index · Weighted average cost (USD) per Artificial Analysis Intelligence Index task</p>
+        </div>
+        <div className="task-chart-controls">
+          <div className="task-chart-tools">
+            <Button className="task-chart-icon" aria-label="复制 AA 原图链接" title="复制 AA 原图链接"
+              onClick={() => void copyText(aaChart).then(() => toast("链接已复制"), failure => toast(errText(failure), "error"))}><IconLink size={16}/></Button>
+            <Button className="task-chart-icon" aria-label="下载图表" title="下载图表" disabled={view !== "chart" || !points.length}
+              onClick={() => saveChartImage(chartSurface.current)}><IconImage size={16}/></Button>
+            <Button className="task-chart-icon" aria-label="下载数据" title="下载数据" disabled={!visible.length}
+              onClick={() => void exportModels()}><IconTable size={16}/></Button>
+          </div>
+          <div className="task-chart-tools task-comparison-status">
+            <Button className="task-model-count" aria-label="选择模型" aria-haspopup="dialog" disabled={!families.length} onClick={() => openPicker()}>
+              <span role="status" data-selected={visible.length} data-plotted={points.length} data-available={families.length}>
+                {visible.length} of {families.length} models
+              </span>
+              <IconChoose size={16}/>
+            </Button>
+            <Button className="task-chart-icon" aria-label="筛选模型" title="筛选模型" disabled={!families.length}
+              onClick={() => openPicker()}><IconFilter size={16}/></Button>
+            <Button className="task-chart-icon" aria-label="图表显示设置" title="图表显示设置"
+              onClick={() => setPanel("display")}><IconAdjust size={16}/></Button>
+          </div>
         </div>
       </header>
-      {view === "chart" ? <div className="task-plot-panel" role="tabpanel" aria-label="图表">
-        {points.length ? canvas : <p className="task-chart-empty">{placeholder}</p>}
-      </div> : <div className="task-models-list" role="tabpanel" aria-label="列表">
+      {view === "chart" ? <div className="task-plot-panel" role="region" aria-label="图表">
+        {points.length ? <>
+          <div className="task-plot-key">
+            <button type="button" aria-pressed={quadrantVisible} onClick={() => setQuadrantVisible(value => !value)}>
+              <i className="task-key-area"/>Most attractive quadrant
+            </button>
+            <button type="button" aria-pressed={frontierVisible} onClick={() => setFrontierVisible(value => !value)}>
+              <i className="task-key-line"/>Pareto line
+            </button>
+          </div>
+          <div className="task-creator-legend" aria-label="模型厂商">
+            {plottedCreators.map(creator => <button type="button" key={creator}
+              onMouseEnter={() => setHoveredCreator(creator)} onMouseLeave={() => setHoveredCreator(null)}
+              onFocus={() => setHoveredCreator(creator)} onBlur={() => setHoveredCreator(null)}
+              onClick={() => openPicker(creator)}>
+              <i style={{ background: chartCreatorColor(creator) }}/>{creator}
+            </button>)}
+          </div>
+          <div className="task-plot-source"><Button variant="quiet" onClick={() => void api.openExternal(aaChart)}>Artificial Analysis</Button></div>
+          <ModelCostChart {...chartOptions} surfaceRef={chartSurface}/>
+        </> : <p className="task-chart-empty">{placeholder}</p>}
+      </div> : <div className="task-models-list" role="region" aria-label="列表">
         {visible.length ? <table>
           <thead><tr><th scope="col">型号</th><th scope="col">综合指数</th><th scope="col">单任务成本</th></tr></thead>
           <tbody>{visible.map(({ family, configuration }) => <tr key={family.id} data-model={family.id}
@@ -310,24 +410,21 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
           </tr>)}</tbody>
         </table> : <p className="task-chart-empty">{placeholder}</p>}
       </div>}
-      <footer className="task-cost-footer">
-        <div className="task-comparison-status">
-          <span role="status" data-selected={visible.length} data-plotted={points.length} data-available={families.length}>
-            {visible.length} 个型号
-          </span>
-        </div>
-        <div className="task-source-status">
-          {snapshot && <span data-checked-at={snapshot.checkedAt}>
-            {snapshot.origin === "historical" ? "历史快照 " : "更新于 "}
-            <time dateTime={snapshot.checkedAt}>{syncTime.format(new Date(snapshot.checkedAt))}</time>
-          </span>}
-          <Button variant="quiet" onClick={() => void api.openExternal(aaChart)}>Artificial Analysis</Button>
-        </div>
-      </footer>
     </section>
-    {panel === "chart" && points.length > 0 && <Modal maxWidth={1280} title="模型图表"
-      onClose={() => setPanel(null)}>{canvas}</Modal>}
-    {panel === "picker" && <ModelPicker families={families} vendors={vendors} selectedIds={selectedIds}
+    {panel === "chart" && points.length > 0 && <Modal key="model-chart" maxWidth={1280} title="模型图表"
+      onClose={() => setPanel(null)}><ModelCostChart {...chartOptions}/></Modal>}
+    {panel === "display" && <Modal key="model-display" title="图表显示设置" onClose={() => setPanel(null)}>
+      <div className="task-display-options">
+        <label><input type="checkbox" checked={labelsVisible} onChange={event => setLabelsVisible(event.target.checked)}/>显示型号标签</label>
+        <label><input type="checkbox" checked={quadrantVisible} onChange={event => setQuadrantVisible(event.target.checked)}/>显示优选区域</label>
+        <label><input type="checkbox" checked={frontierVisible} onChange={event => setFrontierVisible(event.target.checked)}/>显示帕累托前沿</label>
+      </div>
+      <div className="task-model-actions task-display-actions">
+        <Button onClick={() => { setView(view === "chart" ? "list" : "chart"); setPanel(null); }}>{view === "chart" ? "列表" : "图表"}</Button>
+        <Button disabled={!points.length} onClick={() => setPanel("chart")}><IconArrowUpRight size={15}/>放大图表</Button>
+      </div>
+    </Modal>}
+    {panel === "picker" && <ModelPicker families={families} vendors={vendors} selectedIds={selectedIds} initialVendor={pickerVendor}
       canReset={canReset} onToggle={toggle} onReset={() => setSelection(restoreComparison(null))} onClose={() => setPanel(null)}/>}
     {panel === "source" && <DataConnection connected={connected} snapshot={snapshot} onClose={() => setPanel(null)}
       onSave={next => { apply(next); setPanel(null); }}/>}

@@ -10,6 +10,31 @@ pub const EXPANDED_WIDTH: f64 = 324.0;
 pub const EXPANDED_HEIGHT: f64 = 276.0;
 #[derive(Default)]
 struct DragOrigin(std::sync::Mutex<Option<(PhysicalPosition<i32>,f64)>>);
+
+/// Raising the main window should leave the edge widget above it without
+/// stealing activation or changing the widget's visibility.
+pub fn raise(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(window) = app.get_webview_window(LABEL) else { return Ok(()); };
+    if !options(app).enabled {
+        return Ok(());
+    }
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+        };
+        let hwnd = window.hwnd().map_err(|_| "无法读取悬浮窗句柄")?;
+        if unsafe {
+            SetWindowPos(hwnd.0 as _, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER)
+        } == 0 {
+            return Err("无法置顶悬浮窗".into());
+        }
+    }
+    #[cfg(not(windows))]
+    window.set_always_on_top(true).map_err(|_| "无法置顶悬浮窗")?;
+    Ok(())
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct Options { pub enabled: bool, pub side: String, pub height_percent: u8 }
@@ -64,6 +89,7 @@ fn place(app: &tauri::AppHandle, expanded: bool, initial: bool) -> Result<(), St
     }
     // Settings/ready placement resets interaction; an older hover reply must
     // not reopen the surface after it has moved or been disabled.
+    if o.enabled { raise(app)?; }
     win.emit("widget-state", serde_json::json!({"expanded":expanded,"side":o.side,"enabled":o.enabled,"reset":initial})).map_err(|_| "无法更新悬浮窗")?;
     Ok(())
 }
@@ -109,6 +135,7 @@ pub fn widget_ready(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Resu
 #[tauri::command]
 pub fn set_widget_expanded(app: tauri::AppHandle, window: tauri::WebviewWindow, expanded: bool) -> Result<(),String> {
     if window.label()!=LABEL { return Err("无效窗口".into()); }
+    if !options(&app).enabled { return Ok(()); }
     place(&app,expanded,false)
 }
 /// Pointer deltas are logical pixels; only the widget may reposition itself.

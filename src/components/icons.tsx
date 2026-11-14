@@ -28,6 +28,12 @@ export const IconPlus = (p: P) => (
 );
 export const IconGrid = (p:P) => <Base {...p}><rect x="4" y="4" width="6" height="6" rx="1.8"/><rect x="14" y="4" width="6" height="6" rx="1.8"/><rect x="4" y="14" width="6" height="6" rx="1.8"/><rect x="14" y="14" width="6" height="6" rx="1.8"/></Base>;
 export const IconArrowUpRight = (p:P) => <Base {...p}><path d="M6 18 18 6M7 6h11v11"/></Base>;
+export const IconLink = (p: P) => <Base {...p}><path d="M10 13h4m-6 3H6a4 4 0 0 1 0-8h2m8 0h2a4 4 0 1 1 0 8h-2"/></Base>;
+export const IconImage = (p: P) => <Base {...p}><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="m4 16 5-4 4 4 3-3 4 3"/></Base>;
+export const IconTable = (p: P) => <Base {...p}><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M4 14h16m-8-5v11"/></Base>;
+export const IconFilter = (p: P) => <Base {...p}><path d="M4 5h16l-6 7v5l-4 2v-7Z"/></Base>;
+export const IconAdjust = (p: P) => <Base {...p}><path d="M4 6h3m4 0h9M4 12h9m4 0h3M4 18h3m4 0h9M7 4v4m10 2v4m-10 2v4"/></Base>;
+export const IconChoose = (p: P) => <Base {...p}><path d="m8 9 4-4 4 4m-8 6 4 4 4-4"/></Base>;
 
 export const IconRefresh = (p: P) => (
   <Base {...p}>

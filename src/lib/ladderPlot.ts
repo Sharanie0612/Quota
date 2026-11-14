@@ -29,7 +29,7 @@ export function plotPrice(entry: LadderEntry, metric: LadderMetric, currency: st
   return converted != null && Number.isFinite(converted) ? converted : null;
 }
 /** Fit both axes to the current data, without jittering or dropping models. */
-export function ladderScale(points: { cost: number; score: number }[],bounds=plotBounds) {
+export function ladderScale(points: { cost: number; score: number }[],bounds=plotBounds,scoreStep?:number) {
   const valid=points.filter(p=>Number.isFinite(p.cost)&&p.cost>=0&&Number.isFinite(p.score)&&p.score>=0&&p.score<=100);
   const costs=valid.map(p=>p.cost), scores=valid.map(p=>p.score);
   const lowCost=costs.length?Math.min(...costs):0, highCost=costs.length?Math.max(...costs):1;
@@ -50,7 +50,7 @@ export function ladderScale(points: { cost: number; score: number }[],bounds=plo
   const rawMin=Math.max(0,lowScore-scorePadding),rawMax=Math.min(100,highScore+scorePadding);
   const targetStep=Math.max(.1,(rawMax-rawMin)/6);
   const base=10**Math.floor(Math.log10(targetStep));
-  const step=[1,2,5,10].map(n=>n*base).find(n=>n>=targetStep)!;
+  const step=scoreStep??[1,2,5,10].map(n=>n*base).find(n=>n>=targetStep)!;
   const edgeStep=step;
   const min=Math.max(0,Math.floor(rawMin/edgeStep)*edgeStep),maxScore=Math.min(100,Math.ceil(rawMax/edgeStep)*edgeStep);
   const y=(value:number)=>bounds.bottom-(value-min)/(maxScore-min)*(bounds.bottom-bounds.top);

@@ -38,7 +38,7 @@ pub fn benchmark_smoke_report(
     let result =
         (|| -> Result<(), String> {
             let rows = report["all"].as_array().ok_or("缺少单任务成本和指数坐标")?;
-            if report["taskAxes"] != true || report["usesClusters"] == true {
+            if report["taskAxes"] != true || report["cleanChart"] != true {
                 return Err("模型图的坐标口径或标记不符".into());
             }
 
@@ -139,7 +139,7 @@ pub fn benchmark_smoke_report(
                 }
             }
             if report["plotCount"].as_u64() != Some(plotted)
-                || (plotted > 0 && report["labelCount"].as_u64().unwrap_or(0) == 0)
+                || report["labelCount"].as_u64().is_none_or(|count| count > 5)
             {
                 return Err("图中缺少独立型号点或名称".into());
             }
@@ -209,30 +209,40 @@ pub fn smoke_if_requested(app: AppHandle) {
               width: Number(plot.dataset.plotWidth), height: Number(plot.dataset.plotHeight)
             }
           ]));
+          if (!points.size) return;
+          report.points = [...points.entries()];
+          report.plotCount = points.size;
+          report.labelCount = plot.querySelectorAll('.task-point-label').length;
+          report.cleanChart = !document.querySelector('.task-vendor-legend,.task-models-list')
+            && !plot.querySelector('.scatter-badge,.task-frontier-line,.task-label-leader');
+          report.taskAxes = plot.textContent.includes('Intelligence Index') && plot.textContent.includes('单任务成本（美元）');
+          button('列表')?.click();
+          step++;
+          return;
+        }
+        if (step === 2) {
           const rows = [...document.querySelectorAll('.task-models-list tbody tr')];
-          if (!points.size || !rows.length) return;
+          if (!rows.length) return;
+          const points = new Map(report.points);
+          delete report.points;
           report.all = rows.map(element => ({
             id: element.dataset.profileId, score: Number(element.dataset.score),
             cost: element.dataset.cost === undefined ? null : Number(element.dataset.cost),
             ...points.get(element.dataset.profileId)
           }));
           report.modelCount = Number(document.querySelector('.task-comparison-status [role="status"]').dataset.selected);
-          report.plotCount = points.size;
-          report.labelCount = plot.querySelectorAll('.task-point-label').length;
-          report.usesClusters = Boolean(plot.querySelector('.scatter-badge'));
-          report.taskAxes = plot.textContent.includes('Intelligence Index') && plot.textContent.includes('单任务成本（USD · 对数刻度）');
           go('输出速度');
           step++;
           return;
         }
-        if (step === 2) {
+        if (step === 3) {
           const days = button('7天');
           if (!days) return;
           days.click();
           step++;
           return;
         }
-        if (step === 3) {
+        if (step === 4) {
           if (!document.querySelector('.speed-summary') || !document.querySelector('.speed-plot')) return;
           report.speed = ['.speed-average-value', '.speed-sample-value', '.speed-latest-value']
             .map(selector => Number(document.querySelector(selector).textContent.replaceAll(',', '')));

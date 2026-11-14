@@ -33,20 +33,23 @@ async function main(){
     await go('设置');await capture('appearance');
     for(const theme of ['Quota','Codex','Claude','VS Code','GitHub'])for(const mode of ['浅色','深色']){const appearance=page.locator('.appearance-settings');await appearance.getByRole('button',{name:new RegExp('^'+theme)}).click();await appearance.getByRole('tab',{name:mode,exact:true}).click();await noOverflow(page);if(theme==='Quota'&&mode==='深色')await capture('appearance-dark');}
     await page.locator('.appearance-settings').getByRole('button',{name:/^Quota/}).click();await page.locator('.appearance-settings').getByRole('tab',{name:'浅色',exact:true}).click();await chooseMaterial(page,false);checks.push('opaque main window, frosted surfaces, persistence, five palettes in both modes and forced-colors fallback');
-    for(const width of [1024,1360]){await page.setViewportSize({width,height:width===1024?768:1000});for(const [name,selector] of [['我的使用','.usage-kpis'],['输出速度','.speed-summary'],['设置','.appearance-settings'],['AI 模型','.visual-model-toolbar']]){await go(name);await page.locator(selector).waitFor();await noOverflow(page);if(width===1024&&name==='我的使用')await capture('usage-1024');}await page.getByRole('button',{name:'收起侧边栏',exact:true}).click();await page.locator('.app.sidebar-collapsed').waitFor();await noOverflow(page);await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();}
+    for(const width of [1024,1360]){await page.setViewportSize({width,height:width===1024?768:1000});for(const [name,selector] of [['我的使用','.usage-kpis'],['输出速度','.speed-summary'],['设置','.appearance-settings'],['AI 模型','.task-page-heading']]){await go(name);await page.locator(selector).waitFor();await noOverflow(page);if(width===1024&&name==='我的使用')await capture('usage-1024');}await page.getByRole('button',{name:'收起侧边栏',exact:true}).click();await page.locator('.app.sidebar-collapsed').waitFor();await noOverflow(page);await page.getByRole('button',{name:'展开侧边栏',exact:true}).click();}
     await go('AI 模型');
-    await page.getByRole('heading',{name:'Intelligence Index vs. Cost per Task',exact:true}).waitFor();
+    await page.getByRole('heading',{name:'模型性价比',exact:true}).waitFor();
     await page.locator('.task-plot-point').first().waitFor();
+    await page.getByRole('tab',{name:'列表',exact:true}).click();
     assert.equal(await page.locator('.task-models-list tbody tr').count(),30);
+    await page.getByRole('tab',{name:'图表',exact:true}).click();
+    await page.locator('.task-scatter[data-measured="true"]').waitFor();
     assert.equal(await page.locator('.scatter-badge').count(),0);
-    assert(await page.locator('.task-point-label').count()>10);
+    assert(await page.locator('.task-point-label').count()<=5);
     await capture('model-ladder');
     await page.getByRole('button',{name:'放大图表',exact:true}).click();
-    const expanded=page.getByRole('dialog',{name:'Intelligence Index vs. Cost per Task'});
+    const expanded=page.getByRole('dialog',{name:'模型图表',exact:true});
     await expanded.locator('.task-plot-point').first().waitFor();
     await page.keyboard.press('Escape');
     await expanded.waitFor({state:'hidden'});
-    assert.match(await page.locator('.task-cost-chart svg[data-plot-width]').textContent(),/单任务成本（USD/);
+    assert.match(await page.locator('.task-cost-chart svg[data-plot-width]').textContent(),/单任务成本（美元）/);
     await go('账户总览');await page.getByRole('button',{name:'添加账户',exact:true}).click();await page.getByRole('dialog').waitFor();assert.match(await page.getByRole('dialog').innerText(),/API Key 在哪拿/);await page.getByRole('dialog').getByRole('button',{name:'取消',exact:true}).click();
     await go('输出速度');await page.waitForFunction(()=>document.querySelector('.speed-average-value')?.textContent!=='—');await capture('output-speed');assert.equal(Number(await page.locator('.speed-plot').getAttribute('data-call-count')),96);assert.equal(await page.locator('.speed-plot path').count(),0);assert(await page.locator('.speed-call-canvas canvas').evaluate(el=>{const values=el.getContext('2d').getImageData(0,0,el.width,el.height).data;return values.some((v,i)=>i%4===3&&v>0);}));await page.locator('.speed-plot svg').focus();await page.keyboard.press('ArrowLeft');await page.getByRole('tooltip').waitFor();await page.keyboard.press('Escape');await page.getByRole('tab',{name:'记录',exact:true}).click();await page.locator('.speed-records tbody tr').first().waitFor();assert.equal(await page.locator('.speed-records tbody tr').count(),24);await page.getByRole('button',{name:'显示更多',exact:true}).click();assert.equal(await page.locator('.speed-records tbody tr').count(),96);checks.push('loaded 1024/1360 layouts, 30 separately selectable model releases, expansion, USD per task and all 96 individual calls without lines');
     const missing=await browser.newPage();await missing.addInitScript(fixtures);await missing.addInitScript(()=>{window.demoFxMissing=true;});await missing.goto(base);await missing.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'我的使用',exact:true}).click();await missing.waitForFunction(()=>document.querySelector('.usage-kpis strong')?.textContent==='待换算');assert(!/¥186.5/.test(await missing.locator('.usage-kpis').innerText()));await missing.close();checks.push('missing FX never presents a partial RMB total as complete');

@@ -21,6 +21,7 @@ const UPDATED: &str = "task-cost-updated";
 const MAX_PAGES: usize = 24;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 const MAX_MODELS: usize = 6000;
+const AUTO_REQUESTS_PER_DAY: usize = 80;
 const INVALID_DATA: &str = "Artificial Analysis 返回的模型数据不完整，请稍后重试";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -87,9 +88,9 @@ impl Snapshot {
                 == self.models.len()
     }
 
-    fn refresh_due(&self, now: DateTime<Utc>) -> bool {
+    pub fn refresh_due(&self, now: DateTime<Utc>) -> bool {
         // Leave room in the documented free 100-request/day budget for manual updates.
-        let interval = 3600.max((86_400 * self.page_count).div_ceil(80)) as i64;
+        let interval = (86_400 * self.page_count).div_ceil(AUTO_REQUESTS_PER_DAY) as i64;
         self.origin != Origin::Api
             || !(0..interval).contains(&(now - self.checked_at).num_seconds())
     }
@@ -516,6 +517,18 @@ pub fn get_task_cost(state: State<'_, AppState>) -> Result<Report, String> {
 }
 
 #[tauri::command]
+pub async fn check_task_cost(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let enabled = state
+        .config
+        .lock()
+        .is_ok_and(|config| config.settings.ladder_auto_update);
+    if enabled && refresh(&state, false).await? {
+        let _ = app.emit(UPDATED, ());
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn refresh_task_cost(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -561,14 +574,7 @@ pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(5)).await;
         loop {
-            let state = app.state::<AppState>();
-            let enabled = state
-                .config
-                .lock()
-                .is_ok_and(|config| config.settings.ladder_auto_update);
-            if enabled && refresh(&state, false).await.unwrap_or(false) {
-                let _ = app.emit(UPDATED, ());
-            }
+            let _ = check_task_cost(app.clone(), app.state()).await;
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
     });

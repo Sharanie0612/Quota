@@ -1,13 +1,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { creatorColors, ModelCostChart, type ComparisonPoint } from "../components/ModelCostChart";
-import { IconArrowUpRight, IconCheck, IconPlus, IconRefresh, IconSearch, IconX } from "../components/icons";
+import { ModelCostChart, type ComparisonPoint } from "../components/ModelCostChart";
 import { ModelLogo } from "../components/ModelLogo";
-import { Button, EmptyState, Field, Modal, Notice } from "../components/ui";
+import { Button, Field, Modal, Notice, Seg } from "../components/ui";
 import { api, errText } from "../lib/api";
 import {
   configurationLabel, latestModelCount, matchesModel, modelFamiliesForComparison, restoreComparison,
-  selectedComparison, selectedConfiguration, type ComparisonSelection, type ModelFamily,
+  selectedComparison, selectedConfiguration, type ModelFamily,
 } from "../lib/modelComparison";
 import type { TaskCostModel, TaskCostReport } from "../lib/types";
 import "./model-ladder.css";
@@ -16,17 +15,20 @@ const aaChart = "https://artificialanalysis.ai/models?cost=intelligence-vs-cost-
 const aaKeys = "https://artificialanalysis.ai/api-key-management-redirect";
 const storageKey = "quota-model-comparison-v1";
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 });
+const syncTime = new Intl.DateTimeFormat("zh-CN", { dateStyle: "short", timeStyle: "short", hour12: false });
 const formatCost = (cost: number) => cost < 0.0001 ? `$${cost.toExponential(3)}` : usd.format(cost);
 type ComparedModel = { family: ModelFamily; configuration: TaskCostModel };
 type OpenPanel = "picker" | "chart" | "source" | null;
+type ModelView = "chart" | "list";
 
 function readSelection() {
   try { return restoreComparison(localStorage.getItem(storageKey)); }
   catch { return restoreComparison(null); }
 }
 
-function DataConnection({ connected, onClose, onSave }: {
+function DataConnection({ connected, snapshot, onClose, onSave }: {
   connected: boolean;
+  snapshot?: TaskCostReport["snapshot"];
   onClose: () => void;
   onSave: (report: TaskCostReport) => void;
 }) {
@@ -47,7 +49,7 @@ function DataConnection({ connected, onClose, onSave }: {
     }
   }
 
-  return <Modal title="Artificial Analysis 数据源" onClose={() => { if (!busy) onClose(); }} footer={<>
+  return <Modal title="Artificial Analysis" onClose={() => { if (!busy) onClose(); }} footer={<>
     {connected && <Button disabled={busy} onClick={() => void save("")}>断开连接</Button>}
     <Button disabled={busy} onClick={onClose}>取消</Button>
     <Button type="submit" form={formId} variant="primary" disabled={busy || !key.trim()}>
@@ -59,43 +61,46 @@ function DataConnection({ connected, onClose, onSave }: {
       if (!busy && key.trim()) void save(key.trim());
     }}>
       {error && <Notice tone="error">{error}</Notice>}
-      <Field label="Artificial Analysis API Key" hint="支持免费 API Key。Quota 将其保存在系统凭据管理器中。">
+      {snapshot && <p className="task-source-version">
+        {snapshot.origin === "historical" ? snapshot.indexVersion : `Intelligence Index v${snapshot.indexVersion}`}
+      </p>}
+      <Field label="API Key">
         <input className="input" type="password" maxLength={512} autoComplete="off" spellCheck={false}
           value={key} disabled={busy} onChange={event => setKey(event.target.value)}
           placeholder={connected ? "输入新密钥以更换" : "粘贴 API Key"} />
       </Field>
-      <Button type="button" size="sm" variant="quiet" onClick={() => void api.openExternal(aaKeys)}>打开 AA 密钥管理</Button>
+      <div className="task-model-actions">
+        <Button type="button" variant="quiet" onClick={() => void api.openExternal(aaKeys)}>管理 API Key</Button>
+        <Button type="button" variant="quiet" onClick={() => void api.openExternal(aaChart)}>查看 AA 原图</Button>
+      </div>
     </form>
   </Modal>;
 }
 
-function ModelPicker({ families, vendor, vendors, selection, selectedIds, onToggle, onVendor, onClose }: {
+function ModelPicker({ families, vendors, selectedIds, canReset, onToggle, onReset, onClose }: {
   families: ModelFamily[];
-  vendor: string;
   vendors: string[];
-  selection: ComparisonSelection;
   selectedIds: Set<string>;
+  canReset: boolean;
   onToggle: (id: string) => void;
-  onVendor: (creator: string) => void;
+  onReset: () => void;
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const [vendor, setVendor] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
   const [limit, setLimit] = useState(60);
   const matches = families.filter(family => matchesModel(family, search, vendor)
     && (!onlySelected || selectedIds.has(family.id)));
   return <Modal wide title="选择对比模型" onClose={onClose} footer={<>
-    <span className="model-picker-count" role="status">已选 {selectedIds.size} 个型号</span>
+    <Button variant="quiet" className="model-picker-reset" disabled={!canReset} onClick={onReset}>恢复最新 {latestModelCount} 个</Button>
     <Button variant="primary" onClick={onClose}>完成</Button>
   </>}>
     <div className="model-picker-controls">
-      <div className="search">
-        <IconSearch size={16}/>
-        <input className="input" aria-label="搜索模型或厂商" placeholder="搜索模型或厂商" value={search}
-          onChange={event => { setSearch(event.target.value); setLimit(60); }}/>
-      </div>
+      <input className="input" type="search" aria-label="搜索模型或厂商" placeholder="搜索模型或厂商" value={search}
+        onChange={event => { setSearch(event.target.value); setLimit(60); }}/>
       <select className="select" aria-label="模型厂商" value={vendor}
-        onChange={event => { onVendor(event.target.value); setLimit(60); }}>
+        onChange={event => { setVendor(event.target.value); setLimit(60); }}>
         <option value="">全部厂商</option>
         {vendors.map(creator => <option key={creator} value={creator}>{creator}</option>)}
       </select>
@@ -105,23 +110,17 @@ function ModelPicker({ families, vendor, vendors, selection, selectedIds, onTogg
         setOnlySelected(event.target.checked);
         setLimit(60);
       }}/> 仅显示已选</label>
-      <span>{matches.length} 个型号 · 最新发布优先</span>
+      <span role="status">已选 {selectedIds.size} 个型号</span>
     </div>
     <div className="model-picker-list" aria-label="可选模型">
       {matches.slice(0, limit).map(family => {
         const chosen = selectedIds.has(family.id);
-        const model = selectedConfiguration(family, selection);
-        return <button key={family.id} type="button" className="model-picker-row" aria-label={`${chosen ? "移除" : "加入"} ${family.name}`}
-          aria-pressed={chosen} onClick={() => onToggle(family.id)}>
-          <ModelLogo name={family.name} size={21}/>
-          <span className="model-picker-name"><strong>{family.name}</strong>
-            <small>{family.creator} · {family.releaseDate ?? "发布日期未知"}{family.configurations.length > 1 && ` · ${family.configurations.length} 个档位`}</small>
-          </span>
-          <span className="model-picker-metric"><strong>{model.index.toFixed(1)}</strong>
-            <small>{model.costPerTask === null ? "成本未知" : formatCost(model.costPerTask)}</small>
-          </span>
-          <span className="model-picker-check" aria-hidden="true">{chosen ? <IconCheck size={15}/> : <IconPlus size={15}/>}</span>
-        </button>;
+        return <label key={family.id} className="model-picker-row">
+          <input type="checkbox" checked={chosen} onChange={() => onToggle(family.id)}
+            aria-label={`${chosen ? "移除" : "加入"} ${family.name}`}/>
+          <span className="model-picker-name">{family.name}</span>
+          {family.releaseDate && <time dateTime={family.releaseDate}>{family.releaseDate}</time>}
+        </label>;
       })}
       {!matches.length && <p className="model-picker-empty">没有匹配的模型</p>}
     </div>
@@ -139,25 +138,25 @@ function ModelDetail({ row, onChooseConfiguration, onClose }: {
   const { family, configuration } = row;
   return <Modal title={<span className="task-model-title"><ModelLogo name={family.name} size={25}/>{family.name}</span>}
     onClose={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
+    <dl className="task-model-details">
+      <dt>综合指数</dt><dd>{configuration.index.toFixed(1)}</dd>
+      <dt>单任务成本</dt><dd>{configuration.costPerTask === null ? "未公布" : formatCost(configuration.costPerTask)}</dd>
+      <dt>厂商</dt><dd>{family.creator}</dd>
+      {family.releaseDate && <><dt>发布日期</dt><dd>{family.releaseDate}</dd></>}
+    </dl>
     {family.configurations.length > 1 && <Field label="评测档位">
       <select className="select" value={configuration.id}
         onChange={event => onChooseConfiguration(family.id, event.target.value)}>
         {family.configurations.map(model => <option key={model.id} value={model.id}>{configurationLabel(model)}</option>)}
       </select>
     </Field>}
-    <dl className="task-model-details">
-      <dt>厂商</dt><dd>{family.creator}</dd>
-      <dt>发布日期</dt><dd>{family.releaseDate ?? "未知"}</dd>
-      <dt>Intelligence Index</dt><dd>{configuration.index.toFixed(1)}</dd>
-      <dt>Cost per Task</dt><dd>{configuration.costPerTask === null ? "暂无可比成本" : formatCost(configuration.costPerTask)}</dd>
-    </dl>
   </Modal>;
 }
 
 export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   const [report, setReport] = useState<TaskCostReport | null>(null);
   const [selection, setSelection] = useState(readSelection);
-  const [vendor, setVendor] = useState("");
+  const [view, setView] = useState<ModelView>("chart");
   const [activeModel, setActiveModel] = useState<string | null>(null);
   const [panel, setPanel] = useState<OpenPanel>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -187,6 +186,26 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!autoUpdate || !report?.connected) return;
+    let active = true;
+    const check = () => {
+      if (document.hidden) return;
+      const version = request.current;
+      void api.checkTaskCost().catch(failure => {
+        if (active && version === request.current) setError(errText(failure));
+      });
+    };
+    check();
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [autoUpdate, report?.connected]);
+
   function apply(next: TaskCostReport) {
     request.current += 1;
     setReport(next);
@@ -212,20 +231,16 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   const families = useMemo(() => modelFamiliesForComparison(snapshot?.models ?? []), [snapshot]);
   const { defaults, selected } = useMemo(() => selectedComparison(families, selection), [families, selection]);
   const selectedIds = useMemo(() => new Set(selected.map(family => family.id)), [selected]);
-  const vendorColors = useMemo(() => creatorColors([...new Set(families.map(family => family.creator))]), [families]);
+  const vendors = useMemo(() => [...new Set(families.map(family => family.creator))].sort(), [families]);
   const visible = useMemo<ComparedModel[]>(() => selected.map(family => ({
     family, configuration: selectedConfiguration(family, selection),
   })), [selected, selection]);
   const points = useMemo<ComparisonPoint[]>(() => visible.flatMap(row => row.configuration.costPerTask === null
     ? [] : [{ ...row, cost: row.configuration.costPerTask }]), [visible]);
-  const vendorCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const { family } of visible) counts.set(family.creator, (counts.get(family.creator) ?? 0) + 1);
-    return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [visible]);
   const detail = visible.find(row => row.family.id === detailId);
   const connected = report?.connected ?? false;
   const failure = error || report?.error;
+  const canReset = selection.included.length + selection.excluded.length + Object.keys(selection.configurations).length > 0;
 
   function toggle(id: string) {
     setSelection(current => {
@@ -249,96 +264,72 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   function inspect(id: string) {
     setActiveModel(id);
     setDetailId(id);
-    setPanel(null);
   }
 
-  const canvas = <ModelCostChart rows={points} vendorColors={vendorColors}
-    formatCost={formatCost} selectedId={activeModel} onSelect={inspect}/>;
+  const canvas = <ModelCostChart rows={points} formatCost={formatCost} selectedId={activeModel} onSelect={inspect}/>;
 
+  const emptyChart = visible.length ? "已选模型暂无单任务成本" : "选择模型开始对比";
+  const placeholder = !report && !error ? "正在读取模型" : emptyChart;
   return <div className="content-inner visual-model-page" data-task-cost-origin={snapshot?.origin}>
-    <header className="visual-model-toolbar">
+    <header className="task-page-heading">
       <h1>AI 模型</h1>
-      <div className="visual-model-actions">
-        <Button size="sm" variant="quiet" onClick={() => setPanel("source")}>{connected ? "管理数据源" : "连接数据源"}</Button>
-        {connected && <Button size="sm" disabled={busy} onClick={() => void refresh()}>
-          <IconRefresh size={14} className={busy ? "spin" : ""}/>{busy ? "更新中…" : "立即更新"}
-        </Button>}
+      <div className="task-model-actions">
+        {connected && <Button onClick={() => void refresh()} disabled={busy}>{busy ? "正在更新…" : "立即更新"}</Button>}
+        <Button variant={connected ? "quiet" : "default"} onClick={() => setPanel("source")}>
+          {connected ? "数据源" : "连接 AA"}
+        </Button>
       </div>
     </header>
-    {failure && <Notice tone="warn">{failure}{snapshot && "。正在显示上次有效数据。"}</Notice>}
-    <section className="card task-cost-chart" aria-labelledby="task-cost-title">
-      <div className="task-cost-heading">
-        <div>
-          <h2 id="task-cost-title">Intelligence Index vs. Cost per Task</h2>
-          <p>左上方代表更高的能力、更低的单任务成本</p>
-        </div>
-        <div className="visual-model-actions">
-          {points.length > 0 && <Button size="sm" variant="quiet" onClick={() => setPanel("chart")}>
-            <IconArrowUpRight size={15}/> 放大图表
-          </Button>}
-          <Button size="sm" variant="primary" disabled={!families.length} onClick={() => { setVendor(""); setPanel("picker"); }}>
-            <IconPlus size={15}/> 选择模型
+    {failure && <div className="task-sync-error" role="alert">
+      {failure}{snapshot && "。已保留上次数据。"}
+    </div>}
+    <section className="card task-cost-chart" aria-label="模型性价比">
+      <header className="task-cost-heading">
+        <h2>模型性价比</h2>
+        <div className="task-model-actions">
+          <Seg value={view} options={[{ value: "chart", label: "图表" }, { value: "list", label: "列表" }]} onChange={setView}/>
+          {view === "chart" && points.length > 0 && <Button variant="quiet" onClick={() => setPanel("chart")}>放大图表</Button>}
+          <Button variant="primary" disabled={!families.length} onClick={() => setPanel("picker")}>
+            选择模型
           </Button>
         </div>
-      </div>
-      {snapshot && <div className="task-comparison-status">
-        <span role="status" data-selected={visible.length} data-plotted={points.length} data-available={families.length}>
-          已选 <b>{visible.length}</b> / {families.length} 个型号
-          {visible.length > points.length && ` · ${visible.length - points.length} 个成本待公布`}
-        </span>
-        <Button size="sm" variant="quiet" disabled={!families.length} onClick={() => setSelection(restoreComparison(null))}>
-          <IconRefresh size={13}/> 恢复最新 {latestModelCount} 个
-        </Button>
-      </div>}
-      {points.length > 0 ? panel !== "chart" && canvas : <EmptyState icon={<IconSearch size={24}/>}
-        title={!report && !error ? "正在读取模型数据…" : visible.length ? "已选模型暂无可比成本" : "暂无可绘制的模型"}
-        desc={snapshot ? "可从模型列表中加入有单任务成本的型号。" : undefined}/>}
-      {vendorCounts.length > 0 && <div className="task-vendor-legend" aria-label="模型厂商">
-        {vendorCounts.map(([creator]) => <button key={creator} type="button" title={`查看 ${creator} 的型号`}
-          onClick={() => { setVendor(creator); setPanel("picker"); }}>
-          <span style={{ background: vendorColors.get(creator) }}/>{creator}
-        </button>)}
-      </div>}
-      <footer className="task-cost-footer">
-        <span>{snapshot && <>
-          {snapshot.origin === "historical" ? `历史快照 ${snapshot.indexVersion.replace(/^Intelligence Index /, "")}`
-            : `API 指数 v${snapshot.indexVersion}`}
-          <span className="task-cost-check-time"> · {new Date(snapshot.checkedAt).toLocaleString("zh-CN")}</span>
-          {connected && ` · ${autoUpdate ? "自动更新" : "手动更新"}`}
-        </>}</span>
-        <Button size="sm" variant="quiet" onClick={() => void api.openExternal(aaChart)}>数据来源 · Artificial Analysis <IconArrowUpRight size={13}/></Button>
-      </footer>
-    </section>
-    {visible.length > 0 && <section className="card task-models-list" aria-labelledby="selected-models-title">
-      <div className="task-models-heading"><h2 id="selected-models-title">已选模型</h2><span>按发布日期排序</span></div>
-      <div className="task-models-scroll">
-        <table>
-          <thead><tr><th scope="col">型号</th><th scope="col">评测档位</th><th scope="col">发布日期</th>
-            <th scope="col">指数</th><th scope="col">USD / 任务</th><th scope="col" aria-label="操作"/></tr></thead>
+      </header>
+      {view === "chart" ? <div className="task-plot-panel" role="tabpanel" aria-label="图表">
+        {points.length ? canvas : <p className="task-chart-empty">{placeholder}</p>}
+      </div> : <div className="task-models-list" role="tabpanel" aria-label="列表">
+        {visible.length ? <table>
+          <thead><tr><th scope="col">型号</th><th scope="col">综合指数</th><th scope="col">单任务成本</th></tr></thead>
           <tbody>{visible.map(({ family, configuration }) => <tr key={family.id} data-model={family.id}
             data-profile-id={configuration.id} data-score={configuration.index} data-cost={configuration.costPerTask ?? undefined}
-            data-release={family.releaseDate ?? ""} aria-selected={activeModel === family.id}>
+            data-release={family.releaseDate ?? ""}>
             <th scope="row"><button type="button" className="task-model-name" onClick={() => inspect(family.id)}>
-              <ModelLogo name={family.name} size={20}/><span><strong>{family.name}</strong><small>{family.creator}</small></span>
+              {family.name}
             </button></th>
-            <td>{family.configurations.length > 1 ? <select className="select task-model-configuration"
-              aria-label={`${family.name} 评测档位`} value={configuration.id}
-              onChange={event => chooseConfiguration(family.id, event.target.value)}>
-              {family.configurations.map(model => <option value={model.id} key={model.id}>{configurationLabel(model)}</option>)}
-            </select> : <span className="task-model-single-setting">{configuration.name === family.name ? "—" : configurationLabel(configuration)}</span>}</td>
-            <td>{family.releaseDate ?? "—"}</td>
-            <td><strong>{configuration.index.toFixed(1)}</strong></td>
-            <td>{configuration.costPerTask === null ? "—" : formatCost(configuration.costPerTask)}</td>
-            <td><Button size="sm" variant="quiet" aria-label={`移除 ${family.name}`} onClick={() => toggle(family.id)}><IconX size={14}/></Button></td>
+            <td>{configuration.index.toFixed(1)}</td>
+            <td>{configuration.costPerTask === null ? "未公布" : formatCost(configuration.costPerTask)}</td>
           </tr>)}</tbody>
-        </table>
-      </div>
-    </section>}
-    {panel === "chart" && points.length > 0 && <Modal maxWidth={1280} title="Intelligence Index vs. Cost per Task"
+        </table> : <p className="task-chart-empty">{placeholder}</p>}
+      </div>}
+      <footer className="task-cost-footer">
+        <div className="task-comparison-status">
+          <span role="status" data-selected={visible.length} data-plotted={points.length} data-available={families.length}>
+            {visible.length} 个型号
+          </span>
+        </div>
+        <div className="task-source-status">
+          {snapshot && <span data-checked-at={snapshot.checkedAt}>
+            {snapshot.origin === "historical" ? "历史快照 " : "更新于 "}
+            <time dateTime={snapshot.checkedAt}>{syncTime.format(new Date(snapshot.checkedAt))}</time>
+          </span>}
+          <Button variant="quiet" onClick={() => void api.openExternal(aaChart)}>Artificial Analysis</Button>
+        </div>
+      </footer>
+    </section>
+    {panel === "chart" && points.length > 0 && <Modal maxWidth={1280} title="模型图表"
       onClose={() => setPanel(null)}>{canvas}</Modal>}
-    {panel === "picker" && <ModelPicker families={families} vendor={vendor} vendors={[...vendorColors.keys()].sort()}
-      selection={selection} selectedIds={selectedIds} onToggle={toggle} onVendor={setVendor} onClose={() => setPanel(null)}/>}
-    {panel === "source" && <DataConnection connected={connected} onClose={() => setPanel(null)}
+    {panel === "picker" && <ModelPicker families={families} vendors={vendors} selectedIds={selectedIds}
+      canReset={canReset} onToggle={toggle} onReset={() => setSelection(restoreComparison(null))} onClose={() => setPanel(null)}/>}
+    {panel === "source" && <DataConnection connected={connected} snapshot={snapshot} onClose={() => setPanel(null)}
       onSave={next => { apply(next); setPanel(null); }}/>}
     {detail && <ModelDetail row={detail} onChooseConfiguration={chooseConfiguration} onClose={() => setDetailId(null)}/>}
   </div>;

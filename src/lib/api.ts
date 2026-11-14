@@ -19,6 +19,7 @@ import type {
 export const api = {
   getMainWindowChrome: () => invoke<{installed:boolean;blockedFramePaints:number;blockedThemedPaints:number;safeActivationForwards:number}>('get_main_window_chrome'),
   getTaskCost: () => invoke<TaskCostReport>('get_task_cost'),
+  checkTaskCost: () => invoke<void>('check_task_cost'),
   refreshTaskCost: () => invoke<TaskCostReport>('refresh_task_cost'),
   saveTaskCostKey: (key: string) => invoke<TaskCostReport>('save_task_cost_key', { key }),
   getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),

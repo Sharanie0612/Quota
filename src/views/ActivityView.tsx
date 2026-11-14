@@ -270,10 +270,10 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
     {readError && <Notice tone="warn" actions={<Button size="sm" disabled={loading} onClick={() => void load()}>重试读取</Button>}>
       <b>统计读取未完成</b><div>{readError}</div>{data && <div className="hint">保留当前筛选最近一次读取的结果。</div>}
     </Notice>}
-    {(data?.errors.length || syncError) ? <Notice tone="warn">
+    {(data?.errors.length || syncError) ? <Notice autoDismiss tone="warn">
       <b>部分用量尚未采集完整</b><details className="activity-error-details"><summary>查看采集详情</summary><ul>{[...new Set([...(data?.errors ?? []), ...(syncError ? [syncError] : [])])].map(message => <li key={message}>{message}</li>)}</ul></details>
     </Notice> : null}
-    {options && <Modal title="采集设置" wide onClose={() => { if (!busy && !connectingTrae) closeOptions(); }} footer={<><Button disabled={!!busy || connectingTrae} onClick={closeOptions}>取消</Button><Button variant="primary" disabled={!!busy || sshDetecting || connectingTrae} onClick={() => void save()}>{busy === "save" ? "保存中…" : "保存设置"}</Button></>}>
+    {options && <Modal title="采集设置" wide dismissible={!busy && !connectingTrae} onClose={closeOptions} footer={close => <><Button disabled={!!busy || connectingTrae} onClick={close}>取消</Button><Button variant="primary" disabled={!!busy || sshDetecting || connectingTrae} onClick={() => void save()}>{busy === "save" ? "保存中…" : "保存设置"}</Button></>}>
       <div className="activity-collection-settings">
       <p className="hint activity-settings-intro">从本机日志读取用量，采集后自动更新图表。</p>
       <div className="setting-row"><div className="txt"><b>自动采集</b><span>仅在 Quota 运行时执行</span></div><Switch checked={options.autoCollect} disabled={!!busy} onChange={autoCollect => setOptions({...options,autoCollect})} label="自动采集 Token 活动" /></div>

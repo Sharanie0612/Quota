@@ -14,9 +14,10 @@
   border: 1px solid var(--border);
   background: var(--surface);
   opacity: 1;
-  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  font-weight: 500;
+  transition: background var(--motion-fast) ease, color var(--motion-fast) ease, border-color var(--motion-fast) ease, transform var(--motion-fast) var(--motion-ease);
 }
-.btn:active:not(:disabled) { background: var(--fill-press);
+.btn:active:not(:disabled) { background: var(--fill-press); transform: scale(.98);
 }
 
 .btn:disabled {
@@ -49,7 +50,7 @@
 .btn-sm {
   height: 30px;
   padding: 0 12px;
-  font-size: 12.5px;
+  font-size: var(--text-label);
 }
 
 .btn-icon {
@@ -66,7 +67,7 @@
   gap: 8px;
   padding: 10px 12px;
   border-radius: var(--radius);
-  font-size: 12.5px;
+  font-size: var(--text-label);
   line-height: 1.5;
   align-items: flex-start;
 }
@@ -93,6 +94,7 @@
 
 .notice-text {
   min-width: 0;
+  flex: 1;
   word-break: break-word;
 }
 
@@ -145,13 +147,13 @@
 }
 
 .field > label {
-  font-size: 12px;
+  font-size: var(--text-label);
   color: var(--text-2);
   font-weight: 500;
 }
 
 .hint {
-  font-size: 11.5px;
+  font-size: var(--text-caption);
   color: var(--text-2);
   line-height: 1.5;
 }
@@ -202,7 +204,7 @@ textarea.input:focus {
   border: none;
   background: rgba(120, 120, 128, 0.24);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background var(--motion-fast) ease;
   padding: 0;
 }
 
@@ -216,7 +218,7 @@ textarea.input:focus {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-enter) var(--motion-spring);
 }
 
 .switch.on {
@@ -275,7 +277,7 @@ textarea.input:focus {
   place-items: center;
   padding: 24px;
   z-index: 50;
-  animation: fade 240ms var(--motion-ease);
+  animation: fade var(--motion-enter) var(--motion-ease);
 }
 
 .modal {
@@ -285,7 +287,7 @@ textarea.input:focus {
   overflow-y: auto;
   box-shadow: var(--shadow-pop);
   border: 1px solid var(--border);
-  animation: pop 300ms var(--motion-spring);
+  animation: pop var(--motion-enter) var(--motion-spring);
   border-radius: var(--radius-surface);
   background: var(--surface);
 }
@@ -305,9 +307,11 @@ html[data-effects="reduced"] .modal { animation: fade 160ms var(--motion-ease); 
 
 .modal-head h2 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-size: var(--text-dialog);
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  line-height: 1.35;
 }
 
 .modal-body {
@@ -344,8 +348,10 @@ html[data-effects="reduced"] .modal { animation: fade 160ms var(--motion-ease); 
 
 .section h2 {
   margin: 0 0 6px;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--text-section);
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
 }
 
 .section > p {
@@ -365,22 +371,38 @@ html[data-effects="reduced"] .modal { animation: fade 160ms var(--motion-ease); 
   gap: 8px;
   z-index: 80;
   align-items: center;
+  width: min(520px, calc(100% - 48px));
+  pointer-events: none;
 }
 
 .toast {
-  background: rgba(30, 30, 32, 0.92);
-  color: #fff;
-  padding: 9px 15px;
-  border-radius: 999px;
-  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius-control);
+  font-size: var(--text-label);
   box-shadow: var(--shadow-pop);
-  max-width: 520px;
-  animation: pop 0.2s ease;
+  max-width: 100%;
+  pointer-events: auto;
+  overflow-wrap: anywhere;
+  animation: pop var(--motion-enter) var(--motion-ease);
 }
 
 .toast.error {
-  background: rgba(190, 20, 35, 0.94);
+  background: var(--red-soft);
+  color: var(--red);
+  border-color: color-mix(in srgb,var(--red) 30%,var(--border));
 }
+
+.toast > span { min-width: 0; }
+.feedback-close { display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px; border: 0; border-radius: var(--radius-inset); padding: 0; background: transparent; color: inherit; cursor: pointer; }
+.feedback-close svg { margin: 0; }
+.feedback-close:hover { background: color-mix(in srgb,currentColor 10%,transparent); }
+.feedback-close:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 
 .spin {
   animation: spin 0.9s linear infinite;

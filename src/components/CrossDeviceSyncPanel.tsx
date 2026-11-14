@@ -15,6 +15,7 @@ export function CrossDeviceSyncPanel(){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [message,setMessage]=useState('');
+  const [attempt,setAttempt]=useState(0);
   const reload=useCallback(async()=>{
     const [os,rs,as,ps]=await Promise.allSettled([api.getActivityOptions(),api.getSyncOverview(),api.getAccountSyncStatus(),api.getActivityReaders()]);
     if(os.status==='rejected')throw os.reason;
@@ -28,7 +29,7 @@ export function CrossDeviceSyncPanel(){
   useEffect(()=>{let live=true;void reload().catch(e=>{if(live)setError(errText(e));});const refresh=()=>{if(live)void reload().catch(()=>undefined);};const un=events.onAccountsUpdated(refresh);const activity=events.onActivityUpdated(refresh);return()=>{live=false;void un.then(f=>f());void activity.then(f=>f());};},[reload]);
   const sync=async(o=options)=>{
     if(!o?.syncDir)return;
-    setBusy(true);setError('');setMessage('');
+    setBusy(true);setError('');setMessage('');setAttempt(value=>value+1);
     try{
       const results=await Promise.allSettled([api.syncActivityNow(),api.syncUsageNow(),o.syncAccounts?api.syncAccounts():Promise.resolve()]);
       const next=await reload();
@@ -46,6 +47,7 @@ export function CrossDeviceSyncPanel(){
   const enabled=!!options?.syncDir;
   const errors=[error,...(enabled?(report?.syncErrors??[]):[]),...(enabled&&options?.syncAccounts&&account?.error?[account.error]:[])];
   const failed=enabled&&errors.some(Boolean);
+  const errorSummary=[...new Set(errors.filter(Boolean))].join('；');
   const {peers:other,ssh}=options?splitSyncDevices(report?.devices??[],readers,options):{peers:[],ssh:[]};
   const old=readers.filter(r=>other.some(device=>device.id===r.device)&&r.compressed!==true).length;
   const last=report?.updatedAt?new Date(report.updatedAt).toLocaleString('zh-CN'):null;
@@ -59,8 +61,9 @@ export function CrossDeviceSyncPanel(){
       {other.length>0&&<details className="sync-devices"><summary>查看 Quota 同步客户端</summary>{other.map(d=><div key={d.id}><b>{d.name||'其他电脑'}</b><span className="hint">{readers.find(r=>r.device===d.id)?.version??'版本待确认'}</span></div>)}</details>}
     </>}
     {ssh.length>0&&<details className="sync-devices sync-ssh-sources"><summary>SSH 用量来源 · {ssh.length} 台</summary><p className="hint">由电脑上的 Quota 通过 SSH 只读采集。远端无需安装 Quota，也无需创建同步目录。</p>{ssh.map(device=><div key={device.id}><b>{device.name.replace(/^SSH · /,'')}</b><span className="badge">无需安装 Quota</span></div>)}</details>}
-    {message&&<Notice>{message}</Notice>}
-    {errors.some(Boolean)&&<Notice tone="warn"><b>部分同步未完成，已保存的数据仍保留。</b><details><summary>查看原因</summary><p>{[...new Set(errors.filter(Boolean))].join('；')}</p></details></Notice>}
+    {message&&<Notice autoDismiss dismissKey={attempt}>{message}</Notice>}
+    {errorSummary&&<Notice autoDismiss dismissKey={`${attempt}:${errorSummary}`} tone="warn">部分同步未完成，已保存的数据仍保留。</Notice>}
+    {errorSummary&&<details className="sync-devices sync-error-details"><summary>查看未完成的同步</summary><p>{errorSummary}</p></details>}
     {enabled&&options?.syncAccounts&&<AccountSyncPanel/>}
     {enabled&&<details className="sync-advanced"><summary>高级选项与故障处理</summary>
       <div className="setting-row"><div className="txt"><b>同时同步账户信息</b><span>同步账户名称、余额与额度；不会同步密钥和登录信息。</span></div><Switch checked={options?.syncAccounts??true} label="同时同步账户信息" disabled={busy} onChange={value=>{setBusy(true);void update({syncAccounts:value}).catch(e=>setError(errText(e))).finally(()=>setBusy(false));}}/></div>

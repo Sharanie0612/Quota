@@ -1,5 +1,6 @@
 import {useEffect,useLayoutEffect,useRef} from 'react';
 import {useAppearance} from './appearance';
+import {motion} from './motion';
 const useBrowserLayoutEffect=typeof window==='undefined'?useEffect:useLayoutEffect;
 
 /** Measure one selection surface; navigation and segmented controls share it. */
@@ -20,7 +21,7 @@ export function useSlidingHighlight<T extends HTMLElement>(value:string) {
       for(const [key,number] of Object.entries({x:active.offsetLeft,y:active.offsetTop,width:active.offsetWidth,height:active.offsetHeight}))host.style.setProperty('--highlight-'+key,number+'px');
       if(!animate||before.width<1)return;
       let frames:Keyframe[],duration:number;
-      if(reduced){frames=[{opacity:.25},{opacity:1}];duration=140;}
+      if(reduced){frames=[{opacity:.4},{opacity:1}];duration=motion.fast;}
       else{
         const x=before.left-bounds.left,y=before.top-bounds.top,tx=active.offsetLeft,ty=active.offsetTop;
         const start={transform:`translate(${x}px,${y}px)`,width:before.width+'px',height:before.height+'px'};
@@ -28,7 +29,7 @@ export function useSlidingHighlight<T extends HTMLElement>(value:string) {
         if(appearance.material==='liquid'){
           const dx=tx-x,dy=ty-y;
           frames=[{...start,offset:0},{transform:`translate(${x+dx*.74}px,${y+dy*.74}px) scale(${1+Math.min(.06,Math.abs(dx)/1600)},${1+Math.min(.12,Math.abs(dy)/1200)})`,width:active.offsetWidth+'px',height:active.offsetHeight+'px',offset:.5},{...end,transform:`translate(${tx+dx*.018}px,${ty+dy*.018}px)`,offset:.79},{...end,offset:1}];duration=340;
-        }else{frames=[start,end];duration=180;}
+        }else{frames=[start,end];duration=motion.enter;}
       }
       const next=highlight.animate(frames,{duration,easing:'cubic-bezier(.2,.7,.2,1)'});animation.current=next;
       next.onfinish=()=>{if(animation.current===next)animation.current=null;};

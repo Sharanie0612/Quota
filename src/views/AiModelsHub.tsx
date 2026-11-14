@@ -83,9 +83,9 @@ function DataConnection({ connected, snapshot, onClose, onSave }: {
     }
   }
 
-  return <Modal title="Artificial Analysis" onClose={() => { if (!busy) onClose(); }} footer={<>
+  return <Modal title="Artificial Analysis" onClose={onClose} dismissible={!busy} footer={close => <>
     {connected && <Button disabled={busy} onClick={() => void save("")}>断开连接</Button>}
-    <Button disabled={busy} onClick={onClose}>取消</Button>
+    <Button disabled={busy} onClick={close}>取消</Button>
     <Button type="submit" form={formId} variant="primary" disabled={busy || !key.trim()}>
       {busy ? "正在连接…" : "连接并更新"}
     </Button>
@@ -127,9 +127,9 @@ function ModelPicker({ families, vendors, selectedIds, canReset, initialVendor, 
   const [limit, setLimit] = useState(60);
   const matches = families.filter(family => matchesModel(family, search, vendor)
     && (!onlySelected || selectedIds.has(family.id)));
-  return <Modal wide title="选择对比模型" onClose={onClose} footer={<>
+  return <Modal wide title="选择对比模型" onClose={onClose} footer={close => <>
     <Button variant="quiet" className="model-picker-reset" disabled={!canReset} onClick={onReset}>恢复最新 {latestModelCount} 个</Button>
-    <Button variant="primary" onClick={onClose}>完成</Button>
+    <Button variant="primary" onClick={close}>完成</Button>
   </>}>
     <div className="model-picker-controls">
       <input className="input" type="search" aria-label="搜索模型或厂商" placeholder="搜索模型或厂商" value={search}
@@ -172,7 +172,7 @@ function ModelDetail({ row, onChooseConfiguration, onClose }: {
 }) {
   const { family, configuration } = row;
   return <Modal title={<span className="task-model-title"><ModelLogo name={family.name} size={25}/>{family.name}</span>}
-    onClose={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
+    onClose={onClose} footer={close => <Button onClick={close}>关闭</Button>}>
     <dl className="task-model-details">
       <dt>综合指数</dt><dd>{configuration.index.toFixed(1)}</dd>
       <dt>单任务成本</dt><dd>{configuration.costPerTask === null ? "未公布" : formatCost(configuration.costPerTask)}</dd>

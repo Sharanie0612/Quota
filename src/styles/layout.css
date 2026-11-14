@@ -157,9 +157,9 @@
   overflow-y: auto;
   padding: 28px 28px 40px;
   scrollbar-gutter: stable; padding-top:25px; }
-.page-heading h1 {
-  font-weight: 600;
-  margin: 0; font-size: 26px; letter-spacing: -.6px; font-family: var(--font-heading,var(--font)); color: var(--brand-strong,var(--text)); }
+:is(.page-heading,.task-page-heading,.usage-heading,.speed-page-heading) h1 {
+  font-weight: var(--heading-weight);
+  margin: 0; font-size: var(--text-title); letter-spacing: var(--heading-tracking); font-family: var(--font-heading,var(--font)); color: var(--brand-strong,var(--text)); line-height:1.3; }
 .sidebar {
   width: var(--sidebar-width);
   flex: 0 0 var(--sidebar-width);

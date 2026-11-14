@@ -45,7 +45,7 @@ export function ActivityStoragePanel({ syncDir }: { syncDir: string }) {
     <p className="hint">{info?.legacyCompatibility?'为兼容旧设备，暂时保留较大的副本。全部设备更新并同步后，才能安全节省空间。':'优化前会校验数据，保留完整用量；只处理本机创建的文件。'}</p>
     {readers.some(r=>r.compressed!==true) && <p className="hint">{readers.filter(r=>r.compressed!==true).length} 台设备尚未确认更新。</p>}
     <div className="setting-row"><div className="txt"><b>另一台电脑缺少用量</b><span>重新读取共享数据并恢复兼容副本，不清空本机统计。</span></div><Button size="sm" disabled={busy} onClick={()=>void rebuild()}>{busy?'处理中…':'修复漏同步'}</Button></div>
-    {result && <Notice>{result}</Notice>}
-    {error && <Notice tone="error">{error}</Notice>}
+    {result && <Notice autoDismiss>{result}</Notice>}
+    {error && <Notice autoDismiss tone="error">{error}</Notice>}
   </div>;
 }

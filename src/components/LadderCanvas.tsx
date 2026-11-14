@@ -22,26 +22,18 @@ type Props = {
   costLabel: (value: number) => string;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  showFrontier?: boolean;
 };
 
-export function LadderCanvas({ points, xLabel, yLabel, label, costLabel, selectedId, onSelect, showFrontier }: Props) {
+export function LadderCanvas({ points, xLabel, yLabel, label, costLabel, selectedId, onSelect }: Props) {
   const chart = useChartSize(1000, 440);
   const [hover, setHover] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
-  const { bounds, scale, clusters, frontier } = useMemo(() => {
+  const { bounds, scale, clusters } = useMemo(() => {
     const bounds = { left: 54, right: chart.width - 30, top: 38, bottom: chart.height - 64 };
     const scale = ladderScale(points, bounds);
     const projected = points.map(point => ({ ...point, x: scale.x(point.cost), y: scale.y(point.score) }));
-    const frontier: typeof projected = [];
-    if (showFrontier) {
-      const ordered = [...projected].sort((a, b) => a.cost - b.cost || b.score - a.score || a.id.localeCompare(b.id));
-      for (const point of ordered) {
-        if (point.score > (frontier[frontier.length - 1]?.score ?? -Infinity)) frontier.push(point);
-      }
-    }
-    return { bounds, scale, clusters: scatterClusters(projected), frontier };
-  }, [points, chart.width, chart.height, showFrontier]);
+    return { bounds, scale, clusters: scatterClusters(projected) };
+  }, [points, chart.width, chart.height]);
 
   const active = clusters.find(cluster => cluster.anchor.id === hover);
   const expanded = clusters.find(cluster => cluster.anchor.id === opened);
@@ -71,11 +63,6 @@ export function LadderCanvas({ points, xLabel, yLabel, label, costLabel, selecte
         </text>
       </g>)}
       <text x={(bounds.left + bounds.right) / 2} y={chart.height - 8} textAnchor="middle" className="scatter-axis-title">{xLabel} →</text>
-      {frontier.length > 1 && <>
-        <text x={bounds.right} y={18} textAnchor="end" className="scatter-axis-title">帕累托前沿</text>
-        <polyline className="scatter-frontier" data-frontier-ids={JSON.stringify(frontier.map(point => point.id))}
-          points={frontier.map(point => `${point.x},${point.y}`).join(" ")} />
-      </>}
       {clusters.map(cluster => {
         const { anchor, members } = cluster;
         const selected = members.some(point => point.id === selectedId);

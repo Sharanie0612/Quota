@@ -28,6 +28,8 @@ const INVALID_DATA: &str = "Artificial Analysis 返回的模型数据不完整�
 pub struct Model {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub model_name: String,
     pub creator: String,
     pub release_date: Option<NaiveDate>,
     pub index: f64,
@@ -97,6 +99,21 @@ fn positive_cost(cost: Option<f64>) -> Option<f64> {
     cost.filter(|cost| cost.is_finite() && *cost > 0.0)
 }
 
+// Only remove explicit settings at the end of an AA configuration name.
+// Parenthesized model revisions, such as Qwen3.8 Max (0902), stay distinct.
+fn base_model_name(name: &str) -> &str {
+    let (base, _) = benchmarks::split_configuration(name);
+    if let Some((model, suffix)) = base.rsplit_once(" (") {
+        if matches!(
+            suffix.to_ascii_lowercase().as_str(),
+            "minimal)" | "thinking)" | "non-thinking)" | "adaptive)" | "no thinking)"
+        ) {
+            return model;
+        }
+    }
+    base
+}
+
 fn historical_snapshot(dataset: &benchmarks::Dataset) -> Option<Snapshot> {
     let source = dataset
         .sources
@@ -121,6 +138,7 @@ fn historical_snapshot(dataset: &benchmarks::Dataset) -> Option<Snapshot> {
         .map(|profile| Model {
             id: profile.id.clone(),
             name: profile.name.clone(),
+            model_name: base_model_name(&profile.name).into(),
             creator: profile.vendor.clone(),
             release_date: dataset
                 .releases
@@ -157,7 +175,15 @@ pub fn load_snapshot(dir: &Path, historical: &benchmarks::Dataset) -> Option<Sna
             .ok()
             .filter(Snapshot::valid_api)
     })();
-    saved.or_else(|| historical_snapshot(historical))
+    saved
+        .map(|mut snapshot| {
+            // Snapshots from 1.0.3900 carry the full configuration name.
+            for model in &mut snapshot.models {
+                model.model_name = base_model_name(&model.name).into();
+            }
+            snapshot
+        })
+        .or_else(|| historical_snapshot(historical))
 }
 
 #[derive(Deserialize)]
@@ -246,6 +272,7 @@ impl Pages {
             };
             let model = Model {
                 id: row.id,
+                model_name: base_model_name(&row.name).into(),
                 name: row.name,
                 creator: row.model_creator.name,
                 release_date: row.release_date,

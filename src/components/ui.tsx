@@ -162,19 +162,22 @@ export function Modal({
   children,
   footer,
   wide,
+  maxWidth,
 }: {
   title: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   wide?: boolean;
+  maxWidth?: number;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focused = document.activeElement;
+    const previousFocus = focused instanceof HTMLElement || focused instanceof SVGElement ? focused : null;
     dialog.showModal();
     return () => {
       if (dialog.open) dialog.close();
@@ -187,19 +190,19 @@ export function Modal({
       onCancel={(e) => { e.preventDefault(); onClose(); }}
       onKeyDown={(e) => {
         if (e.key !== "Tab") return;
-        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary,[tabindex]'))
+        const controls = Array.from(e.currentTarget.querySelectorAll<HTMLElement | SVGElement>('button:enabled,input:enabled,select:enabled,textarea:enabled,a[href],summary,[tabindex]'))
           .filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
         const first = controls[0];
         const last = controls[controls.length - 1];
         if (!first) { e.preventDefault(); e.currentTarget.focus(); return; }
-        if (e.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement as HTMLElement))) {
+        if (e.shiftKey && (document.activeElement === first || !controls.some(control => control === document.activeElement))) {
           e.preventDefault(); last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
           e.preventDefault(); first.focus();
         }
       }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={wide ? { maxWidth: 620 } : undefined}>
+      <div className="modal" style={maxWidth || wide ? { maxWidth: maxWidth ?? 620 } : undefined}>
         <div className="modal-head">
           <h2 id={titleId}>{title}</h2>
           <div className="spacer" />

@@ -10,6 +10,9 @@
 !define MUI_FINISHPAGE_TEXT "安装已完成。$\r$\n$\r$\n打开 Quota，继续管理你的 AI 用量。"
 !define MUI_FINISHPAGE_RUN_TEXT "打开 Quota"
 !define MUI_CUSTOMFUNCTION_GUIINIT QuotaGuiInit
+!define QUOTA_SHORTCUT_ICON "$INSTDIR\Quota.ico"
+!define QUOTA_SLGP_RAWPATH 0x4
+Var QuotaShortcutsReady
 SetFont "Microsoft YaHei UI" 9
 
 Function QuotaGuiInit
@@ -54,6 +57,68 @@ Function QuotaGuiInit
   ClearErrors
 FunctionEnd
 
+; Edit only the icon property of an existing link to this installation.
+Function QuotaSetShortcutIcon
+  Exch $R7
+  Push $0
+  Push $1
+  Push $2
+  Push $3
+  ${If} ${FileExists} "$R7"
+    !insertmacro ComHlpr_CreateInProcInstance ${CLSID_ShellLink} ${IID_IShellLink} r0 ""
+    ${If} $0 P<> 0
+      ${IUnknown::QueryInterface} $0 '("${IID_IPersistFile}",.r1)'
+      ${If} $1 P<> 0
+        ${IPersistFile::Load} $1 '("$R7", ${STGM_READWRITE}).r2'
+        ${If} $2 = 0
+          ; The output buffer belongs to the caller of IShellLinkW::GetPath.
+          System::Call '*(&w1024 "") p.r3'
+          System::Call '$0->3(p r3, i 1024, p 0, i ${QUOTA_SLGP_RAWPATH}) i.r2'
+          ${If} $2 = 0
+            System::Call '*$3(&w1024 .r2)'
+          ${EndIf}
+          System::Free $3
+          ${If} $2 == "$INSTDIR\quota.exe"
+            ${IShellLink::SetIconLocation} $0 '("${QUOTA_SHORTCUT_ICON}",0).r2'
+            ${If} $2 = 0
+              ${IPersistFile::Save} $1 '("$R7",1).r2'
+              ${If} $2 = 0
+                ; Notify Explorer that this link changed (SHCNE_UPDATEITEM).
+                System::Call 'shell32::SHChangeNotify(i 0x2000, i 0x3005, w "$R7", p 0) v'
+              ${EndIf}
+            ${EndIf}
+          ${EndIf}
+        ${EndIf}
+        ${IUnknown::Release} $1 ""
+      ${EndIf}
+      ${IUnknown::Release} $0 ""
+    ${EndIf}
+  ${EndIf}
+  Pop $3
+  Pop $2
+  Pop $1
+  Pop $0
+  Pop $R7
+FunctionEnd
+
+Function QuotaRefreshShortcutIcons
+  ${If} ${FileExists} "${QUOTA_SHORTCUT_ICON}"
+    Push "$DESKTOP\Quota.lnk"
+    Call QuotaSetShortcutIcon
+    Push "$SMPROGRAMS\Quota.lnk"
+    Call QuotaSetShortcutIcon
+    Push "$SMPROGRAMS\Quota\Quota.lnk"
+    Call QuotaSetShortcutIcon
+  ${EndIf}
+FunctionEnd
+
+; The classic finish page can create a desktop shortcut after POSTINSTALL.
+Function .onGUIEnd
+  ${If} $QuotaShortcutsReady = 1
+    Call QuotaRefreshShortcutIcons
+  ${EndIf}
+FunctionEnd
+
 !macro NSIS_HOOK_PREINSTALL
   Push $R8
   Push $R9
@@ -84,15 +149,21 @@ FunctionEnd
   ClearErrors
   ${GetOptions} $R8 "/QUOTA_DESKTOP" $R9
   ${IfNot} ${Errors}
-    CreateShortcut "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
+    ${IfNot} ${FileExists} "$DESKTOP\${PRODUCTNAME}.lnk"
+      CreateShortcut "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "${QUOTA_SHORTCUT_ICON}" 0
+      !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
+    ${EndIf}
   ${EndIf}
   ClearErrors
   ${GetOptions} $R8 "/QUOTA_STARTMENU" $R9
   ${IfNot} ${Errors}
-    CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+    ${IfNot} ${FileExists} "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+      CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe" "" "${QUOTA_SHORTCUT_ICON}" 0
+      !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+    ${EndIf}
   ${EndIf}
+  StrCpy $QuotaShortcutsReady 1
+  Call QuotaRefreshShortcutIcons
   ClearErrors
   ${GetOptions} $R8 "/QUOTA_PROGRESS=" $R9
   ${IfNot} ${Errors}

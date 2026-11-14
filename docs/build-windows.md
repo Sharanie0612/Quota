@@ -42,6 +42,8 @@ rustup toolchain install stable-x86_64-pc-windows-gnu
 
 真实安装后用 scripts/check-install.ps1 验证启动；非默认安装位置传入 -ExePath，使用 -DataDir 指定绝对路径的隔离数据目录。脚本仅结束它启动的实例。解包后的 DLL 和启动检查不代表安装器覆盖升级通过。
 
+从 1.0.4000 起，桌面与开始菜单快捷方式使用安装目录的 `Quota.ico`。升级仅刷新目标指向本次安装的已有快捷方式，并通知 Windows Shell。验收应核对已安装的 ICO，以及已有快捷方式的目标、参数和图标路径。重新生成安装图标时，`src-tauri/icons/icon.ico` 同时用于程序、安装器和快捷方式。
+
 升级用 scripts/check-upgrade.ps1 单独验证；已有正式安装时不要运行隔离升级脚本，避免污染卸载注册信息。
 
 ## 发布安装包的完整性标签（1.0.1502）

@@ -66,7 +66,9 @@ fn main() {
             row("not-evaluated", None, Some(0.01)),
         ],
     );
-    let last = page(6.1, 2, 2, vec![row("new-config", Some(52.7), Some(5.0093))]);
+    let mut new_config = row("new-config", Some(52.7), Some(5.0093));
+    new_config["name"] = json!("Example Model (0902) (Max, Default Fallback)");
+    let last = page(6.1, 2, 2, vec![new_config]);
     let mut partial = Pages::default();
     assert!(partial.ingest(&first).unwrap());
     assert!(partial.finish(Utc::now()).is_err());
@@ -97,6 +99,7 @@ fn main() {
     assert_eq!(next.models[2].index, 0.0);
     assert_eq!(next.models[2].cost_per_task, None);
     assert_eq!(next.models[3].id, "new-config");
+    assert_eq!(next.models[3].model_name, "Example Model (0902)");
     assert_eq!(next.models[3].index, 52.7);
     assert_eq!(next.models[3].cost_per_task, Some(5.0093));
     assert_eq!(
@@ -112,11 +115,16 @@ fn main() {
     );
     let json = serde_json::to_string(&next).unwrap();
     assert!(!json.contains("price_1m_input_tokens") && !json.contains("12345"));
-    fs::write(&path, json).unwrap();
+    let mut legacy: Value = serde_json::from_str(&json).unwrap();
+    for model in legacy["models"].as_array_mut().unwrap() {
+        model.as_object_mut().unwrap().remove("modelName");
+    }
+    fs::write(&path, legacy.to_string()).unwrap();
     let reloaded = load_snapshot(&dir, &historical).unwrap();
     assert_eq!(reloaded.origin, Origin::Api);
     assert_eq!(reloaded.checked_at, next.checked_at);
     assert_eq!(reloaded.models[3].cost_per_task, Some(5.0093));
-    println!("PASS exact USD/task and index, complete pagination, new configuration, omitted data, legacy fallback and restart");
+    assert_eq!(reloaded.models[3].model_name, "Example Model (0902)");
+    println!("PASS exact USD/task and index, complete pagination, distinct model releases, omitted data and legacy snapshot migration");
     println!("Fixture: {}", path.display());
 }

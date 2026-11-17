@@ -130,6 +130,10 @@ pub struct Metric {
 }
 fn is_zero(value: &u32) -> bool { *value == 0 }
 impl Metric {
+    pub(crate) fn superseded_zcode(&self) -> bool {
+        self.source == "zcode" && self.kind == "tokens"
+            && matches!(self.revision, ZCODE_INHERITED_REVISION | ZCODE_MODERN_ALIAS_REVISION)
+    }
     fn activity_source(&self) -> &str {
         if self.multica { "multica" } else { &self.source }
     }
@@ -149,6 +153,10 @@ impl Metric {
 // A corrected observation supersedes legacy counts for the SAME event ID,
 // including old cloud packets. This is a parser revision, not a clock value.
 const CODEX_USAGE_REVISION: u32 = 1;
+// Keep a zero correction under the copied message's original ID, including sync.
+const ZCODE_INHERITED_REVISION: u64 = 1;
+// An explicit assistant_message_id links this legacy ID to a modern request.
+const ZCODE_MODERN_ALIAS_REVISION: u64 = 2;
 #[derive(Default, Serialize, Deserialize)]
 pub struct Cursor {
     pub offset: u64,
@@ -275,7 +283,9 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
         next.device=previous.device.clone().min(next.device);
         // Harness replaces the latest settlement for an attempt; older synced samples must
         // not resurrect an earlier (possibly larger) count.
-        if next.source=="codex" && next.kind=="tokens" && next.codex_usage_version!=previous.codex_usage_version {
+        if next.source=="zcode" && (next.superseded_zcode() || previous.superseded_zcode()) {
+            if previous.superseded_zcode() && (!next.superseded_zcode() || previous.revision>=next.revision) {let owner=next.device;next=previous;next.device=owner;}
+        } else if next.source=="codex" && next.kind=="tokens" && next.codex_usage_version!=previous.codex_usage_version {
             if previous.codex_usage_version>next.codex_usage_version {let owner=next.device;next=previous;next.device=owner;}
         } else if matches!(next.source.as_str(), "harness" | "trae") {
             if previous.revision > next.revision { let owner=next.device; next=previous; next.device=owner; }
@@ -287,6 +297,9 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
         // Older clients and copies in the ordinary Codex folder can omit the origin.
         next.multica = next.source == "codex" && multica;
     }
+    // Older readers can keep revision while max-merging the old amount. The
+    // explicit correction wins even on the first import of a relay.
+    if next.superseded_zcode() {next.tokens=Tokens::default();next.speed=None;}
     // A pre-fix speed sample may have used the inflated output counter.
     if next.speed.as_ref().is_some_and(|sample| !sample.valid(&next)) {
         next.speed=event.speed.clone().filter(|sample| sample.valid(&next));
@@ -378,6 +391,71 @@ fn collect_codex_paths(db: &mut Connection, mut paths: Vec<PathBuf>, device: &st
     }
     count
 }
+fn reconcile_zcode_legacy(db:&mut Connection,paths:&[PathBuf])->Result<usize,String> {
+    let mut links:BTreeMap<String,std::collections::BTreeSet<String>>=BTreeMap::new();
+    for path in paths {
+        if !path.exists() {continue}
+        // Normal collection reports source/schema failures. Missing evidence
+        // here must preserve legacy usage, never guess that it is duplicated.
+        let Ok(source)=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_ONLY|OpenFlags::SQLITE_OPEN_NO_MUTEX) else {continue};
+        let Ok(mut statement)=source.prepare("SELECT COALESCE(logical_request_id,id),COALESCE(attempt_index,0),assistant_message_id FROM model_usage WHERE assistant_message_id IS NOT NULL") else {continue};
+        let Ok(rows)=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,i64>(1)?,row.get::<_,String>(2)?))) else {continue};
+        for row in rows {
+            let(request,attempt,message)=row.map_err(|_|"读取 ZCode 跨库请求关联失败")?;
+            links.entry(hash(&format!("zcode:legacy:model:{message}"))).or_default()
+                .insert(hash(&format!("zcode:model:{request}:{}",attempt.max(0))));
+        }
+    }
+    let tx=db.transaction().map_err(|_|"统计资料库忙碌")?;let mut count=0;
+    for (legacy,modern) in links {
+        let old:Option<String>=tx.query_row("SELECT body FROM metrics WHERE id=?1",[legacy],|row|row.get(0)).optional().map_err(|_|"读取 ZCode 旧用量失败")?;
+        let Some(old)=old else {continue};
+        let mut event:Metric=serde_json::from_str(&old).map_err(|_|"ZCode 旧用量损坏")?;
+        if event.source!="zcode" || event.kind!="tokens" {continue}
+        let mut covered=false;
+        for id in modern {
+            covered=tx.query_row("SELECT EXISTS(SELECT 1 FROM metrics WHERE id=?1 AND json_extract(body,'$.source')='zcode' AND json_extract(body,'$.kind')='tokens')",[id],|row|row.get(0)).map_err(|_|"核对 ZCode 新用量失败")?;
+            if covered {break}
+        }
+        // Only suppress the alias once the canonical request is actually in
+        // the statistics database, including when another source failed.
+        if covered {
+            event.revision=ZCODE_MODERN_ALIAS_REVISION;event.tokens=Tokens::default();
+            if merge_metric(&tx,&event,true)? {count+=1}
+        }
+    }
+    tx.commit().map_err(|_|"保存 ZCode 跨库核对失败")?;Ok(count)
+}
+fn zcode_parents(source:&Connection)->Result<BTreeMap<String,(String,i64)>,String> {
+    let exists:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='session')",[],|row|row.get(0)).map_err(|_|"读取 ZCode 会话关系失败")?;
+    if !exists {return Ok(BTreeMap::new())}
+    let mut statement=source.prepare("SELECT id,parent_id,time_created FROM session WHERE parent_id IS NOT NULL").map_err(|_|"读取 ZCode 会话关系失败")?;
+    let rows=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,(row.get::<_,String>(1)?,row.get::<_,i64>(2)?)))).map_err(|_|"读取 ZCode 会话关系失败")?;
+    rows.collect::<Result<_,_>>().map_err(|_|"读取 ZCode 会话关系失败".into())
+}
+fn inherited_zcode_message(source:&Connection,parents:&BTreeMap<String,(String,i64)>,event:&Metric)->Result<bool,String> {
+    let tokens=[event.tokens.input,event.tokens.output,event.tokens.cached,event.tokens.cache_write,event.tokens.reasoning,event.tokens.total]
+        .into_iter().map(i64::try_from).collect::<Result<Vec<_>,_>>().map_err(|_|"ZCode Token 数值超出范围")?;
+    let mut session=event.session.as_str();let mut visited=std::collections::BTreeSet::new();
+    while let Some((parent,created))=parents.get(session) {
+        // A real subagent request occurs after creation. Only pre-existing
+        // history with an exact ancestor observation is inherited.
+        if event.timestamp>=*created || !visited.insert(session) || visited.len()>32 {break}
+        let inherited:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM message WHERE session_id=?1 AND time_created=?2
+            AND json_extract(data,'$.role')='assistant'
+            AND COALESCE(json_extract(data,'$.modelID'),json_extract(data,'$.modelId'),'未知模型')=?3
+            AND COALESCE(json_extract(data,'$.tokens.input'),0)=?4
+            AND COALESCE(json_extract(data,'$.tokens.output'),0)=?5
+            AND COALESCE(json_extract(data,'$.tokens.cache.read'),0)=?6
+            AND COALESCE(json_extract(data,'$.tokens.cache.write'),0)=?7
+            AND COALESCE(json_extract(data,'$.tokens.reasoning'),0)=?8
+            AND COALESCE(json_extract(data,'$.tokens.total'),COALESCE(json_extract(data,'$.tokens.input'),0)+COALESCE(json_extract(data,'$.tokens.output'),0))=?9)",
+            params![parent,event.timestamp,event.model,tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]],|row|row.get(0)).map_err(|_|"核对 ZCode 分叉历史失败")?;
+        if inherited {return Ok(true)}
+        session=parent;
+    }
+    Ok(false)
+}
 fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
     if !path.exists(){return Ok(0)}
     let source=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_ONLY|OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|_| "ZCode 统计暂时无法读取")?;
@@ -400,11 +478,32 @@ fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,Stri
     let rows=tools.query_map([since as i64],|r|Ok(Metric {id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:label(&r.get::<_,String>(4)?),agent:label(&r.get::<_,String>(5)?),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()})).map_err(|_| "读取 ZCode 工具统计失败")?;
     for row in rows {let e=row.map_err(|_| "读取 ZCode 工具记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp>0 && merge_metric(&tx,&e,true)?{count+=1}}
     // Older ZCode records predate model_usage. Select metrics only and exclude modern rows.
-    let legacy_key=format!("{key}:legacy");let mut legacy=cursor(&tx,&legacy_key)?;let legacy_since=legacy.offset.saturating_sub(5000) as i64;
+    let legacy_key=format!("{key}:legacy");let mut legacy=cursor(&tx,&legacy_key)?;
+    // Revisit consumed legacy rows once so corrections also replace old cloud IDs.
+    let legacy_since=if legacy.usage_version<ZCODE_INHERITED_REVISION as u32 {0}else{legacy.offset.saturating_sub(5000) as i64};
+    let parents=zcode_parents(&source)?;
     // Capture source watermarks before scanning, including rows excluded by modern usage.
     let legacy_highwater=source.query_row("SELECT MAX(n) FROM (SELECT MAX(time_updated) AS n FROM message UNION ALL SELECT MAX(time_updated) AS n FROM part)",[],|r|r.get::<_,Option<i64>>(0)).ok().flatten().unwrap_or(0).max(0) as u64;
-    let sql="SELECT m.id,m.session_id,COALESCE(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.modelId'),'未知模型'),COALESCE(json_extract(m.data,'$.agent'),'主 Agent'),m.time_created,json_extract(m.data,'$.tokens.input'),json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache.write'),json_extract(m.data,'$.tokens.output'),json_extract(m.data,'$.tokens.reasoning'),json_extract(m.data,'$.tokens.total'),m.time_updated FROM message m WHERE m.time_updated>=?1 AND json_extract(m.data,'$.role')='assistant' AND COALESCE(json_extract(m.data,'$.tokens.output'),0)+COALESCE(json_extract(m.data,'$.tokens.input'),0)>0 AND NOT EXISTS(SELECT 1 FROM model_usage u WHERE u.assistant_message_id=m.id OR (u.assistant_message_id IS NULL AND u.session_id=m.session_id AND u.completed_at=m.time_created AND u.input_tokens=json_extract(m.data,'$.tokens.input') AND u.output_tokens=json_extract(m.data,'$.tokens.output')))";
-    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|{let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);let input=n(5)?;let output=n(8)?;Ok((Metric{id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))}).map_err(|_|"读取 ZCode 历史统计失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    // A newly forked message can retain an update time older than our cursor.
+    // Continue checking that small pre-creation subset, including delayed parents.
+    let inherited_filter=if parents.is_empty(){""}else{" OR EXISTS(SELECT 1 FROM session s WHERE s.id=m.session_id AND s.parent_id IS NOT NULL AND m.time_created<s.time_created)"};
+    let sql=format!("SELECT m.id,m.session_id,COALESCE(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.modelId'),'未知模型'),COALESCE(json_extract(m.data,'$.agent'),'主 Agent'),m.time_created,json_extract(m.data,'$.tokens.input'),json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache.write'),json_extract(m.data,'$.tokens.output'),json_extract(m.data,'$.tokens.reasoning'),json_extract(m.data,'$.tokens.total'),m.time_updated FROM message m WHERE (m.time_updated>=?1{inherited_filter}) AND json_extract(m.data,'$.role')='assistant' AND COALESCE(json_extract(m.data,'$.tokens.output'),0)+COALESCE(json_extract(m.data,'$.tokens.input'),0)>0 AND NOT EXISTS(SELECT 1 FROM model_usage u WHERE u.assistant_message_id=m.id OR (u.assistant_message_id IS NULL AND u.session_id=m.session_id AND u.completed_at=m.time_created AND u.input_tokens=json_extract(m.data,'$.tokens.input') AND u.output_tokens=json_extract(m.data,'$.tokens.output')))");
+    if let Ok(mut stmt)=source.prepare(&sql){
+        let rows=stmt.query_map([legacy_since],|r|{
+            let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);
+            let input=n(5)?;let output=n(8)?;
+            Ok((Metric{id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,
+                session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),
+                tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))
+        }).map_err(|_|"读取 ZCode 历史统计失败")?;
+        for row in rows {
+            let(mut e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;
+            legacy.offset=legacy.offset.max(updated.max(0) as u64);
+            if inherited_zcode_message(&source,&parents,&e)? {e.revision=ZCODE_INHERITED_REVISION;e.tokens=Tokens::default();}
+            if merge_metric(&tx,&e,true)? {count+=1}
+        }
+        legacy.usage_version=ZCODE_INHERITED_REVISION as u32;
+    }
     let sql="SELECT COALESCE(json_extract(p.data,'$.callID'),p.id),p.session_id,json_extract(p.data,'$.tool'),p.time_created,p.time_updated FROM part p WHERE p.time_updated>=?1 AND json_extract(p.data,'$.type')='tool' AND NOT EXISTS(SELECT 1 FROM tool_usage t WHERE t.tool_call_id=json_extract(p.data,'$.callID'))";
     if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|Ok((Metric{id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:"未知模型".into(),agent:"未知 Agent".into(),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()},r.get::<_,i64>(4)?))).map_err(|_|"读取 ZCode 历史工具失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史工具失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
     legacy.offset=legacy.offset.max(legacy_highwater);
@@ -548,7 +647,7 @@ pub struct UsageSummary { pub today:u64, pub total:u64, pub date:String, pub upd
 /// Read existing deduplicated metrics without building the full chart/report payload.
 pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
     let today=chrono::Local::now().date_naive();let db=database(dir)?;let excluded=options(dir).excluded_devices();
-    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total'),json_extract(body,'$.device') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae'").map_err(|_|"读取用量失败")?;
+    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total'),json_extract(body,'$.device') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae' AND NOT(json_extract(body,'$.source')='zcode' AND COALESCE(json_extract(body,'$.revision'),0) IN(1,2))").map_err(|_|"读取用量失败")?;
     let rows=stmt.query_map([],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?,r.get::<_,String>(2)?))).map_err(|_|"读取用量失败")?;
     let mut result=UsageSummary{today:0,total:0,date:today.to_string(),updated_at:None,partial:false};
     for row in rows {let(timestamp,total,device)=row.map_err(|_|"用量记录损坏")?;if excluded.contains(&device){continue}let total=u64::try_from(total).map_err(|_|"用量记录损坏")?;if let Some(t)=chrono::DateTime::from_timestamp_millis(timestamp){let date=t.with_timezone(&chrono::Local).date_naive();if date<=today {result.total=result.total.saturating_add(total);if date==today{result.today=result.today.saturating_add(total);}}}}
@@ -608,7 +707,7 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
+        if !e.superseded_zcode() && !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
     let devices=known_device_names(&db,&o)?;
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
@@ -629,7 +728,9 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
     let mut errors=Vec::new();
     let mut count = multica::collect(&mut db, &o, &mut errors);
     count+=collect_codex_sources(dir,&mut db,&mut o,&mut errors)?;
-    for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
+    let zcode_paths=[PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")];
+    for path in &zcode_paths {match collect_zcode(&mut db,path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
+    match reconcile_zcode_legacy(&mut db,&zcode_paths){Ok(n)=>count+=n,Err(e)=>errors.push(e)}
     if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
     if o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
     let sync_errors:Vec<String>=if sync_enabled {

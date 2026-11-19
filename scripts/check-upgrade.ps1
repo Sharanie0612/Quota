@@ -48,6 +48,10 @@ try {
   $exe = Join-Path $installPath 'quota.exe'
   if (-not (Test-Path -LiteralPath $exe)) { throw 'Previous install missing quota.exe' }
   Write-Output ('previous installed: ' + (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion)
+  # Establish the previous app's real persisted format before comparing bytes.
+  # Synthetic minimal settings may gain compatible defaults on first startup.
+  & (Join-Path $PSScriptRoot 'check-install.ps1') -ExePath $exe -DataDir $env:QUOTA_DATA_DIR
+  foreach ($name in $dataHashes.Keys | ForEach-Object { $_ }) { $dataHashes[$name] = (Get-FileHash -LiteralPath (Join-Path $dataPath $name)).Hash }
   $marker = Join-Path $installPath 'upgrade-check.txt'
   Set-Content -LiteralPath $marker -Value 'isolated upgrade marker'
   $next = Start-Process -FilePath $Installer -ArgumentList @('/S','/NS', ('/D=' + $installPath)) -PassThru -Wait -WindowStyle Hidden

@@ -5,19 +5,19 @@ import { ModelLogo } from "./ModelLogo";
 import "./activity-model-picker.css";
 const channelHints: Record<string, string> = { trae: "Trae 提供（用 Trae 额度）", api: "API 接入 Trae（自带密钥）", unknown: "未鉴别通道" };
 const label = (key: string) => { const channel = activityChannelName(activityModelChannel(key)); return channel ? `${activityModelName(key)} · ${channel}` : activityModelName(key); };
-export function ActivityModelPicker({rows,value,onChange,loading}: {rows:ActivityGroup[];value:string;onChange:(key:string)=>void;loading:boolean}) {
+export function ActivityModelPicker({rows,value,onChange,loading,softwareView=false}: {rows:ActivityGroup[];value:string;onChange:(key:string)=>void;loading:boolean;softwareView?:boolean}) {
   const [search,setSearch]=useState("");
-  const models=useMemo(()=>activityModelChoices(rows,search),[rows,search]);
-  const vendors=[...new Map(rows.filter(row=>!activityModelChannel(row.key)).map(row=>{const info=activityModelIdentity(row.key);return [info.provider,info];})).values()];
+  const models=useMemo(()=>{const choices=activityModelChoices(rows,search);return softwareView?[...new Map(choices.map(row=>{const key=`model:${activityModelName(row.key)}`;return [key,{...row,key}];})).values()]:choices;},[rows,search,softwareView]);
+  const vendors=[...new Map(rows.filter(row=>softwareView||!activityModelChannel(row.key)).map(row=>{const info=activityModelIdentity(row.key);return [info.provider,info];})).values()];
   const channels=activityChannels(rows);
   const known=value.startsWith("vendor:")||value.startsWith("channel:")||models.some(row=>row.key===value);
   return <div className="activity-scope-picker">
-    <input className="input" aria-label="搜索模型或厂商" placeholder="搜索模型、厂商或 Trae 通道" value={search} onChange={e=>setSearch(e.target.value)}/>
+    <input className="input" aria-label="搜索模型或厂商" placeholder={softwareView?"搜索型号或厂商":"搜索模型、厂商或 Trae 通道"} value={search} onChange={e=>setSearch(e.target.value)}/>
     <select className="select" aria-label="模型或供应商筛选" value={value} onChange={e=>onChange(e.target.value)} disabled={loading&&!rows.length}>
-      <option value="">全部用量</option>
-      <optgroup label="供应商汇总">{channels.length>0&&<option value="vendor:trae">Trae · 全部用量</option>}{vendors.map(v=><option key={v.provider} value={`vendor:${v.provider}`}>{v.vendor} · 全部模型</option>)}</optgroup>
-      {vendors.map(v=><optgroup key={v.provider} label={v.vendor}>{models.filter(row=>!activityModelChannel(row.key)&&activityModelIdentity(row.key).provider===v.provider).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}</optgroup>)}
-      {channels.map(channel=><optgroup key={channel} label={channelHints[channel] ?? activityChannelName(channel)}>
+      <option value="">全部模型</option>
+      {!softwareView&&<optgroup label="供应商汇总">{channels.length>0&&<option value="vendor:trae">Trae · 全部用量</option>}{vendors.map(v=><option key={v.provider} value={`vendor:${v.provider}`}>{v.vendor} · 全部模型</option>)}</optgroup>}
+      {vendors.map(v=><optgroup key={v.provider} label={v.vendor}>{models.filter(row=>(softwareView||!activityModelChannel(row.key))&&activityModelIdentity(row.key).provider===v.provider).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}</optgroup>)}
+      {!softwareView&&channels.map(channel=><optgroup key={channel} label={channelHints[channel] ?? activityChannelName(channel)}>
         <option value={`channel:${channel}`}>{activityChannelName(channel)} · 全部模型</option>
         {models.filter(row=>activityModelChannel(row.key)===channel).map(row=><option key={row.key} value={row.key}>{label(row.key)}</option>)}
       </optgroup>)}

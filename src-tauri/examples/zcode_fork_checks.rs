@@ -1,4 +1,6 @@
 //! Fork-history correction and mixed-version replay; sources are always read-only.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, Options};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -18,7 +20,7 @@ fn setup(dir: &Path, home: &Path) {
     options.codex_home.clear(); options.zcode_home = home.to_string_lossy().into();
     options.harness_home.clear(); options.multica_enabled = false; options.trae_enabled = false;
     options.sync_dir.clear(); options.sync_accounts = false; options.codex_ssh_devices = Some(vec![]);
-    activity::save_options(dir, &options).unwrap();
+    activity::save_options(dir, &options).unwrap(); activity_workspace_fixture::isolate(dir);
 }
 fn report(dir: &Path) -> activity::Report { activity::report(dir, None, None, None).unwrap() }
 fn checks(root: &Path) {
@@ -143,9 +145,61 @@ fn cross_database_checks(root: &Path) {
     }
     println!("PASS cross-database modern/legacy linkage in both source orders, correction replay/old relay, unrelated equal usage retained and missing-canonical fallback");
 }
+fn feedback_checks(root:&Path){
+    let root=root.join("feedback");let home=root.join("source");let dir=root.join("quota");
+    fs::create_dir_all(home.join("cli/db")).unwrap();
+    let file=home.join("cli/db/db.sqlite");let source=Connection::open(&file).unwrap();source.execute_batch(SCHEMA).unwrap();
+    let at=chrono::Utc::now().timestamp_millis()-60_000;
+    let canonical=hash("zcode:model:native-request:0");
+    let original2=hash("retained-original");let missing=hash("missing-original");let fresh_missing=hash("fresh-missing-original");let unpaired=hash("unpaired-original");
+    for(storage,request,total) in [
+        ("native-storage".into(),"native-request".into(),120),
+        (format!("usage_quota_{canonical}"),format!("quota:{canonical}"),120),
+        (format!("usage_quota_{original2}"),format!("quota:{original2}"),60),
+        (format!("usage_quota_{missing}"),format!("quota:{missing}"),80),
+        (format!("usage_quota_{fresh_missing}"),format!("quota:{fresh_missing}"),70),
+        ("unrelated-storage".into(),format!("quota:{unpaired}"),30),
+    ]{
+        source.execute("INSERT INTO model_usage VALUES(?1,?2,0,'session','turn','GLM-test','main',?3,?3,?4,0,0,20,0,?5,?5,NULL)",params![storage,request,at,total-20,total]).unwrap();
+    }
+    drop(source);let source_bytes=fs::read(&file).unwrap();setup(&dir,&home);report(&dir);
+    let db=Connection::open(dir.join("activity.sqlite")).unwrap();
+    let metric=|id:&str,total:u64|->activity::Metric{serde_json::from_value(json!({"id":id,"device":DEVICE,"source":"zcode","session":"session","model":"GLM-test","agent":"main","tool":"","timestamp":at,"kind":"tokens","tokens":{"input":total-20,"cached":0,"cacheWrite":0,"output":20,"reasoning":0,"total":total}})).unwrap()};
+    for(id,total,local) in [(&canonical,120,true),(&original2,60,false),(&hash(&format!("zcode:model:quota:{canonical}:0")),120,true),(&hash(&format!("zcode:model:quota:{missing}:0")),80,true)]{
+        activity::merge_metric(&db,&metric(id,total),local).unwrap();
+    }
+    assert_eq!(report(&dir).totals.tokens.total,380);let old_packets=activity::cloud_packets(&dir).unwrap();
+    activity::collect(&dir).unwrap();assert_eq!(report(&dir).totals.tokens.total,290);
+    assert_eq!(activity::collect(&dir).unwrap(),0);
+    let repair=activity::sources::repair_summary(&dir,&db);
+    assert_eq!(repair.changes,1);assert_eq!(repair.removed_tokens,120);assert_eq!(repair.feedback_blocked,1);assert_eq!(repair.feedback_pending,2);
+    let new_packets=activity::cloud_packets(&dir).unwrap();
+    for old_first in [false,true]{
+        let peer=root.join(if old_first{"old-first"}else{"new-first"});setup(&peer,&root.join("absent"));
+        let batches=if old_first{[&old_packets,&new_packets]}else{[&new_packets,&old_packets]};
+        for packets in batches{for(_,packet)in packets{activity::import_cloud_packet(&peer,packet.as_bytes()).unwrap();}}
+        assert_eq!(report(&peer).totals.tokens.total,290);
+    }
+    let peer=root.join("relay");setup(&peer,&root.join("absent"));
+    for(_,packet)in &new_packets{
+        let mut relay:Value=serde_json::from_str(packet).unwrap();
+        for event in relay["events"].as_array_mut().unwrap(){if event["revision"]==2{event["tokens"]=json!({"input":100,"cached":0,"cacheWrite":0,"output":20,"reasoning":0,"total":120});}}
+        activity::import_cloud_packet(&peer,&serde_json::to_vec(&relay).unwrap()).unwrap();
+    }
+    assert_eq!(report(&peer).totals.tokens.total,290);
+    // A later restored original must correct an old alias even though its
+    // timestamp is already far behind the consumed source cursor.
+    db.execute("UPDATE cursors SET body=json_set(body,'$.offset',?1) WHERE path NOT LIKE '%:legacy'",[at+86_400_000]).unwrap();
+    activity::merge_metric(&db,&metric(&missing,80),false).unwrap();
+    assert_eq!(report(&dir).totals.tokens.total,370);
+    activity::collect(&dir).unwrap();assert_eq!(report(&dir).totals.tokens.total,290);
+    assert_eq!(activity::sources::repair_summary(&dir,&db).feedback_pending,1);
+    assert_eq!(activity::collect(&dir).unwrap(),0);assert_eq!(fs::read(&file).unwrap(),source_bytes);
+    println!("PASS explicit Quota/ZCode feedback identities, canonical retention and republishing, missing-original preservation, late restoration, unpaired request retention and mixed-version replay");
+}
 fn main() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/zcode-fork-checks").join(uuid::Uuid::new_v4().to_string());
-    fs::create_dir_all(&root).unwrap(); checks(&root);cross_database_checks(&root);
+    fs::create_dir_all(&root).unwrap(); checks(&root);cross_database_checks(&root);feedback_checks(&root);
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !args.is_empty() {
         assert_eq!(args.len(),4); assert_eq!(args[0],"--snapshot"); assert_eq!(args[2],"--zcode-home");
@@ -159,6 +213,7 @@ fn main() {
         let corrected:i64 = db.query_row("SELECT count(*) FROM metrics WHERE json_extract(body,'$.source')='zcode' AND json_extract(body,'$.revision')=1", [], |row|row.get(0)).unwrap();
         let aliases:i64 = db.query_row("SELECT count(*) FROM metrics WHERE json_extract(body,'$.source')='zcode' AND json_extract(body,'$.revision')=2", [], |row|row.get(0)).unwrap();
         println!("Snapshot replay: before={before}, after={}, difference={}, inherited_rows={corrected}, legacy_aliases={aliases}, directory={}",after.totals.tokens.total,i128::from(before)-i128::from(after.totals.tokens.total),dir.display());
+        println!("Repair summary: {}",serde_json::to_string(&activity::sources::repair_summary(&dir,&db)).unwrap());
         assert_eq!(activity::collect(&dir).unwrap(),0);
     }
 }

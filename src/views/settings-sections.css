@@ -1,0 +1,6 @@
+.settings-section-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-surface); margin-bottom: 20px; }
+.settings-section-nav button { border: 0; background: transparent; color: var(--text-2); padding: 10px 16px; border-radius: var(--radius-control); cursor: pointer; font: inherit; font-size: 12px; }
+.settings-section-nav .is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-card); }
+.settings-section-content { display: grid; gap: 18px; }
+.settings-section-content[hidden] { display: none; }
+.settings-section-content .section { margin-bottom: 0; }

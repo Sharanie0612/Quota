@@ -1,5 +1,7 @@
 //! Isolated collector regression. --live reads the real workspace layout
 //! into a new metrics directory and leaves the source logs and Quota data alone.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, Options, Report};
 use serde_json::{json, Value};
 use std::{
@@ -115,7 +117,7 @@ fn checks(root: &Path, at: i64) {
     // Simulate a user who had manually pointed the old collector at one task.
     let mut options = settings(&dir);
     options.codex_home = run_home.to_string_lossy().into();
-    activity::save_options(&dir, &options).unwrap();
+    activity::save_options(&dir, &options).unwrap(); activity_workspace_fixture::isolate(&dir);
     let settings_path = dir.join("activity-settings.json");
     let mut old_settings: Value =
         serde_json::from_slice(&fs::read(&settings_path).unwrap()).unwrap();
@@ -179,7 +181,7 @@ fn checks(root: &Path, at: i64) {
     options.codex_home = codex.to_string_lossy().into();
     options.multica_enabled = true;
     options.multica_workspace_root = workspaces.to_string_lossy().into();
-    activity::save_options(&dir, &options).unwrap();
+    activity::save_options(&dir, &options).unwrap(); activity_workspace_fixture::isolate(&dir);
     activity::collect(&dir).unwrap();
     let multica = report(&dir, "multica");
     assert!(multica.errors.is_empty(), "{:?}", multica.errors);
@@ -228,7 +230,7 @@ fn checks(root: &Path, at: i64) {
     ] {
         let peer = root.join(name);
         let peer_settings = settings(&peer);
-        activity::save_options(&peer, &peer_settings).unwrap();
+        activity::save_options(&peer, &peer_settings).unwrap(); activity_workspace_fixture::isolate(&peer);
         for packets in order {
             for (_, packet) in packets {
                 activity::import_cloud_packet(&peer, packet.as_bytes()).unwrap();
@@ -252,7 +254,7 @@ fn checks(root: &Path, at: i64) {
     assert_eq!(activity::collect(&dir).unwrap(), 1);
     assert_eq!(report(&dir, "multica").totals.tokens.total, 330);
     options.multica_enabled = false;
-    activity::save_options(&dir, &options).unwrap();
+    activity::save_options(&dir, &options).unwrap(); activity_workspace_fixture::isolate(&dir);
     fs::remove_file(&current).unwrap();
     assert_eq!(activity::collect(&dir).unwrap(), 0);
     assert_eq!(report(&dir, "multica").totals.tokens.total, 330);
@@ -262,7 +264,7 @@ fn checks(root: &Path, at: i64) {
 fn live(root: &Path) {
     let mut options = settings(root);
     options.multica_enabled = true;
-    activity::save_options(root, &options).unwrap();
+    activity::save_options(root, &options).unwrap(); activity_workspace_fixture::isolate(root);
     let collected = activity::collect(root).unwrap();
     let first = report(root, "multica");
     assert!(first.totals.tokens.total > 0, "{:?}", first.errors);

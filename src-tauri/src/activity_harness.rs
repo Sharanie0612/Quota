@@ -143,34 +143,38 @@ pub(super) fn parse(bytes: &[u8], version: u32, device: &str) -> Result<Vec<Metr
             last_slot = Some(slot);
             let route = data.pointer("/message/source/model").and_then(Value::as_str).map(label).unwrap_or_else(|| model.clone());
             let id = hash(&format!("harness:tokens:{session}:{turn}:{step}:{}",slot.2));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), channel:String::new(), speed:None,harness_identity:1,codex_usage_version:0,multica:false, tokens, revision });
+            metrics.insert(id.clone(), Metric { origin:None, id, device:device.into(), source:"harness".into(), session:label(session), model:route, agent:agent.clone(), tool:String::new(), timestamp, kind:"tokens".into(), channel:String::new(), speed:None,harness_identity:1,codex_usage_version:0,multica:false, tokens, revision });
         } else if kind == "tool/call" {
             let call = data.get("callId").and_then(Value::as_str).ok_or("Harness 工具编号无效")?;
             let id = hash(&format!("harness:tool:{session}:{call}"));
-            metrics.insert(id.clone(), Metric { id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), channel:String::new(), speed:None,harness_identity:1,codex_usage_version:0,multica:false, tokens:Tokens::default(), revision });
+            metrics.insert(id.clone(), Metric { origin:None, id, device:device.into(), source:"harness".into(), session:label(session), model:model.clone(), agent:agent.clone(), tool:label(data.get("name").and_then(Value::as_str).unwrap_or("未知工具")), timestamp, kind:"tool".into(), channel:String::new(), speed:None,harness_identity:1,codex_usage_version:0,multica:false, tokens:Tokens::default(), revision });
         }
     }
     Ok(metrics.into_values().collect())
 }
 
-fn collect_file(db: &mut Connection, path: &Path, device: &str) -> Result<usize, String> {
+fn collect_file(db: &mut Connection, path: &Path, device: &str, origin:&super::sources::Origin) -> Result<usize, String> {
     let (version, compressed) = generation(&path.file_name().unwrap_or_default().to_string_lossy()).ok_or("Harness 文件名无效")?;
     let meta = fs::metadata(path).map_err(|_| "Harness 会话暂时无法读取")?;
     let modified = meta.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|t| t.as_nanos().to_string()).unwrap_or_default();
     // New cursor namespace re-reads existing v2-v4 once to migrate identities.
     let key = format!("harness:stable-v1:{}",path.to_string_lossy()); let previous = cursor(db,&key)?;
-    if previous.offset == meta.len() && previous.model == modified { return Ok(0); }
+    let origin_stamp=hash(&serde_json::to_string(origin).map_err(|_|"编码来源标记失败")?);
+    if previous.offset == meta.len() && previous.model == modified && previous.origin_version>=1 && previous.origin_stamp==origin_stamp { return Ok(0); }
     let bytes = read_log(path, compressed)?; let events = parse(&bytes,version,device)?;
     let tx = db.transaction().map_err(|_| "统计资料库忙碌")?; let mut count = 0;
-    for event in events { if merge_metric(&tx,&event,true)? { count += 1; } }
-    save_cursor(&tx,&key,&Cursor { offset:meta.len(), model:modified, ..Cursor::default() })?;
+    for mut event in events {event.origin=Some(origin.clone()); if merge_metric(&tx,&event,true)? { count += 1; } }
+    save_cursor(&tx,&key,&Cursor { offset:meta.len(), model:modified, origin_version:1, origin_stamp, ..Cursor::default() })?;
     tx.commit().map_err(|_| "保存 Harness 统计失败")?; Ok(count)
 }
 
 pub(super) fn collect(db: &mut Connection, root: &Path, device: &str, count: &mut usize, errors: &mut Vec<String>) {
+    collect_configured(db,root,device,count,errors,super::sources::native_origin("harness",device,false,"local","unknown"))
+}
+pub(super) fn collect_configured(db: &mut Connection, root: &Path, device: &str, count: &mut usize, errors: &mut Vec<String>,origin:super::sources::Origin) {
     let mut paths = Vec::new();
     if let Err(error) = discover(root,0,&mut paths) { errors.push(error); return; }
     paths.sort(); let mut failures = 0;
-    for path in paths { match collect_file(db,&path,device) { Ok(n) => *count += n, Err(error) => { if failures < 3 { errors.push(error); } failures += 1; } } }
+    for path in paths { match collect_file(db,&path,device,&origin) { Ok(n) => *count += n, Err(error) => { if failures < 3 { errors.push(error); } failures += 1; } } }
     if failures > 3 { errors.push(format!("另有 {} 个 Harness 会话未采集",failures-3)); }
 }

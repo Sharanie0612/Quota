@@ -1,9 +1,11 @@
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self,Options};
 use std::{fs,io::Write,path::Path};
 use serde_json::json;
 use chrono::TimeZone;
 fn envelope(kind:&str,payload:serde_json::Value,ordinal:u64)->String{json!({"timestamp":"2026-10-04T00:00:00Z","type":kind,"payload":payload,"ordinal":ordinal}).to_string()+"\n"}
-fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),multica_enabled:false,multica_workspace_root:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into(),codex_ssh_host:String::new(),codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![])}).unwrap()}
+fn setup(dir:&Path,home:&Path,sync:&Path,id:&str){fs::create_dir_all(dir).unwrap();activity::save_options(dir,&Options{device_id:id.into(),device_name:id.into(),auto_collect:true,collect_interval_seconds:30,sync_accounts:true,codex_home:home.to_string_lossy().into(),zcode_home:dir.join("none").to_string_lossy().into(),harness_home:String::new(),multica_enabled:false,multica_workspace_root:String::new(),trae_home:dir.join("absent-trae").to_string_lossy().into(),trae_enabled:false,sync_dir:sync.to_string_lossy().into(),codex_ssh_host:String::new(),codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![])}).unwrap(); activity_workspace_fixture::isolate(dir);}
 fn check_codex_fault_isolation(root:&Path) {
  let dir=root.join("codex-faults");let home=root.join("fault-logs");
  fs::create_dir_all(home.join("sessions")).unwrap();
@@ -32,15 +34,15 @@ fn check_codex_fault_isolation(root:&Path) {
   assert_eq!(activity::collect(&dir).unwrap(),1);assert_eq!(report().totals.tokens.total,560);assert!(!report().errors.is_empty());
   drop(locked);activity::collect(&dir).unwrap();assert!(report().errors.is_empty());
  }
- let mut o=activity::options(&dir);o.codex_home=root.join("missing-codex").to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ let mut o=activity::options(&dir);o.codex_home=root.join("missing-codex").to_string_lossy().into();activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);
  activity::collect(&dir).unwrap();assert!(report().errors.iter().any(|e|e.contains("未找到 Codex 会话目录")));
- let empty=root.join("empty-codex");fs::create_dir_all(empty.join("sessions")).unwrap();o.codex_home=empty.to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ let empty=root.join("empty-codex");fs::create_dir_all(empty.join("sessions")).unwrap();o.codex_home=empty.to_string_lossy().into();activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);
  activity::collect(&dir).unwrap();assert!(report().errors.iter().any(|e|e.contains("暂无 JSONL")));
  // An unreadable sessions directory must not suppress valid archived sessions.
  let malformed=root.join("malformed-codex");fs::create_dir_all(malformed.join("archived_sessions")).unwrap();fs::write(malformed.join("sessions"),b"not a directory").unwrap();
- fs::write(malformed.join("archived_sessions/archived.jsonl"),header+&token(40,60)).unwrap();o.codex_home=malformed.to_string_lossy().into();activity::save_options(&dir,&o).unwrap();
+ fs::write(malformed.join("archived_sessions/archived.jsonl"),header+&token(40,60)).unwrap();o.codex_home=malformed.to_string_lossy().into();activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);
  assert_eq!(activity::collect(&dir).unwrap(),1);assert!(report().errors.iter().any(|e|e.contains("目录无法读取")));
- o.codex_home.clear();activity::save_options(&dir,&o).unwrap();activity::collect(&dir).unwrap();assert!(report().errors.is_empty());
+ o.codex_home.clear();activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);activity::collect(&dir).unwrap();assert!(report().errors.is_empty());
  println!("PASS: missing/empty Codex roots, directory failures, invalid/locked file isolation, append during failure, atomic cursor retry, recovered daily totals, blank source disabled");
 }
 fn check_trae_vendor(root:&Path) {
@@ -64,7 +66,7 @@ fn check_model_calendar_reports(root:&Path) {
  let aid="00000000-0000-4000-8000-000000000001";let bid="00000000-0000-4000-8000-000000000002";
  let today=chrono::Local::now().date_naive();let first=today.checked_sub_days(chrono::Days::new(6)).unwrap();
  let at=|day:chrono::NaiveDate,hour,minute,second|chrono::Local.from_local_datetime(&day.and_hms_opt(hour,minute,second).unwrap()).earliest().unwrap().timestamp_millis();
- let token=|id:u64,model:&str,source:&str,device:&str,timestamp,total:u64,cached|activity::Metric {
+ let token=|id:u64,model:&str,source:&str,device:&str,timestamp,total:u64,cached|activity::Metric { origin:None,
   id:format!("{id:064x}"),device:device.into(),source:source.into(),session:if model=="Alpha"{"shared".into()}else{model.into()},model:model.into(),agent:"主 Agent".into(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),speed:None,harness_identity:0,codex_usage_version:0,multica:false,revision:0,
   tokens:activity::Tokens{input:total.saturating_sub(20),output:total.min(20),cached,reasoning:5,total,..Default::default()}
  };
@@ -133,16 +135,16 @@ fn main(){
  // Read-only ZCode usage adapter: duplicate migrated databases share request IDs.
  let z=root.join("zcode");fs::create_dir_all(z.join("v2")).unwrap();fs::create_dir_all(z.join("cli/db")).unwrap();
  let dbpath=z.join("v2/tasks-index.sqlite");let db=rusqlite::Connection::open(&dbpath).unwrap();db.execute_batch("CREATE TABLE model_usage(id TEXT,logical_request_id TEXT,attempt_index INTEGER,session_id TEXT,turn_id TEXT,model_id TEXT,agent TEXT,started_at INTEGER,completed_at INTEGER,input_tokens INTEGER,cache_read_input_tokens INTEGER,cache_creation_input_tokens INTEGER,output_tokens INTEGER,reasoning_tokens INTEGER,computed_total_tokens INTEGER,provider_total_tokens INTEGER,assistant_message_id TEXT);CREATE TABLE tool_usage(id TEXT,tool_call_id TEXT,session_id TEXT,turn_id TEXT,tool_name TEXT,started_at INTEGER,completed_at INTEGER);INSERT INTO model_usage VALUES('m','req',0,'z-session','turn','GLM-test','build',1791072000000,1791072000000,100,80,0,20,5,120,120,'message');INSERT INTO tool_usage VALUES('t','z-call','z-session','turn','read',1791072000000,1791072000000);").unwrap();db.execute_batch(r#"CREATE TABLE message(id TEXT,session_id TEXT,time_created INTEGER,time_updated INTEGER,data TEXT);CREATE TABLE part(id TEXT,session_id TEXT,time_created INTEGER,time_updated INTEGER,data TEXT);INSERT INTO message VALUES('legacy','z-session',1791072000000,1791072000000,'{"role":"assistant","modelID":"GLM-old","agent":"build","tokens":{"input":85,"output":15,"reasoning":2,"cache":{"read":50,"write":0}}}');INSERT INTO message VALUES('message','z-session',1791072000000,1791072060000,'{"role":"assistant","modelID":"GLM-test","tokens":{"input":100,"output":20}}');INSERT INTO part VALUES('p-old','z-session',1791072000000,1791072000000,'{"type":"tool","tool":"legacy-read","callID":"old-call"}');INSERT INTO part VALUES('p-modern','z-session',1791072000000,1791072000000,'{"type":"tool","tool":"read","callID":"z-call"}');"#).unwrap();drop(db);fs::copy(dbpath,z.join("cli/db/db.sqlite")).unwrap();
- let mut o=activity::options(&a);o.zcode_home=z.to_string_lossy().into();activity::save_options(&a,&o).unwrap();activity::collect(&a).unwrap();let r=report(&a);assert!(r.errors.is_empty(),"{:?}",r.errors);assert_eq!(r.totals.tokens.total,440);assert_eq!(r.totals.calls,3);assert_eq!(activity::report(&a,None,Some("zcode".into()),None).unwrap().totals.tokens.total,220);
+ let mut o=activity::options(&a);o.zcode_home=z.to_string_lossy().into();activity::save_options(&a,&o).unwrap(); activity_workspace_fixture::isolate(&a);activity::collect(&a).unwrap();let r=report(&a);assert!(r.errors.is_empty(),"{:?}",r.errors);assert_eq!(r.totals.tokens.total,440);assert_eq!(r.totals.calls,3);assert_eq!(activity::report(&a,None,Some("zcode".into()),None).unwrap().totals.tokens.total,220);
  let update=rusqlite::Connection::open(z.join("v2/tasks-index.sqlite")).unwrap();update.execute("UPDATE message SET time_updated=1791072120000,data=json_set(data,'$.tokens.input',95) WHERE id='legacy'",[]).unwrap();drop(update);activity::collect(&a).unwrap();activity::collect(&a).unwrap();assert_eq!(report(&a).totals.tokens.total,450);assert_eq!(report(&a).totals.calls,3);
  // A current ZCode task index has no usage schema. It must not produce a false version error.
  let index_home=root.join("index-only");fs::create_dir_all(index_home.join("v2")).unwrap();
  let index=rusqlite::Connection::open(index_home.join("v2/tasks-index.sqlite")).unwrap();index.execute_batch("CREATE TABLE tasks(task_id TEXT PRIMARY KEY); CREATE TABLE task_groups(id TEXT PRIMARY KEY);").unwrap();drop(index);
- let mut settings=activity::options(&a);settings.zcode_home=index_home.to_string_lossy().into();activity::save_options(&a,&settings).unwrap();
+ let mut settings=activity::options(&a);settings.zcode_home=index_home.to_string_lossy().into();activity::save_options(&a,&settings).unwrap(); activity_workspace_fixture::isolate(&a);
  activity::collect(&a).unwrap();assert!(report(&a).errors.is_empty());assert_eq!(report(&a).totals.tokens.total,450);
  assert_eq!(quota_lib::parse_macos_proxy("HTTPEnable : 1\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897"),Some("http://127.0.0.1:7897".into()));
  assert!(quota_lib::parse_macos_proxy("HTTPEnable : 0\nHTTPProxy : 127.0.0.1\nHTTPPort : 7897").is_none());
  println!("PASS: task-index detection, macOS proxy, legacy updates, repeated counters, append, partial tail, truncation, inherited fork, cross-device dedup, filters, private-field exclusion, duplicate ZCode databases");
  check_model_calendar_reports(&root);check_trae_vendor(&root);check_codex_fault_isolation(&root);
- if std::env::args().any(|a|a=="--live"){let dir=root.join("live");fs::create_dir_all(&dir).unwrap();let mut o=activity::options(&dir);o.sync_dir.clear();activity::save_options(&dir,&o).unwrap();activity::collect(&dir).unwrap();let r=report(&dir);println!("Live read-only sources: {} token records/models, {} tools, {} sessions, errors={:?}",r.models.len(),r.tools.len(),r.totals.sessions,r.errors);activity::collect(&dir).unwrap();let after=report(&dir);assert!(after.errors.is_empty());assert!(after.totals.tokens.total>=r.totals.tokens.total);println!("PASS: live repeat scan, {} new Token while sources remain active",after.totals.tokens.total-r.totals.tokens.total);}
+ if std::env::args().any(|a|a=="--live"){let dir=root.join("live");fs::create_dir_all(&dir).unwrap();let mut o=activity::options(&dir);o.sync_dir.clear();activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);activity::collect(&dir).unwrap();let r=report(&dir);println!("Live read-only sources: {} token records/models, {} tools, {} sessions, errors={:?}",r.models.len(),r.tools.len(),r.totals.sessions,r.errors);activity::collect(&dir).unwrap();let after=report(&dir);assert!(after.errors.is_empty());assert!(after.totals.tokens.total>=r.totals.tokens.total);println!("PASS: live repeat scan, {} new Token while sources remain active",after.totals.tokens.total-r.totals.tokens.total);}
 }

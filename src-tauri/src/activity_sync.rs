@@ -159,6 +159,7 @@ pub struct Capability {
     pub device: String,
     pub version: String,
     pub compressed: bool,
+    #[serde(default)] pub multi_source: bool,
 }
 pub(super) fn announce(own: &Path, device: &str) -> Result<(), String> {
     let value = Capability {
@@ -166,6 +167,7 @@ pub(super) fn announce(own: &Path, device: &str) -> Result<(), String> {
         device: device.into(),
         version: crate::version::display_version(),
         compressed: true,
+        multi_source: true,
     };
     // Extension deliberately differs from packet JSON so older clients ignore it.
     crate::storage::write_atomic(
@@ -179,6 +181,7 @@ pub struct Reader {
     pub device: String,
     pub version: Option<String>,
     pub compressed: Option<bool>,
+    pub multi_source: Option<bool>,
 }
 pub fn readers(dir: &Path) -> Result<Vec<Reader>, String> {
     readers_for(&options(dir))
@@ -214,7 +217,8 @@ pub(super) fn readers_for(o: &super::Options) -> Result<Vec<Reader>, String> {
         result.push(Reader {
             device,
             version: cap.as_ref().map(|c| c.version.clone()),
-            compressed: cap.map(|c| c.compressed),
+            compressed: cap.as_ref().map(|c| c.compressed),
+            multi_source: cap.map(|c|c.multi_source),
         });
     }
     Ok(result)
@@ -254,10 +258,9 @@ pub fn inspect(dir: &Path) -> Result<StorageInfo, String> {
     if o.sync_dir.is_empty() {
         return Ok(info);
     }
-    let root = Path::new(&o.sync_dir).join("quota-activity-v1");
-    if !root.exists() {
-        return Ok(info);
-    }
+    for schema in ["quota-activity-v1","quota-activity-v2"]{
+    let root = Path::new(&o.sync_dir).join(schema);
+    if !root.exists() {continue;}
     for device in fs::read_dir(root).map_err(|_| "无法读取共享目录")? {
         let device = device.map_err(|_| "无法读取共享目录")?;
         if !device
@@ -284,6 +287,7 @@ pub fn inspect(dir: &Path) -> Result<StorageInfo, String> {
                 }
             }
         }
+    }
     }
     Ok(info)
 }

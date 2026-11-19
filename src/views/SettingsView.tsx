@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { IconClock, IconGear, IconInfo, IconSpark } from "../components/icons";
 import { Button, Notice, Seg, Switch } from "../components/ui";
@@ -6,10 +6,13 @@ import { CrossDeviceSyncPanel } from "../components/CrossDeviceSyncPanel";
 import { UsageWidgetSettings } from '../components/UsageWidgetSettings';
 import { AppearanceSettings } from '../components/AppearanceSettings';
 
+import { ActivitySourcesPanel } from "../components/ActivitySourcesPanel";
+import "./settings-sections.css";
+
 import { DataImportPanel } from "../components/DataImportPanel";
 import { api, copyText, errText } from "../lib/api";
 import { toast } from "../lib/store";
-import type { ActivityOptions, AppInfo, Settings } from "../lib/types";
+import type { AppInfo, Settings } from "../lib/types";
 
 const INTERVALS = [
   { value: "10", label: "10 分钟" },
@@ -18,6 +21,7 @@ const INTERVALS = [
   { value: "180", label: "3 小时" },
 ];
 
+export type SettingsSection="appearance"|"sources"|"sync"|"updates"|"about";
 type BackupPanel = null | "export";
 
 /** 备份文件的默认名（带日期，避免覆盖上一次的备份） */
@@ -31,11 +35,14 @@ export function SettingsView({
   settings,
   onUpdate,
   info,
+  initialSection = "appearance",
 }: {
   settings: Settings | null;
   onUpdate: (s: Settings) => void;
   info: AppInfo | null;
+  initialSection?:SettingsSection;
 }) {
+  const [section,setSection]=useState<SettingsSection>(initialSection);
   const [customInterval, setCustomInterval] = useState<string | null>(null);
   const [backupPanel, setBackupPanel] = useState<BackupPanel>(null);
   const [backupPw, setBackupPw] = useState("");
@@ -45,20 +52,6 @@ export function SettingsView({
   const [dataBusy, setDataBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [dataExport, setDataExport] = useState<{path:string; summary:string} | null>(null);
-  const [activity, setActivity] = useState<ActivityOptions | null>(null);
-  const [activityBusy, setActivityBusy] = useState(false);
-  const [activityError, setActivityError] = useState("");
-  useEffect(() => { void api.getActivityOptions().then(setActivity).catch(e => setActivityError(errText(e))); }, []);
-  const updateActivity = async (patch: Partial<ActivityOptions>):Promise<boolean> => {
-    if (!activity || activityBusy) return false;
-    setActivityBusy(true);
-    try {
-      const current = await api.getActivityOptions();
-      const next = {...current, ...patch};
-      await api.saveActivityOptions(next);setActivity(next);setActivityError("");return true;
-    } catch(e) {setActivityError(errText(e));return false;}
-    finally {setActivityBusy(false);}
-  };
   if (!settings) {
     return (
       <div className="content-inner">
@@ -131,16 +124,107 @@ export function SettingsView({
 
   return (
     <div className="content-inner settings-page">
-      <AppearanceSettings />
-      <CrossDeviceSyncPanel />
-      <UsageWidgetSettings />
+      <nav className="settings-section-nav" aria-label="设置分类">{([{id:'appearance',name:'外观与窗口'},{id:'sources',name:'采集来源'},{id:'sync',name:'同步与备份'},{id:'updates',name:'提醒与更新'},{id:'about',name:'关于与安全'}] as const).map(item=><button key={item.id} className={section===item.id?'is-active':''} aria-current={section===item.id?'page':undefined} onClick={()=>setSection(item.id)}>{item.name}</button>)}</nav>
+      <div className="settings-section-content" hidden={section!=='appearance'}><AppearanceSettings/><UsageWidgetSettings/>
       <div className="card section">
-        <h2><IconClock size={14} /> Token 活动</h2>
-        <div className="setting-row"><div className="txt"><b>自动采集</b><span>Quota 运行时更新本机用量</span></div><Switch checked={activity?.autoCollect ?? false} disabled={!activity || activityBusy} onChange={value=>void updateActivity({autoCollect:value})} label="自动采集 Token 活动" /></div>
-        <div className="setting-row"><div className="txt"><b>完整采集周期</b></div><select className="select" aria-label="Token 采集频率" disabled={!activity || activityBusy} value={activity?.collectIntervalSeconds ?? 30} onChange={e=>void updateActivity({collectIntervalSeconds:Number(e.target.value)})}>{[5,10,15,30,60,300,900].map(value=><option key={value} value={value}>{value<60?`${value} 秒`:`${value/60} 分钟`}</option>)}{activity && ![5,10,15,30,60,300,900].includes(activity.collectIntervalSeconds) && <option value={activity.collectIntervalSeconds}>{activity.collectIntervalSeconds} 秒</option>}</select></div>
-        <div className="setting-row"><div className="txt"><b>Codex 本机增量读取</b></div><span>每秒检查，输出完成后记录速度</span></div>
-        {activityError && <Notice autoDismiss tone="warn">{activityError}</Notice>}
+        <h2>
+          <IconGear size={14} /> 窗口与托盘
+        </h2>
+        <div className="setting-row">
+          <div className="txt">
+            <b>关闭主窗口时最小化到托盘</b>
+            <span>点击托盘图标即可重新打开</span>
+          </div>
+          <Switch
+            checked={settings.closeToTray}
+            onChange={(v) => set({ closeToTray: v })}
+            label="关闭到托盘"
+          />
+        </div>
+        <div className="setting-row"><div className="txt"><b>托盘提醒角标</b><span>额度不足时显示红点</span></div><Switch checked={settings.trayAlert} onChange={(v) => set({ trayAlert: v })} label="托盘角标" /></div>
       </div>
+
+
+      </div>
+      <div className="settings-section-content" hidden={section!=='sources'}><ActivitySourcesPanel/></div>
+      <div className="settings-section-content" hidden={section!=='sync'}><CrossDeviceSyncPanel/>
+      <div className="card section">
+        <h2>
+          <IconGear size={14} /> 备份与迁移
+        </h2>
+        {dataExport && <Notice autoDismiss><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
+        <div className="setting-row">
+          <div className="txt">
+            <b>导出备份</b>
+            <span>默认不含登录信息</span>
+          </div>
+          <Button
+            size="sm"
+            disabled={dataBusy || backupBusy}
+            onClick={() => { setImportOpen(false); setBackupPanel(backupPanel === "export" ? null : "export"); }}
+          >
+            导出
+          </Button>
+        </div>
+        {backupPanel && <label className="migration-option"><input type="checkbox" checked={includeCredentials} disabled={backupBusy || dataBusy} onChange={e=>setIncludeCredentials(e.target.checked)}/>包含登录信息（需要加密密码）</label>}
+        {backupPanel && !includeCredentials && <div className="backup-panel"><Button variant="primary" size="sm" disabled={dataBusy || backupBusy} onClick={()=>void doDataExport()}>{dataBusy?"处理中…":"保存备份"}</Button><Button size="sm" variant="quiet" onClick={closeBackupPanel}>取消</Button></div>}
+        <div className="setting-row">
+          <div className="txt">
+            <b>导入数据 / 迁移账户</b>
+            <span>选择需要恢复的内容，未选内容保留</span>
+          </div>
+          <Button
+            size="sm"
+            disabled={dataBusy || backupBusy}
+            onClick={() => { closeBackupPanel(); setImportOpen(!importOpen); }}
+          >
+            导入
+          </Button>
+        </div>
+        {importOpen ? <DataImportPanel onClose={() => setImportOpen(false)} onBusyChange={setDataBusy} /> : null}
+        {backupPanel && includeCredentials ? (
+          <div className="backup-panel">
+            <div className="backup-fields">
+              <input
+                className="input"
+                type="password"
+                placeholder="备份密码"
+                aria-label="备份密码"
+                autoComplete="new-password"
+                value={backupPw}
+                onChange={(e) => setBackupPw(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !backupBusy && !dataBusy && void doExport()}
+              />
+              {backupPanel === "export" ? (
+                <input
+                  className="input"
+                  type="password"
+                  placeholder="再输入一次确认"
+                  aria-label="确认备份密码"
+                  autoComplete="new-password"
+                  value={backupPw2}
+                  onChange={(e) => setBackupPw2(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !backupBusy && !dataBusy && void doExport()}
+                />
+              ) : null}
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={backupBusy || dataBusy}
+                onClick={() => void doExport()}
+              >
+                {backupBusy ? "处理中…" : "导出备份"}
+              </Button>
+              <Button size="sm" variant="quiet" onClick={closeBackupPanel}>
+                取消
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      </div>
+      <div className="settings-section-content" hidden={section!=='updates'}>
       <div className="card section">
         <h2>
           <IconClock size={14} /> 余额刷新
@@ -236,100 +320,8 @@ export function SettingsView({
         <div className="setting-row"><div className="txt"><b>余额增加提示</b><span>检测到充值时提示</span></div><Switch checked={settings.notifyRecharge} onChange={(v) => set({ notifyRecharge: v })} label="余额增加提示" /></div>
         <div className="setting-row"><div className="txt"><b>自动更新 AI 模型</b><span>连接 Artificial Analysis 后，运行期间定期更新指数与单任务成本</span></div><Switch checked={settings.ladderAutoUpdate} onChange={(v) => set({ ladderAutoUpdate: v })} label="模型资料自动更新" /></div>
       </div>
-      <div className="card section">
-        <h2>
-          <IconGear size={14} /> 窗口与托盘
-        </h2>
-        <div className="setting-row">
-          <div className="txt">
-            <b>关闭主窗口时最小化到托盘</b>
-            <span>点击托盘图标即可重新打开</span>
-          </div>
-          <Switch
-            checked={settings.closeToTray}
-            onChange={(v) => set({ closeToTray: v })}
-            label="关闭到托盘"
-          />
-        </div>
-        <div className="setting-row"><div className="txt"><b>托盘提醒角标</b><span>额度不足时显示红点</span></div><Switch checked={settings.trayAlert} onChange={(v) => set({ trayAlert: v })} label="托盘角标" /></div>
       </div>
-
-
-      <div className="card section">
-        <h2>
-          <IconGear size={14} /> 备份与迁移
-        </h2>
-        {dataExport && <Notice autoDismiss><b>{dataExport.summary}</b><div style={{overflowWrap:"anywhere"}}>保存位置：{dataExport.path}</div></Notice>}
-        <div className="setting-row">
-          <div className="txt">
-            <b>导出备份</b>
-            <span>默认不含登录信息</span>
-          </div>
-          <Button
-            size="sm"
-            disabled={dataBusy || backupBusy}
-            onClick={() => { setImportOpen(false); setBackupPanel(backupPanel === "export" ? null : "export"); }}
-          >
-            导出
-          </Button>
-        </div>
-        {backupPanel && <label className="migration-option"><input type="checkbox" checked={includeCredentials} disabled={backupBusy || dataBusy} onChange={e=>setIncludeCredentials(e.target.checked)}/>包含登录信息（需要加密密码）</label>}
-        {backupPanel && !includeCredentials && <div className="backup-panel"><Button variant="primary" size="sm" disabled={dataBusy || backupBusy} onClick={()=>void doDataExport()}>{dataBusy?"处理中…":"保存备份"}</Button><Button size="sm" variant="quiet" onClick={closeBackupPanel}>取消</Button></div>}
-        <div className="setting-row">
-          <div className="txt">
-            <b>导入数据 / 迁移账户</b>
-            <span>选择需要恢复的内容，未选内容保留</span>
-          </div>
-          <Button
-            size="sm"
-            disabled={dataBusy || backupBusy}
-            onClick={() => { closeBackupPanel(); setImportOpen(!importOpen); }}
-          >
-            导入
-          </Button>
-        </div>
-        {importOpen ? <DataImportPanel onClose={() => setImportOpen(false)} onBusyChange={setDataBusy} /> : null}
-        {backupPanel && includeCredentials ? (
-          <div className="backup-panel">
-            <div className="backup-fields">
-              <input
-                className="input"
-                type="password"
-                placeholder="备份密码"
-                aria-label="备份密码"
-                autoComplete="new-password"
-                value={backupPw}
-                onChange={(e) => setBackupPw(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !backupBusy && !dataBusy && void doExport()}
-              />
-              {backupPanel === "export" ? (
-                <input
-                  className="input"
-                  type="password"
-                  placeholder="再输入一次确认"
-                  aria-label="确认备份密码"
-                  autoComplete="new-password"
-                  value={backupPw2}
-                  onChange={(e) => setBackupPw2(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !backupBusy && !dataBusy && void doExport()}
-                />
-              ) : null}
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={backupBusy || dataBusy}
-                onClick={() => void doExport()}
-              >
-                {backupBusy ? "处理中…" : "导出备份"}
-              </Button>
-              <Button size="sm" variant="quiet" onClick={closeBackupPanel}>
-                取消
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
+      <div className="settings-section-content" hidden={section!=='about'}>
       <div className="card section">
         <h2>
           <IconInfo size={14} /> 数据与安全
@@ -367,7 +359,7 @@ export function SettingsView({
           </div>
         </div>
       </div>
-
+      </div>
     </div>
   );
 }

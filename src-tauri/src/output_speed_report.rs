@@ -67,7 +67,7 @@ pub fn report_window(dir:&Path,device:&str,source:&str,days:u32,model:&str,resol
 }
 pub fn report_minutes(dir:&Path,device:&str,source:&str,days:u32,model:&str,resolution:u32,minutes:u32)->Result<Report,String>{
     if ![0,10,60,300,3600,21600,86400].contains(&resolution)||minutes>1440||days>36600{return Err("输出速度时间范围无效".into())}
-    let db=database(dir)?;let settings=options(dir);let excluded=settings.excluded_devices();
+    let db=database(dir)?;let settings=options(dir);let excluded=crate::activity::sources::excluded(dir,&settings)?;
     let end=now();let today=chrono::Local::now().date_naive();
     let first=if minutes==0&&days>0 { today.checked_sub_days(chrono::Days::new((days-1).into())) }else{None};
     let requested_start=if minutes>0{end-i64::from(minutes)*60_000}else{

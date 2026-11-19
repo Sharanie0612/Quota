@@ -11,7 +11,7 @@ import { ToastStack } from "./components/ToastStack";
 import type { AccountView, AppInfo, ProviderView } from "./lib/types";
 import { AccountsView } from "./views/AccountsView";
 import { OutputSpeedView } from "./views/OutputSpeedView";
-import { SettingsView } from "./views/SettingsView";
+import { SettingsView, type SettingsSection } from "./views/SettingsView";
 import { ActivityView } from "./views/ActivityView";
 import { UsageCostsView } from "./views/UsageCostsView";
 import {useMaterialLight} from './lib/useMaterialLight';
@@ -33,6 +33,7 @@ export default function App() {
   const { accounts, loading, refreshing, reload, refreshAll, refreshOne } = useAccounts();
   const { settings, update } = useSettings();
 
+  const [settingsSection,setSettingsSection]=useState<SettingsSection>("appearance");
   const [view, setView] = useState<View>("accounts");
   useEffect(()=>{const un=listen<string>('navigate-main',event=>{if(['costs','output-speed','activity','settings'].includes(event.payload))setView(event.payload as View);});return()=>{void un.then(stop=>stop());};},[]);
   const light=useMaterialLight(appearance.material==='liquid'&&!appearance.reducedMotion,view+':'+appearance.collapsed);
@@ -186,11 +187,11 @@ export default function App() {
           ) : null}
 
           {view === 'ai-models' ? <AiModelsHub autoUpdate={settings?.ladderAutoUpdate ?? true}/> : null}
-          {view === "activity" ? <ActivityView onOpenSyncSettings={()=>setView('settings')} /> : null}
+          {view === "activity" ? <ActivityView onOpenSyncSettings={()=>{setSettingsSection('sources');setView('settings');}} /> : null}
           {view === "output-speed" ? <OutputSpeedView onOpenSyncSettings={()=>setView("settings")}/> : null}
           {view === "costs" ? <UsageCostsView /> : null}
           {view === "settings" ? (
-            <SettingsView settings={settings} onUpdate={(s) => void update(s)} info={info} />
+            <SettingsView initialSection={settingsSection} settings={settings} onUpdate={(s) => void update(s)} info={info} />
           ) : null}
           </div>
         </div>

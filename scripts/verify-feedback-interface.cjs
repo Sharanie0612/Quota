@@ -76,6 +76,7 @@ async function main() {
       }).observe(document.body,{childList:true,subtree:true});
     });
     await go(page,'设置');
+    await page.getByRole('navigation',{name:'设置分类'}).getByRole('button',{name:'同步与备份',exact:true}).click();
     const notice = page.locator('.cross-device-sync .notice');
     await notice.waitFor();
     await page.locator('.cross-device-sync').scrollIntoViewIfNeeded();

@@ -67,7 +67,7 @@ fn profile_workspace(profile_dir: &Path, errors: &mut Vec<String>) -> Option<Pat
     }
 }
 
-fn workspace_roots(override_root: &str, errors: &mut Vec<String>) -> BTreeSet<PathBuf> {
+pub(super) fn workspace_roots(override_root: &str, errors: &mut Vec<String>) -> BTreeSet<PathBuf> {
     if !override_root.is_empty() {
         return BTreeSet::from([PathBuf::from(override_root)]);
     }
@@ -146,14 +146,27 @@ pub(super) fn collect(db: &mut Connection, options: &Options, errors: &mut Vec<S
             .and_then(|name| name.to_str())
             .is_some_and(|name| name.starts_with("rollout-"))
     });
-    if paths.is_empty() && problems.is_empty() {
-        problems
-            .push("暂无本机 Codex 会话日志，请确认任务在本机运行，或在采集设置中选择工作区".into());
-    }
     errors.extend(
         problems
             .into_iter()
             .map(|problem| format!("Multica {problem}")),
     );
     collect_codex_paths(db, paths, &options.device_id, true, errors)
+}
+
+pub(super) fn owned_sources(options:&Options,errors:&mut Vec<String>)->Vec<super::sources::Instance>{
+    use super::sources::{definitions,stable_id,Instance};
+    if !options.multica_enabled{return vec![]}
+    let mut result=Vec::new();
+    for root in workspace_roots(&options.multica_workspace_root,errors){for workspace in child_dirs(&root,true,errors){for run in child_dirs(&workspace,true,errors){
+        // Some runtimes use the daemon's ordinary home instead. Those records
+        // remain in their native reader; an explicit cwd or chosen source is
+        // required to classify them as Multica.
+        for (software,folder,relative) in [("claude","claude-home","projects"),("gemini","gemini-home","tmp"),("kimi","kimi-home","sessions"),("qoder","qoder-home","projects"),("codebuddy","codebuddy-home","projects"),("harness","harness-home",""),("zcode","zcode-home","")]{
+            let path=run.join(folder).join(relative);if !real_directory(&path,errors){continue}
+            let format=definitions().into_iter().find(|d|d.id==software).expect("known source").format;
+            result.push(Instance{id:stable_id(&format!("multica:{}:{software}:{}",options.device_id,path.to_string_lossy())),software:software.into(),environment:options.device_id.clone(),root:path.to_string_lossy().into(),enabled:true,launcher:"multica".into(),access:"unknown".into(),format:format.into(),legacy:false,revision:0});
+        }
+    }}}
+    result
 }

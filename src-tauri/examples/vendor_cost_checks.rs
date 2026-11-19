@@ -1,4 +1,6 @@
 //! Isolated monetary fixtures; no personal credentials or network requests.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use chrono::TimeZone;
 use quota_lib::{
     activity,
@@ -60,7 +62,7 @@ fn main() {
         if id == 4 {
             at = (chrono::Utc::now() + chrono::Duration::days(1)).timestamp_millis();
         }
-        let e = activity::Metric {
+        let e = activity::Metric { origin:None,
             channel: String::new(),
             id: format!("{id:064x}"),
             device: uuid::Uuid::new_v4().to_string(),
@@ -113,11 +115,11 @@ fn main() {
     let mut excluded: activity::Metric = serde_json::from_str(&body).unwrap();
     let mut selection=activity::options(&root);
     selection.codex_ssh_devices=Some(vec![activity::ssh::Device{host:"synthetic".into(),home:String::new(),device_id:excluded.device.clone(),name:"fixture".into(),included:false,aliases:vec![]}]);
-    activity::save_options(&root,&selection).unwrap();
+    activity::save_options(&root,&selection).unwrap(); activity_workspace_fixture::isolate(&root);
     let without=vendor_costs::report(&state,"2026-10-01","2026-10-31").unwrap();
     assert_eq!(without.lifetime_tokens.total,7000);
     assert_eq!(without.covered_models["custom"].iter().map(|g|g.tokens.total).sum::<u64>(),2000);
-    selection.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&root,&selection).unwrap();
+    selection.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&root,&selection).unwrap(); activity_workspace_fixture::isolate(&root);
     assert_eq!(vendor_costs::report(&state,"2026-10-01","2026-10-31").unwrap().lifetime_tokens.total,8000);
     excluded.id = format!("{:064x}", 5);
     excluded.source = "trae".into();

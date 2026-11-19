@@ -1,3 +1,5 @@
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, trae};
 use std::fs;
 fn live() {
@@ -10,7 +12,7 @@ fn live() {
     options.zcode_home = root.join("absent").to_string_lossy().into();
     options.trae_enabled = true;
     options.sync_dir.clear();
-    activity::save_options(&root, &options).unwrap();
+    activity::save_options(&root, &options).unwrap(); activity_workspace_fixture::isolate(&root);
     activity::collect(&root).unwrap();
     let r = activity::report(&root, None, Some("trae".into()), None).unwrap();
     println!(
@@ -72,7 +74,7 @@ fn fixture() {
             [],
         )
         .unwrap();
-    activity::save_options(&local, &o).unwrap();
+    activity::save_options(&local, &o).unwrap(); activity_workspace_fixture::isolate(&local);
     activity::collect(&local).unwrap();
     let report = || activity::report(&local, None, Some("trae".into()), None).unwrap();
     let key = |name: &str, channel: &str| if channel.is_empty() { name.to_string() } else { format!("{name}\u{1f}{channel}") };
@@ -173,8 +175,8 @@ fn fixture() {
     b.device_id = uuid::Uuid::new_v4().to_string();
     o.sync_dir = root.join("shared").to_string_lossy().into();
     b.sync_dir = o.sync_dir.clone();
-    activity::save_options(&local, &o).unwrap();
-    activity::save_options(&remote, &b).unwrap();
+    activity::save_options(&local, &o).unwrap(); activity_workspace_fixture::isolate(&local);
+    activity::save_options(&remote, &b).unwrap(); activity_workspace_fixture::isolate(&remote);
     activity::collect(&remote).unwrap();
     activity::collect(&local).unwrap();
     activity::collect(&remote).unwrap();

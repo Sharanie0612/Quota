@@ -1,4 +1,6 @@
 //! Synthetic packets only, no OS keyring or personal data.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, sync_storage};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -14,7 +16,7 @@ fn main() {
         fs::create_dir_all(dir).unwrap(); let mut o = activity::options(dir);
         o.device_id = device.into(); o.sync_dir = shared.to_string_lossy().into();
         o.codex_home.clear(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
-        activity::save_options(dir, &o).unwrap();
+        activity::save_options(dir, &o).unwrap(); activity_workspace_fixture::isolate(dir);
     }
     let own = shared.join("quota-activity-v1").join(id); fs::create_dir_all(&own).unwrap();
     for batch in 0..10 {
@@ -128,7 +130,7 @@ fn snapshot(source: &std::path::Path) {
     assert!(copied > 0);
     let mut o = activity::options(&dir); o.sync_dir = shared.to_string_lossy().into();
     o.codex_home.clear(); o.zcode_home = root.join("no-zcode").to_string_lossy().into();
-    activity::save_options(&dir,&o).unwrap(); activity::collect(&dir).unwrap();
+    activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir); activity::collect(&dir).unwrap();
     let before = activity::report(&dir,None,None,None).unwrap(); assert!(before.errors.is_empty(),"{:?}",before.errors);
     let size = sync_storage::inspect(&dir).unwrap();
     // Space optimization represents all devices upgraded; announce capabilities
@@ -137,12 +139,12 @@ fn snapshot(source: &std::path::Path) {
         fs::write(item.path().join("reader.capability"),json!({"schema":1,"device":id,"version":"1.0.1600","compressed":true}).to_string()).unwrap();
     }
     for device in fs::read_dir(&destination).unwrap() {
-        o.device_id = device.unwrap().file_name().to_string_lossy().into(); activity::save_options(&dir,&o).unwrap();
+        o.device_id = device.unwrap().file_name().to_string_lossy().into(); activity::save_options(&dir,&o).unwrap(); activity_workspace_fixture::isolate(&dir);
         sync_storage::optimize(&dir).unwrap();
     }
     let after_size = sync_storage::inspect(&dir).unwrap();
     let peer = root.join("peer"); fs::create_dir_all(&peer).unwrap();
-    o.device_id=uuid::Uuid::new_v4().to_string(); activity::save_options(&peer,&o).unwrap(); activity::collect(&peer).unwrap();
+    o.device_id=uuid::Uuid::new_v4().to_string(); activity::save_options(&peer,&o).unwrap(); activity_workspace_fixture::isolate(&peer); activity::collect(&peer).unwrap();
     let after = activity::report(&peer,None,None,None).unwrap(); assert!(after.errors.is_empty(),"{:?}",after.errors);
     assert!(before.totals.tokens == after.totals.tokens); assert_eq!(before.totals.calls,after.totals.calls); assert_eq!(before.totals.sessions,after.totals.sessions);
     assert_eq!(serde_json::to_value(&before.models).unwrap(),serde_json::to_value(&after.models).unwrap());

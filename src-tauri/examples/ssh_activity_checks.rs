@@ -1,5 +1,7 @@
 //! Synthetic SSH transport: run the exact projection script locally, never connect
 //! to a real host or access personal logs, credentials or configuration.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, ssh, Cursor};
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -77,14 +79,15 @@ fn main(){
     // Existing compressed/legacy packets carry remote metrics through the same
     // ledger, with a selectable fallback device name on older peers.
     let peer=root.join("peer");fs::create_dir_all(&peer).unwrap();for(_,packet)in activity::cloud_packets(&data).unwrap(){activity::import_cloud_packet(&peer,packet.as_bytes()).unwrap();}
-    let peer_report=activity::report(&peer,None,None,None).unwrap();assert_eq!(peer_report.totals.tokens.total,540);assert!(peer_report.devices.iter().any(|d|d.id==remote));
+    let peer_report=activity::report(&peer,None,None,None).unwrap();assert_eq!(peer_report.totals.tokens.total,0);assert!(peer_report.devices.iter().any(|d|d.id==remote));
+    let mut workspace=activity::sources::load(&peer,&activity::options(&peer)).unwrap();let environment=workspace.environments.iter_mut().find(|e|e.id==remote).unwrap();assert!(!environment.included);environment.included=true;activity::sources::save(&peer,&workspace).unwrap();assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
     // Exclusion is a read policy, never deletion, including explicit device views.
     let mut options=activity::options(&data);
     let saved=serde_json::to_value(&options).unwrap();let mut legacy=saved.clone();legacy.as_object_mut().unwrap().remove("codexSshDevices");legacy["codexSshHost"]=json!("vm");
     let legacy:activity::Options=serde_json::from_value(legacy).unwrap();assert!(legacy.ssh_devices()[0].included);
     options.codex_ssh_host="vm".into();options.codex_ssh_devices=Some(vec![]);assert!(options.ssh_devices().is_empty());
     options.codex_ssh_devices=Some(vec![ssh::Device{host:"must-never-connect".into(),home:String::new(),device_id:remote.into(),name:"synthetic".into(),included:false,aliases:vec!["vm".into()]}]);
-    activity::save_options(&data,&options).unwrap();
+    activity::save_options(&data,&options).unwrap(); activity_workspace_fixture::isolate(&data);
     let before:i64=db.query_row("SELECT COUNT(*) FROM metrics",[],|r|r.get(0)).unwrap();
     let mut off=options.ssh_devices();let mut errors=vec![];assert_eq!(ssh::collect_devices(&mut db,&mut off,&mut errors),0);assert!(errors.is_empty());
     let mut changed=off[0].clone();changed.device_id=uuid::Uuid::new_v4().to_string();
@@ -93,8 +96,9 @@ fn main(){
     assert_eq!(activity::report(&data,Some(remote.into()),None,None).unwrap().totals.tokens.total,0);
     assert_eq!(activity::usage_summary(&data).unwrap().total,0);
     assert_eq!(before,db.query_row("SELECT COUNT(*) FROM metrics",[],|r|r.get::<_,i64>(0)).unwrap());
-    options.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&data,&options).unwrap();
+    options.codex_ssh_devices.as_mut().unwrap()[0].included=true;activity::save_options(&data,&options).unwrap(); activity_workspace_fixture::isolate(&data);
     assert_eq!(report().totals.tokens.total,540);assert_eq!(activity::usage_summary(&data).unwrap().total,540);
+    assert!(activity::sources::ssh_source_enabled(&data,&options,remote).unwrap(),"legacy environment re-inclusion must retain Codex collection");
     assert_eq!(activity::report(&peer,None,None,None).unwrap().totals.tokens.total,540);
     speed_projection(&root,&python);
     resumed_projection(&root,&python);

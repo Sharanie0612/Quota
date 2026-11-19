@@ -127,7 +127,7 @@ pub fn collect_source(
             return Err("Trae 用量口径不明确，未计入此数据库".into());
         }
         let milliseconds = |v: f64| if v < 100_000_000_000.0 { v * 1000.0 } else { v };
-        let event = Metric {
+        let event = Metric { origin:Some(super::sources::native_origin("trae",device,false,"local",match channel.as_str(){"trae"=>"builtin","api"=>"api",_=>"unknown"})),
             id: hash(&format!("trae:tokens:{session}:{id}")),
             device: device.into(),
             source: "trae".into(),

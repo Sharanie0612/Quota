@@ -1,4 +1,6 @@
 //! Synthetic Codex rollover, cursor migration and mixed-version sync checks.
+#[path="support/activity_workspace.rs"]
+mod activity_workspace_fixture;
 use quota_lib::activity::{self, Cursor, Metric, Tokens};
 use rusqlite::{params, Connection};
 use serde_json::{json, Value};
@@ -53,7 +55,7 @@ fn settings(dir: &Path, home: &Path) {
     o.codex_ssh_devices = Some(vec![]);
     o.sync_accounts = false;
     o.sync_dir.clear();
-    activity::save_options(dir, &o).unwrap();
+    activity::save_options(dir, &o).unwrap(); activity_workspace_fixture::isolate(dir);
 }
 fn total(dir: &Path) -> u64 {
     activity::report(dir, None, Some("codex".into()), None)

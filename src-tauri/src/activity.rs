@@ -20,6 +20,8 @@ pub mod ssh;
 pub mod speed;
 #[path = "output_speed_live.rs"]
 pub mod speed_live;
+#[path = "activity_sources.rs"]
+pub mod sources;
 // Serialise local cursor readers only. Remote collection and directory sync must
 // never hold this lock while the local incremental reader waits for new output.
 static LOCAL_CODEX_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -67,12 +69,21 @@ fn default_interval() -> u64 { 30 }
 fn sync_accounts_default() -> bool { true }
 pub fn options(dir: &Path) -> Options {
     let mut result:Options=fs::read(dir.join("activity-settings.json")).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_else(|| {
+        static DEFAULTS:std::sync::OnceLock<std::sync::Mutex<BTreeMap<PathBuf,Options>>>=std::sync::OnceLock::new();
+        let mut defaults=DEFAULTS.get_or_init(||std::sync::Mutex::new(BTreeMap::new())).lock().unwrap_or_else(|e|e.into_inner());
+        if let Some(value)=defaults.get(dir){return value.clone()}
         let home = std::env::var_os("USERPROFILE").map(PathBuf::from).or_else(dirs::home_dir).unwrap_or_default();
-        Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
+        let value=Options { device_id: uuid::Uuid::new_v4().to_string(), device_name: std::env::var("COMPUTERNAME").unwrap_or("本机".into()), auto_collect: true, collect_interval_seconds: default_interval(), sync_accounts: true,
             codex_home: std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).to_string_lossy().into(),
-            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), multica_enabled: false, multica_workspace_root: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![]) }
+            zcode_home: home.join(".zcode").to_string_lossy().into(), sync_dir: String::new(), harness_home: String::new(), multica_enabled: false, multica_workspace_root: String::new(), trae_home: String::new(), trae_enabled: false, codex_ssh_host:String::new(), codex_ssh_home:String::new(),codex_ssh_devices:Some(vec![]) };defaults.insert(dir.into(),value.clone());value
     });
     result.codex_ssh_devices=Some(result.ssh_devices());result
+}
+pub fn options_checked(dir:&Path)->Result<Options,String>{
+    match fs::read(dir.join("activity-settings.json")){
+        Ok(bytes)=>{let mut value:Options=serde_json::from_slice(&bytes).map_err(|_|"采集设置损坏，原文件已保留，请从备份恢复")?;if uuid::Uuid::parse_str(&value.device_id).is_err(){return Err("采集设备标识损坏，原文件已保留".into())}value.codex_ssh_devices=Some(value.ssh_devices());Ok(value)},
+        Err(e) if e.kind()==std::io::ErrorKind::NotFound=>{if dir.join("activity-sources.json").exists(){return Err("采集设置缺失，原来源配置已保留，请从备份恢复".into())}Ok(options(dir))},Err(_)=>Err("采集设置暂不可读，原文件已保留".into())
+    }
 }
 pub fn save_options(dir: &Path, o: &Options) -> Result<(), String> {
     crate::storage::write_atomic(&dir.join("activity-settings.json"), &serde_json::to_string_pretty(o).map_err(|_| "保存统计设置失败")?)
@@ -106,6 +117,8 @@ impl Tokens {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all="camelCase")]
 pub struct Metric {
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub origin: Option<sources::Origin>,
     pub id: String, pub device: String, pub source: String, pub session: String, pub model: String,
     pub agent: String, pub tool: String, pub timestamp: i64, pub kind: String, pub tokens: Tokens,
     /// How the usage was obtained. Trae turns either consumed Trae's own model quota
@@ -130,12 +143,17 @@ pub struct Metric {
 }
 fn is_zero(value: &u32) -> bool { *value == 0 }
 impl Metric {
+    pub(crate) fn superseded_zcode(&self) -> bool {
+        self.source == "zcode" && self.kind == "tokens"
+            && matches!(self.revision, ZCODE_INHERITED_REVISION | ZCODE_MODERN_ALIAS_REVISION)
+    }
     fn activity_source(&self) -> &str {
         if self.multica { "multica" } else { &self.source }
     }
     fn valid(&self) -> bool {
         self.id.len()==64 && self.id.bytes().all(|b| b.is_ascii_hexdigit()) && uuid::Uuid::parse_str(&self.device).is_ok()
-            && matches!(self.source.as_str(), "codex"|"zcode"|"harness"|"trae") && matches!(self.kind.as_str(), "tokens"|"tool")
+            && sources::known_software(&self.source) && matches!(self.kind.as_str(), "tokens"|"tool")
+            && self.origin.as_ref().is_none_or(|o|o.valid()&&o.software==self.source&&(o.environment.is_empty()||o.environment==self.device))
             && matches!(self.channel.as_str(), ""|"trae"|"api")
             && (!self.multica || self.source == "codex")
             && (self.harness_identity == 0 || (self.source == "harness" && self.harness_identity == 1))
@@ -149,6 +167,10 @@ impl Metric {
 // A corrected observation supersedes legacy counts for the SAME event ID,
 // including old cloud packets. This is a parser revision, not a clock value.
 const CODEX_USAGE_REVISION: u32 = 1;
+// Keep a zero correction under the copied message's original ID, including sync.
+const ZCODE_INHERITED_REVISION: u64 = 1;
+// An explicit assistant_message_id links this legacy ID to a modern request.
+const ZCODE_MODERN_ALIAS_REVISION: u64 = 2;
 #[derive(Default, Serialize, Deserialize)]
 pub struct Cursor {
     pub offset: u64,
@@ -161,6 +183,9 @@ pub struct Cursor {
     pub speed: speed::TimingCursor,
     #[serde(default)]
     pub usage_version: u32,
+    #[serde(default)]
+    pub origin_version:u32,
+    #[serde(default)] pub origin_stamp:String,
     #[serde(default, skip_serializing_if = "is_false")]
     pub multica: bool,
 }
@@ -202,12 +227,12 @@ pub fn parse_codex(v: &Value, c: &mut Cursor, device: &str) -> Option<Metric> {
         // Timestamp + cumulative counters also deduplicate history copied into forks.
         let id=hash(&format!("codex:tokens:{timestamp}:{}", serde_json::to_string(raw).ok()?));
         let speed=c.speed.take(delta.output,delta.reasoning);
-        return Some(Metric { id, device:device.into(), source:"codex".into(),multica:c.multica,harness_identity:0,codex_usage_version:CODEX_USAGE_REVISION,revision:0, session:label(&c.session), model:if c.model.is_empty(){"未知模型".into()}else{c.model.clone()},agent:c.agent.clone(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),speed,tokens:delta });
+        return Some(Metric { origin:None, id, device:device.into(), source:"codex".into(),multica:c.multica,harness_identity:0,codex_usage_version:CODEX_USAGE_REVISION,revision:0, session:label(&c.session), model:if c.model.is_empty(){"未知模型".into()}else{c.model.clone()},agent:c.agent.clone(),tool:String::new(),timestamp,kind:"tokens".into(),channel:String::new(),speed,tokens:delta });
     }
     if outer=="response_item" && matches!(inner,"function_call"|"custom_tool_call") && !inherited {
         let call=p.get("call_id").or_else(|| p.get("id")).and_then(Value::as_str)?;
         let tool=label(p.get("name").and_then(Value::as_str).unwrap_or("未知工具"));
-        return Some(Metric { id:hash(&format!("codex:tool:{call}")),device:device.into(),source:"codex".into(),multica:c.multica,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&c.session),model:c.model.clone(),agent:c.agent.clone(),tool,timestamp,kind:"tool".into(),channel:String::new(),tokens:Tokens::default() });
+        return Some(Metric { origin:None, id:hash(&format!("codex:tool:{call}")),device:device.into(),source:"codex".into(),multica:c.multica,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&c.session),model:c.model.clone(),agent:c.agent.clone(),tool,timestamp,kind:"tool".into(),channel:String::new(),tokens:Tokens::default() });
     }
     None
 }
@@ -220,7 +245,8 @@ fn database(dir:&Path) -> Result<Connection,String> {
         CREATE TABLE IF NOT EXISTS cursors(path TEXT PRIMARY KEY, body TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS outbox(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS receipts(path TEXT PRIMARY KEY);
-        CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL);").map_err(|_| "初始化统计资料库失败")?;
+        CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS activity_feedback_aliases(alias_id TEXT PRIMARY KEY,origin_id TEXT NOT NULL,pending INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0);").map_err(|_| "初始化统计资料库失败")?;
     // A settlement may be revised many times before the next directory exchange.
     // Keep one pending event, not one copy for every revision.
     let indexed: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name='outbox_event')", [], |r| r.get(0)).map_err(|_| "读取同步队列失败")?;
@@ -256,8 +282,10 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
     let old:Option<String>=db.query_row("SELECT body FROM metrics WHERE id=?1",[&event.id],|r|r.get(0)).optional().map_err(|_| "读取统计记录失败")?;
     let mut next=event.clone();
     next.device=owner;
+    let mut origin=event.origin.clone();
     if let Some(text)=&old {
         let previous:Metric=serde_json::from_str(text).map_err(|_| "统计记录损坏")?;
+        if let Some(old)=&previous.origin {let incoming=origin.clone();if incoming.as_ref().is_none_or(|new|old.rank()>new.rank()){origin=Some(old.clone());}if let Some(context)=&mut origin{if context.access=="unknown"{if let Some(known)=incoming.as_ref().filter(|o|o.access!="unknown").or_else(||(old.access!="unknown").then_some(old)){context.access=known.access.clone();}}}}
         let multica = next.multica || previous.multica;
         // Replays by old clients cannot erase a measured speed. Resolve duplicate
         // timings deterministically so copied logs converge on every device.
@@ -275,10 +303,20 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
         next.device=previous.device.clone().min(next.device);
         // Harness replaces the latest settlement for an attempt; older synced samples must
         // not resurrect an earlier (possibly larger) count.
-        if next.source=="codex" && next.kind=="tokens" && next.codex_usage_version!=previous.codex_usage_version {
+        if next.source=="zcode" && (next.superseded_zcode() || previous.superseded_zcode()) {
+            if previous.superseded_zcode() && (!next.superseded_zcode() || previous.revision>=next.revision) {let owner=next.device;next=previous;next.device=owner;}
+        } else if next.source=="codex" && next.kind=="tokens" && next.codex_usage_version!=previous.codex_usage_version {
             if previous.codex_usage_version>next.codex_usage_version {let owner=next.device;next=previous;next.device=owner;}
         } else if matches!(next.source.as_str(), "harness" | "trae") {
             if previous.revision > next.revision { let owner=next.device; next=previous; next.device=owner; }
+        } else if !sources::legacy_wire(&next.source) {
+            // Assistant snapshots repeat during streaming and may include a
+            // later empty placeholder. Keep a coherent measured tuple, never
+            // sum snapshots or manufacture a tuple from independent maxima.
+            if (previous.tokens.total,previous.tokens.input,previous.tokens.output,previous.tokens.cached,previous.tokens.cache_write,previous.tokens.reasoning)>(next.tokens.total,next.tokens.input,next.tokens.output,next.tokens.cached,next.tokens.cache_write,next.tokens.reasoning){next.tokens=previous.tokens.clone();}
+            next.revision=next.revision.max(previous.revision);
+            if next.model=="未知模型"&&previous.model!="未知模型"{next.model=previous.model.clone();}
+            next.timestamp=next.timestamp.min(previous.timestamp);
         } else {
         next.tokens.input=previous.tokens.input.max(next.tokens.input); next.tokens.cached=previous.tokens.cached.max(next.tokens.cached);
         next.tokens.cache_write=previous.tokens.cache_write.max(next.tokens.cache_write);next.tokens.output=previous.tokens.output.max(next.tokens.output);
@@ -287,12 +325,18 @@ pub fn merge_metric(db:&Connection, event:&Metric, local:bool) -> Result<bool,St
         // Older clients and copies in the ordinary Codex folder can omit the origin.
         next.multica = next.source == "codex" && multica;
     }
+    next.origin=origin;
+    if let Some(context)=&mut next.origin{next.source=context.software.clone();if context.configuration_revision>0&&next.source=="codex"{next.multica=context.launcher=="multica";}if context.environment!=next.device{context.environment=next.device.clone();context.environment_kind="unknown".into();}}
+    // Older readers can keep revision while max-merging the old amount. The
+    // explicit correction wins even on the first import of a relay.
+    if next.superseded_zcode() {next.tokens=Tokens::default();next.speed=None;}
     // A pre-fix speed sample may have used the inflated output counter.
     if next.speed.as_ref().is_some_and(|sample| !sample.valid(&next)) {
         next.speed=event.speed.clone().filter(|sample| sample.valid(&next));
     }
     let body=serde_json::to_string(&next).map_err(|_| "保存统计失败")?;
     if old.as_deref()==Some(&body) { return Ok(false); }
+    if let Some(old)=old.as_ref(){let before:Metric=serde_json::from_str(old).map_err(|_|"统计记录损坏")?;sources::record_repair(db,&before,&next)?;}
     db.execute("INSERT INTO metrics(id,body,local) VALUES(?1,?2,?3) ON CONFLICT(id) DO UPDATE SET body=excluded.body,local=MAX(metrics.local,excluded.local)",params![next.id,body,local as i32]).map_err(|_| "保存统计失败")?;
     if local { db.execute("INSERT OR IGNORE INTO outbox(event_id) VALUES(?1)",[&next.id]).map_err(|_| "保存同步队列失败")?; }
     Ok(true)
@@ -322,11 +366,11 @@ fn collect_codex_file(db:&mut Connection,path:&Path,device:&str,multica:bool) ->
     let key=path.to_string_lossy().to_string(); let mut c=cursor(db,&key)?;
     let known_multica = c.multica;
     // Replay to correct old IDs or add the origin to a previously collected log.
-    if c.needs_codex_replay() || (multica && !known_multica) { c=Cursor::default(); }
+    if c.needs_codex_replay() || c.origin_version<1 || (multica && !known_multica) { c=Cursor::default(); }
     let mut f=fs::File::open(path).map_err(|_| "部分 Codex 会话暂时无法读取")?;
     let size=f.metadata().map_err(|_| "无法读取会话大小")?.len();
     if size<c.offset { c=Cursor::default(); }
-    c.speed.version=1;c.usage_version=CODEX_USAGE_REVISION;
+    c.speed.version=1;c.usage_version=CODEX_USAGE_REVISION;c.origin_version=1;
     c.multica = multica || known_multica;
     if size==c.offset {return Ok(0)}
     f.seek(SeekFrom::Start(c.offset)).map_err(|_| "读取会话进度失败")?;
@@ -335,7 +379,7 @@ fn collect_codex_file(db:&mut Connection,path:&Path,device:&str,multica:bool) ->
     loop { line.clear();let n=reader.read_until(b'\n',&mut line).map_err(|_| "读取 Codex 会话失败")?;if n==0||line.last()!=Some(&b'\n'){break}
         c.offset+=n as u64;
         if line.len()>32*1024*1024 {continue}
-        if let Ok(v)=serde_json::from_slice::<Value>(&line){if let Some(e)=parse_codex(&v,&mut c,device){if merge_metric(&tx,&e,true)?{count+=1}}}
+        if let Ok(v)=serde_json::from_slice::<Value>(&line){if let Some(mut e)=parse_codex(&v,&mut c,device){e.origin=Some(sources::native_origin("codex",device,c.multica,"local","unknown"));if merge_metric(&tx,&e,true)?{count+=1}}}
     }
     save_cursor(&tx,&key,&c)?;tx.commit().map_err(|_| "保存采集进度失败")?;
     Ok(count)
@@ -378,35 +422,159 @@ fn collect_codex_paths(db: &mut Connection, mut paths: Vec<PathBuf>, device: &st
     }
     count
 }
+fn reconcile_zcode_legacy(db:&mut Connection,paths:&[PathBuf])->Result<usize,String> {
+    let mut links:BTreeMap<String,std::collections::BTreeSet<String>>=BTreeMap::new();
+    for path in paths {
+        if !path.exists() {continue}
+        // Normal collection reports source/schema failures. Missing evidence
+        // here must preserve legacy usage, never guess that it is duplicated.
+        let Ok(source)=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_ONLY|OpenFlags::SQLITE_OPEN_NO_MUTEX) else {continue};
+        let Ok(mut statement)=source.prepare("SELECT COALESCE(logical_request_id,id),COALESCE(attempt_index,0),assistant_message_id FROM model_usage WHERE assistant_message_id IS NOT NULL") else {continue};
+        let Ok(rows)=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,i64>(1)?,row.get::<_,String>(2)?))) else {continue};
+        for row in rows {
+            let(request,attempt,message)=row.map_err(|_|"读取 ZCode 跨库请求关联失败")?;
+            links.entry(hash(&format!("zcode:legacy:model:{message}"))).or_default()
+                .insert(hash(&format!("zcode:model:{request}:{}",attempt.max(0))));
+        }
+    }
+    let tx=db.transaction().map_err(|_|"统计资料库忙碌")?;let mut count=0;
+    for (legacy,modern) in links {
+        let old:Option<String>=tx.query_row("SELECT body FROM metrics WHERE id=?1",[legacy],|row|row.get(0)).optional().map_err(|_|"读取 ZCode 旧用量失败")?;
+        let Some(old)=old else {continue};
+        let mut event:Metric=serde_json::from_str(&old).map_err(|_|"ZCode 旧用量损坏")?;
+        if event.source!="zcode" || event.kind!="tokens" {continue}
+        let mut covered=false;
+        for id in modern {
+            covered=tx.query_row("SELECT EXISTS(SELECT 1 FROM metrics WHERE id=?1 AND json_extract(body,'$.source')='zcode' AND json_extract(body,'$.kind')='tokens')",[id],|row|row.get(0)).map_err(|_|"核对 ZCode 新用量失败")?;
+            if covered {break}
+        }
+        // Only suppress the alias once the canonical request is actually in
+        // the statistics database, including when another source failed.
+        if covered {
+            event.revision=ZCODE_MODERN_ALIAS_REVISION;event.tokens=Tokens::default();
+            if merge_metric(&tx,&event,true)? {count+=1}
+        }
+    }
+    tx.commit().map_err(|_|"保存 ZCode 跨库核对失败")?;Ok(count)
+}
+fn zcode_parents(source:&Connection)->Result<BTreeMap<String,(String,i64)>,String> {
+    let exists:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='session')",[],|row|row.get(0)).map_err(|_|"读取 ZCode 会话关系失败")?;
+    if !exists {return Ok(BTreeMap::new())}
+    let mut statement=source.prepare("SELECT id,parent_id,time_created FROM session WHERE parent_id IS NOT NULL").map_err(|_|"读取 ZCode 会话关系失败")?;
+    let rows=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,(row.get::<_,String>(1)?,row.get::<_,i64>(2)?)))).map_err(|_|"读取 ZCode 会话关系失败")?;
+    rows.collect::<Result<_,_>>().map_err(|_|"读取 ZCode 会话关系失败".into())
+}
+fn inherited_zcode_message(source:&Connection,parents:&BTreeMap<String,(String,i64)>,event:&Metric)->Result<bool,String> {
+    let tokens=[event.tokens.input,event.tokens.output,event.tokens.cached,event.tokens.cache_write,event.tokens.reasoning,event.tokens.total]
+        .into_iter().map(i64::try_from).collect::<Result<Vec<_>,_>>().map_err(|_|"ZCode Token 数值超出范围")?;
+    let mut session=event.session.as_str();let mut visited=std::collections::BTreeSet::new();
+    while let Some((parent,created))=parents.get(session) {
+        // A real subagent request occurs after creation. Only pre-existing
+        // history with an exact ancestor observation is inherited.
+        if event.timestamp>=*created || !visited.insert(session) || visited.len()>32 {break}
+        let inherited:bool=source.query_row("SELECT EXISTS(SELECT 1 FROM message WHERE session_id=?1 AND time_created=?2
+            AND json_extract(data,'$.role')='assistant'
+            AND COALESCE(json_extract(data,'$.modelID'),json_extract(data,'$.modelId'),'未知模型')=?3
+            AND COALESCE(json_extract(data,'$.tokens.input'),0)=?4
+            AND COALESCE(json_extract(data,'$.tokens.output'),0)=?5
+            AND COALESCE(json_extract(data,'$.tokens.cache.read'),0)=?6
+            AND COALESCE(json_extract(data,'$.tokens.cache.write'),0)=?7
+            AND COALESCE(json_extract(data,'$.tokens.reasoning'),0)=?8
+            AND COALESCE(json_extract(data,'$.tokens.total'),COALESCE(json_extract(data,'$.tokens.input'),0)+COALESCE(json_extract(data,'$.tokens.output'),0))=?9)",
+            params![parent,event.timestamp,event.model,tokens[0],tokens[1],tokens[2],tokens[3],tokens[4],tokens[5]],|row|row.get(0)).map_err(|_|"核对 ZCode 分叉历史失败")?;
+        if inherited {return Ok(true)}
+        session=parent;
+    }
+    Ok(false)
+}
 fn collect_zcode(db:&mut Connection,path:&Path,device:&str) -> Result<usize,String> {
+    collect_zcode_origin(db,path,device,sources::native_origin("zcode",device,false,"local","unknown"))
+}
+fn zcode_feedback_origin<'a>(request:&'a str,storage_id:&str)->Option<&'a str>{
+    let id=request.strip_prefix("quota:")?;
+    (id.len()==64 && id.bytes().all(|b|b.is_ascii_digit()||(b'a'..=b'f').contains(&b))
+        && storage_id.strip_prefix("usage_quota_")==Some(id)).then_some(id)
+}
+fn reconcile_zcode_feedback(db:&Connection,mut event:Metric,origin_id:&str)->Result<bool,String>{
+    // Historical Quota -> ZCode imports retain Quota's original event ID in
+    // BOTH native identity fields. They are aliases, never a fresh model call.
+    // A matching amount/time alone is deliberately insufficient evidence.
+    let covered:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM metrics WHERE id=?1 AND json_extract(body,'$.source')='zcode' AND json_extract(body,'$.kind')='tokens')",[origin_id],|r|r.get(0)).map_err(|_|"核对 ZCode 回填来源失败")?;
+    let existing:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM metrics WHERE id=?1)",[&event.id],|r|r.get(0)).map_err(|_|"核对 ZCode 回填别名失败")?;
+    let known:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM activity_feedback_aliases WHERE alias_id=?1 AND pending=0)",[&event.id],|r|r.get(0)).map_err(|_|"读取回填核对状态失败")?;
+    db.execute("INSERT INTO activity_feedback_aliases(alias_id,origin_id,pending,blocked) VALUES(?1,?2,?3,?4) ON CONFLICT(alias_id) DO UPDATE SET pending=excluded.pending,blocked=MAX(blocked,excluded.blocked) WHERE pending!=excluded.pending OR blocked<excluded.blocked",params![event.id,origin_id,!covered,covered&&!existing]).map_err(|_|"保存回填核对状态失败")?;
+    if !covered {
+        // Keep any sole existing observation until its canonical record is
+        // restored. Do not create new usage from a derived import meanwhile.
+        return Ok(false)
+    }
+    event.revision=ZCODE_MODERN_ALIAS_REVISION;
+    event.tokens=Tokens::default();
+    if let Some(origin)=event.origin.as_mut(){origin.parser="zcode-quota-feedback".into();}
+    let changed=merge_metric(db,&event,true)?;
+    if !known || changed {
+        // Publish the retained canonical value together with its correction,
+        // even if it originally arrived from another device's sync packet.
+        db.execute("UPDATE metrics SET local=1 WHERE id=?1",[origin_id]).map_err(|_|"保留回填原始用量失败")?;
+        db.execute("INSERT OR IGNORE INTO outbox(event_id) VALUES(?1)",[origin_id]).map_err(|_|"排队回填原始用量失败")?;
+    }
+    Ok(changed)
+}
+fn collect_zcode_origin(db:&mut Connection,path:&Path,device:&str,origin:sources::Origin)->Result<usize,String>{
     if !path.exists(){return Ok(0)}
     let source=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_ONLY|OpenFlags::SQLITE_OPEN_NO_MUTEX).map_err(|_| "ZCode 统计暂时无法读取")?;
     source.busy_timeout(std::time::Duration::from_millis(800)).map_err(|_| "ZCode 统计忙碌")?;
     let modern = source.prepare("SELECT id FROM model_usage LIMIT 0").is_ok();
     // New task-index databases hold scheduling metadata, not usage records.
     if !modern && source.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='tasks')",[],|r|r.get::<_,bool>(0)).unwrap_or(false) { return Ok(0); }
-    let key=format!("zcode:{}",path.to_string_lossy());let mut c=cursor(db,&key)?;let since=c.offset.saturating_sub(5000);
-    let sql="SELECT logical_request_id,attempt_index,session_id,model_id,agent,COALESCE(completed_at,started_at,0),input_tokens,cache_read_input_tokens,cache_creation_input_tokens,output_tokens,reasoning_tokens,COALESCE(computed_total_tokens,provider_total_tokens),id FROM model_usage WHERE COALESCE(completed_at,started_at,0)>=?1 ORDER BY COALESCE(completed_at,started_at,0)";
+    let key=format!("zcode:{}",path.to_string_lossy());let mut c=cursor(db,&key)?;let origin_stamp=hash(&serde_json::to_string(&origin).map_err(|_|"编码来源标记失败")?);let origin_changed=c.origin_version<1||c.origin_stamp!=origin_stamp;let since=if origin_changed{0}else{c.offset.saturating_sub(5000)};c.origin_version=1;c.origin_stamp=origin_stamp;
+    // Recheck old derived imports as well: a missing canonical record can be
+    // restored by a later sync without moving the source's time watermark.
+    let sql="SELECT logical_request_id,attempt_index,session_id,model_id,agent,COALESCE(completed_at,started_at,0),input_tokens,cache_read_input_tokens,cache_creation_input_tokens,output_tokens,reasoning_tokens,COALESCE(computed_total_tokens,provider_total_tokens),id FROM model_usage WHERE COALESCE(completed_at,started_at,0)>=?1 OR logical_request_id LIKE 'quota:%' ORDER BY COALESCE(completed_at,started_at,0)";
     let mut statement=source.prepare(sql).map_err(|_| "此 ZCode 版本的统计格式暂不支持")?;
     let rows=statement.query_map([since as i64],|r|{
         let num=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);
         let request:String=r.get::<_,Option<String>>(0)?.unwrap_or(r.get(12)?);
         let attempt=num(1)?;
-        Ok(Metric { id:hash(&format!("zcode:model:{request}:{attempt}")),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(2)?),model:label(&r.get::<_,String>(3)?),agent:label(&r.get::<_,Option<String>>(4)?.unwrap_or("主 Agent".into())),tool:String::new(),timestamp:r.get(5)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input:num(6)?,cached:num(7)?,cache_write:num(8)?,output:num(9)?,reasoning:num(10)?,total:num(11)?} })
+        let feedback=zcode_feedback_origin(&request,&r.get::<_,String>(12)?).map(str::to_owned);
+        Ok((Metric { origin:Some(origin.clone()), id:hash(&format!("zcode:model:{request}:{attempt}")),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(2)?),model:label(&r.get::<_,String>(3)?),agent:label(&r.get::<_,Option<String>>(4)?.unwrap_or("主 Agent".into())),tool:String::new(),timestamp:r.get(5)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input:num(6)?,cached:num(7)?,cache_write:num(8)?,output:num(9)?,reasoning:num(10)?,total:num(11)?} },feedback))
     }).map_err(|_| "读取 ZCode Token 统计失败")?;
     let tx=db.transaction().map_err(|_| "统计资料库忙碌")?;let mut count=0;
-    for row in rows {let e=row.map_err(|_| "读取 ZCode Token 记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp>0 && merge_metric(&tx,&e,true)?{count+=1}}
+    let mut feedback=Vec::new();
+    for row in rows {let(e,alias)=row.map_err(|_| "读取 ZCode Token 记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp<=0{continue}if let Some(alias)=alias{feedback.push((e,alias));}else if merge_metric(&tx,&e,true)?{count+=1}}
     let mut tools=source.prepare("SELECT COALESCE(tool_call_id,id),session_id,tool_name,COALESCE(completed_at,started_at,0),COALESCE((SELECT model_id FROM model_usage m WHERE m.session_id=t.session_id AND m.turn_id=t.turn_id ORDER BY m.started_at DESC LIMIT 1),'未知模型'),COALESCE((SELECT agent FROM model_usage m WHERE m.session_id=t.session_id AND m.turn_id=t.turn_id ORDER BY m.started_at DESC LIMIT 1),'主 Agent') FROM tool_usage t WHERE COALESCE(completed_at,started_at,0)>=?1").map_err(|_| "此 ZCode 版本的工具统计暂不支持")?;
-    let rows=tools.query_map([since as i64],|r|Ok(Metric {id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:label(&r.get::<_,String>(4)?),agent:label(&r.get::<_,String>(5)?),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()})).map_err(|_| "读取 ZCode 工具统计失败")?;
+    let rows=tools.query_map([since as i64],|r|Ok(Metric { origin:Some(origin.clone()),id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:label(&r.get::<_,String>(4)?),agent:label(&r.get::<_,String>(5)?),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()})).map_err(|_| "读取 ZCode 工具统计失败")?;
     for row in rows {let e=row.map_err(|_| "读取 ZCode 工具记录失败")?;c.offset=c.offset.max(e.timestamp.max(0) as u64);if e.timestamp>0 && merge_metric(&tx,&e,true)?{count+=1}}
     // Older ZCode records predate model_usage. Select metrics only and exclude modern rows.
-    let legacy_key=format!("{key}:legacy");let mut legacy=cursor(&tx,&legacy_key)?;let legacy_since=legacy.offset.saturating_sub(5000) as i64;
+    let legacy_key=format!("{key}:legacy");let mut legacy=cursor(&tx,&legacy_key)?;
+    // Revisit consumed legacy rows once so corrections also replace old cloud IDs.
+    let legacy_since=if origin_changed||legacy.usage_version<ZCODE_INHERITED_REVISION as u32 {0}else{legacy.offset.saturating_sub(5000) as i64};
+    let parents=zcode_parents(&source)?;
     // Capture source watermarks before scanning, including rows excluded by modern usage.
     let legacy_highwater=source.query_row("SELECT MAX(n) FROM (SELECT MAX(time_updated) AS n FROM message UNION ALL SELECT MAX(time_updated) AS n FROM part)",[],|r|r.get::<_,Option<i64>>(0)).ok().flatten().unwrap_or(0).max(0) as u64;
-    let sql="SELECT m.id,m.session_id,COALESCE(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.modelId'),'未知模型'),COALESCE(json_extract(m.data,'$.agent'),'主 Agent'),m.time_created,json_extract(m.data,'$.tokens.input'),json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache.write'),json_extract(m.data,'$.tokens.output'),json_extract(m.data,'$.tokens.reasoning'),json_extract(m.data,'$.tokens.total'),m.time_updated FROM message m WHERE m.time_updated>=?1 AND json_extract(m.data,'$.role')='assistant' AND COALESCE(json_extract(m.data,'$.tokens.output'),0)+COALESCE(json_extract(m.data,'$.tokens.input'),0)>0 AND NOT EXISTS(SELECT 1 FROM model_usage u WHERE u.assistant_message_id=m.id OR (u.assistant_message_id IS NULL AND u.session_id=m.session_id AND u.completed_at=m.time_created AND u.input_tokens=json_extract(m.data,'$.tokens.input') AND u.output_tokens=json_extract(m.data,'$.tokens.output')))";
-    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|{let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);let input=n(5)?;let output=n(8)?;Ok((Metric{id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))}).map_err(|_|"读取 ZCode 历史统计失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    // A newly forked message can retain an update time older than our cursor.
+    // Continue checking that small pre-creation subset, including delayed parents.
+    let inherited_filter=if parents.is_empty(){""}else{" OR EXISTS(SELECT 1 FROM session s WHERE s.id=m.session_id AND s.parent_id IS NOT NULL AND m.time_created<s.time_created)"};
+    let sql=format!("SELECT m.id,m.session_id,COALESCE(json_extract(m.data,'$.modelID'),json_extract(m.data,'$.modelId'),'未知模型'),COALESCE(json_extract(m.data,'$.agent'),'主 Agent'),m.time_created,json_extract(m.data,'$.tokens.input'),json_extract(m.data,'$.tokens.cache.read'),json_extract(m.data,'$.tokens.cache.write'),json_extract(m.data,'$.tokens.output'),json_extract(m.data,'$.tokens.reasoning'),json_extract(m.data,'$.tokens.total'),m.time_updated FROM message m WHERE (m.time_updated>=?1{inherited_filter}) AND json_extract(m.data,'$.role')='assistant' AND COALESCE(json_extract(m.data,'$.tokens.output'),0)+COALESCE(json_extract(m.data,'$.tokens.input'),0)>0 AND NOT EXISTS(SELECT 1 FROM model_usage u WHERE u.assistant_message_id=m.id OR (u.assistant_message_id IS NULL AND u.session_id=m.session_id AND u.completed_at=m.time_created AND u.input_tokens=json_extract(m.data,'$.tokens.input') AND u.output_tokens=json_extract(m.data,'$.tokens.output')))");
+    if let Ok(mut stmt)=source.prepare(&sql){
+        let rows=stmt.query_map([legacy_since],|r|{
+            let n=|i|r.get::<_,Option<i64>>(i).map(|v|v.unwrap_or(0).max(0) as u64);
+            let input=n(5)?;let output=n(8)?;
+            Ok((Metric{ origin:Some(origin.clone()),id:hash(&format!("zcode:legacy:model:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,
+                session:label(&r.get::<_,String>(1)?),model:label(&r.get::<_,String>(2)?),agent:label(&r.get::<_,String>(3)?),tool:String::new(),timestamp:r.get(4)?,kind:"tokens".into(),channel:String::new(),
+                tokens:Tokens{input,output,cached:n(6)?,cache_write:n(7)?,reasoning:n(9)?,total:r.get::<_,Option<i64>>(10)?.map(|v|v.max(0) as u64).unwrap_or(input+output)}},r.get::<_,i64>(11)?))
+        }).map_err(|_|"读取 ZCode 历史统计失败")?;
+        for row in rows {
+            let(mut e,updated)=row.map_err(|_|"读取 ZCode 历史记录失败")?;
+            legacy.offset=legacy.offset.max(updated.max(0) as u64);
+            if inherited_zcode_message(&source,&parents,&e)? {e.revision=ZCODE_INHERITED_REVISION;e.tokens=Tokens::default();}
+            if merge_metric(&tx,&e,true)? {count+=1}
+        }
+        legacy.usage_version=ZCODE_INHERITED_REVISION as u32;
+    }
     let sql="SELECT COALESCE(json_extract(p.data,'$.callID'),p.id),p.session_id,json_extract(p.data,'$.tool'),p.time_created,p.time_updated FROM part p WHERE p.time_updated>=?1 AND json_extract(p.data,'$.type')='tool' AND NOT EXISTS(SELECT 1 FROM tool_usage t WHERE t.tool_call_id=json_extract(p.data,'$.callID'))";
-    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|Ok((Metric{id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:"未知模型".into(),agent:"未知 Agent".into(),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()},r.get::<_,i64>(4)?))).map_err(|_|"读取 ZCode 历史工具失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史工具失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    if let Ok(mut stmt)=source.prepare(sql){let rows=stmt.query_map([legacy_since],|r|Ok((Metric{ origin:Some(origin.clone()),id:hash(&format!("zcode:tool:{}",r.get::<_,String>(0)?)),device:device.into(),source:"zcode".into(),multica:false,speed:None,harness_identity:0,codex_usage_version:0,revision:0,session:label(&r.get::<_,String>(1)?),tool:label(&r.get::<_,String>(2)?),timestamp:r.get(3)?,model:"未知模型".into(),agent:"未知 Agent".into(),kind:"tool".into(),channel:String::new(),tokens:Tokens::default()},r.get::<_,i64>(4)?))).map_err(|_|"读取 ZCode 历史工具失败")?;for row in rows{let(e,updated)=row.map_err(|_|"读取 ZCode 历史工具失败")?;legacy.offset=legacy.offset.max(updated.max(0) as u64);if merge_metric(&tx,&e,true)?{count+=1}}}
+    for(event,origin_id) in feedback{if reconcile_zcode_feedback(&tx,event,&origin_id)?{count+=1}}
     legacy.offset=legacy.offset.max(legacy_highwater);
     save_cursor(&tx,&legacy_key,&legacy)?;
     save_cursor(&tx,&key,&c)?;tx.commit().map_err(|_| "保存 ZCode 统计失败")?; Ok(count)
@@ -423,7 +591,7 @@ struct Packet {
 impl Packet {
     fn valid(&self)->bool {
         let valid_device=|d:&OptionsDevice|uuid::Uuid::parse_str(&d.id).is_ok() && d.name.len()<=640 && !d.name.chars().any(char::is_control);
-        self.schema==1 && self.events.len()<=1000 && valid_device(&self.device)
+        matches!(self.schema,1|2) && (self.schema==2||self.events.iter().all(|e|sources::legacy_wire(&e.source))) && self.events.len()<=1000 && valid_device(&self.device)
             && self.devices.len()<=1001 && self.devices.iter().all(valid_device) && self.events.iter().all(Metric::valid)
     }
 }
@@ -458,16 +626,18 @@ pub fn cloud_packets(dir: &Path) -> Result<Vec<(String,String)>,String> {
     let names=known_device_names(&db,&o)?;
     let mut stmt=db.prepare("SELECT body FROM metrics WHERE local=1 ORDER BY id").map_err(|_|"读取同步统计失败")?;
     let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_|"读取同步统计失败")?;
-    let mut packets=Vec::new(); let mut events=Vec::new();
+    let mut packets=Vec::new(); let mut batches:BTreeMap<u32,Vec<Metric>>=BTreeMap::new();
     for row in rows {
-        events.push(serde_json::from_str::<Metric>(&row.map_err(|_|"读取同步统计失败")?).map_err(|_|"统计格式无效")?);
-        if events.len()==1000 { packets.push(cloud_packet(&o,&names,std::mem::take(&mut events))?); }
+        let event=serde_json::from_str::<Metric>(&row.map_err(|_|"读取同步统计失败")?).map_err(|_|"统计格式无效")?;
+        let schema=if sources::legacy_wire(&event.source){1}else{2};let events=batches.entry(schema).or_default();events.push(event);
+        if events.len()==1000 { packets.push(cloud_packet(&o,&names,std::mem::take(events))?); }
     }
-    if !events.is_empty() { packets.push(cloud_packet(&o,&names,events)?); }
+    for events in batches.into_values(){if !events.is_empty(){packets.push(cloud_packet(&o,&names,events)?);}}
     Ok(packets)
 }
 fn cloud_packet(o:&Options,names:&[OptionsDevice],events:Vec<Metric>)->Result<(String,String),String>{
-    let body=serde_json::to_string(&Packet{schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(names,&events),events}).map_err(|_|"编码同步统计失败")?;
+    let schema=if events.iter().all(|e|sources::legacy_wire(&e.source)){1}else{2};
+    let body=serde_json::to_string(&Packet{schema,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(names,&events),events}).map_err(|_|"编码同步统计失败")?;
     Ok((format!("quota-{}-{}.json",o.device_id,hash(&body)),body))
 }
 pub fn import_cloud_packet(dir:&Path,data:&[u8])->Result<usize,String>{
@@ -478,7 +648,7 @@ pub fn import_cloud_packet(dir:&Path,data:&[u8])->Result<usize,String>{
     tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![p.device.id,label(&p.device.name)]).map_err(|_|"保存设备失败")?;
     import_device_names(&tx,&p.devices)?;
     let mut count=0;for e in p.events {if merge_metric(&tx,&e,false)?{count+=1}}
-    tx.commit().map_err(|_|"保存同步统计失败")?;Ok(count)
+    tx.commit().map_err(|_|"保存同步统计失败")?;sources::adopt_environments(dir,&db)?;Ok(count)
 }
 
 pub fn import_activity_data(dir:&Path,data:&Value)->Result<usize,String>{
@@ -488,7 +658,7 @@ pub fn import_activity_data(dir:&Path,data:&Value)->Result<usize,String>{
     let mut db=database(dir)?;let tx=db.transaction().map_err(|_|"统计资料库忙碌")?;
     for d in devices{tx.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![d.id,d.name]).map_err(|_|"保存设备失败")?;}
     let mut count=0;for event in events{if merge_metric(&tx,&event,false)?{count+=1}}
-    tx.commit().map_err(|_|"保存同步统计失败")?;Ok(count)
+    tx.commit().map_err(|_|"保存同步统计失败")?;sources::adopt_environments(dir,&db)?;Ok(count)
 }
 #[derive(Clone,Serialize,Deserialize)]
 pub struct OptionsDevice { pub id:String, pub name:String }
@@ -510,17 +680,22 @@ fn sync(dir:&Path,db:&mut Connection,o:&Options) -> Result<(),String> {
     }
     loop {
         let pending:Vec<(i64,String)>=db.prepare("SELECT seq,event_id FROM outbox ORDER BY seq LIMIT 1000").map_err(|_| "读取同步队列失败")?.query_map([],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|_| "读取同步队列失败")?.collect::<Result<_,_>>().map_err(|_| "读取同步队列失败")?;
-        if pending.is_empty(){break}let mut events=Vec::new();
+        if pending.is_empty(){break}let mut events:Vec<Metric>=Vec::new();
         for (_,id) in &pending {let text:String=db.query_row("SELECT body FROM metrics WHERE id=?1",[id],|r|r.get(0)).map_err(|_| "读取同步统计失败")?;events.push(serde_json::from_str(&text).map_err(|_| "同步统计格式无效")?);}
         let max=pending.last().expect("nonempty").0;
-        let packet=Packet {schema:1,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(&names,&events),events};
-        let fingerprint=hash(&serde_json::to_string(&packet).map_err(|_| "编码同步统计失败")?);
-        sync_storage::write_packet(&own.join(format!("{max:020}-{fingerprint}.json.zst")), &packet)?;
+        let (legacy_events,new_events):(Vec<Metric>,Vec<Metric>)=events.into_iter().partition(|e|sources::legacy_wire(&e.source));
+        for (schema,events) in [(1,legacy_events),(2,new_events)]{if events.is_empty(){continue}
+            let packet=Packet {schema,device:OptionsDevice{id:o.device_id.clone(),name:o.device_name.clone()},devices:packet_devices(&names,&events),events};
+            let fingerprint=hash(&serde_json::to_string(&packet).map_err(|_| "编码同步统计失败")?);
+            let target=if schema==1{own.clone()}else{PathBuf::from(&o.sync_dir).join("quota-activity-v2").join(&o.device_id)};
+            fs::create_dir_all(&target).map_err(|_|"无法创建新格式用量同步目录")?;
+            sync_storage::write_packet(&target.join(format!("{max:020}-{fingerprint}.json.zst")), &packet)?;
+        }
         db.execute("DELETE FROM outbox WHERE seq<=?1",[max]).map_err(|_| "保存同步进度失败")?;
     }
     if names_changed {crate::storage::write_atomic(&names_state,&names_fingerprint)?;}
-    let dirs=fs::read_dir(&root).map_err(|_| "同步目录暂时无法读取")?;
     let mut errors=if legacy{sync_storage::restore_legacy(&own,&o.device_id)}else{Vec::new()};
+    for root in [root,PathBuf::from(&o.sync_dir).join("quota-activity-v2")]{if !root.exists(){continue}let dirs=fs::read_dir(&root).map_err(|_| "同步目录暂时无法读取")?;
     for device in dirs {let device=match device{Ok(d)=>d,Err(_)=>{errors.push("部分同步设备目录暂不可用".to_string());continue}};
     if !device.file_type().is_ok_and(|t|t.is_dir()&&!t.is_symlink()){continue}
     let items=match fs::read_dir(device.path()){Ok(items)=>items,Err(_)=>{errors.push("部分设备同步目录暂不可用".to_string());continue}};
@@ -535,7 +710,8 @@ fn sync(dir:&Path,db:&mut Connection,o:&Options) -> Result<(),String> {
         import_device_names(&tx,&p.devices)?;
         for e in p.events {merge_metric(&tx,&e,false)?;}
         tx.execute("INSERT INTO receipts(path,fingerprint) VALUES(?1,?2) ON CONFLICT(path) DO UPDATE SET fingerprint=excluded.fingerprint",params![receipt,fingerprint]).map_err(|_| "保存同步进度失败")?;tx.commit().map_err(|_| "保存同步统计失败")?;
-    }}
+    }}}
+    if let Err(e)=sources::adopt_environments(dir,db){errors.push(e)}
     if errors.is_empty(){Ok(())}else{errors.sort();errors.dedup();Err(format!("其他有效文件已合并，异常包保留并将在下次重试：{}",errors.into_iter().take(4).collect::<Vec<_>>().join("；")))}
 }
 
@@ -547,8 +723,8 @@ pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub session
 pub struct UsageSummary { pub today:u64, pub total:u64, pub date:String, pub updated_at:Option<i64>, pub partial:bool }
 /// Read existing deduplicated metrics without building the full chart/report payload.
 pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
-    let today=chrono::Local::now().date_naive();let db=database(dir)?;let excluded=options(dir).excluded_devices();
-    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total'),json_extract(body,'$.device') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae'").map_err(|_|"读取用量失败")?;
+    let today=chrono::Local::now().date_naive();let db=database(dir)?;let excluded=sources::excluded(dir,&options(dir))?;
+    let mut stmt=db.prepare("SELECT json_extract(body,'$.timestamp'),json_extract(body,'$.tokens.total'),json_extract(body,'$.device') FROM metrics WHERE json_extract(body,'$.kind')='tokens' AND json_extract(body,'$.source')<>'trae' AND NOT(json_extract(body,'$.source')='zcode' AND COALESCE(json_extract(body,'$.revision'),0) IN(1,2))").map_err(|_|"读取用量失败")?;
     let rows=stmt.query_map([],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?,r.get::<_,String>(2)?))).map_err(|_|"读取用量失败")?;
     let mut result=UsageSummary{today:0,total:0,date:today.to_string(),updated_at:None,partial:false};
     for row in rows {let(timestamp,total,device)=row.map_err(|_|"用量记录损坏")?;if excluded.contains(&device){continue}let total=u64::try_from(total).map_err(|_|"用量记录损坏")?;if let Some(t)=chrono::DateTime::from_timestamp_millis(timestamp){let date=t.with_timezone(&chrono::Local).date_naive();if date<=today {result.total=result.total.saturating_add(total);if date==today{result.today=result.today.saturating_add(total);}}}}
@@ -559,7 +735,21 @@ pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
-pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String>,pub sync_errors:Vec<String> }
+pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String>,pub sync_errors:Vec<String>,pub softwares:Vec<Group>,pub launchers:Vec<Group>,pub environments:Vec<Group>,pub accesses:Vec<Group>,pub facets:Facets,pub details:Vec<UsageDetail>,pub coverage:Coverage,pub cache:Vec<Group>,pub cache_daily:Vec<Group>,pub cache_hourly:Vec<Group> }
+#[derive(Serialize)]
+pub struct Facets{pub softwares:Vec<Group>,pub launchers:Vec<Group>,pub environments:Vec<Group>,pub accesses:Vec<Group>,pub vendors:Vec<Group>}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct Coverage{pub token_records:usize,pub known_cache_input:u64,pub all_input:u64}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct UsageDetail{pub software:String,pub launcher:String,pub environment:String,pub access:String,pub model:String,pub vendor:String,pub tokens:Tokens,pub calls:u64,pub sessions:u64}
+fn facets(events:&[Metric])->Facets{Facets{softwares:aggregate(events,|e|sources::software(e).into()),launchers:aggregate(events,|e|sources::launcher(e).into()),environments:aggregate(events,|e|sources::environment(e).into()),accesses:aggregate(events,|e|sources::access(e).into()),vendors:aggregate(events,|e|model_vendor(&e.model).into())}}
+fn details(events:&[Metric])->Vec<UsageDetail>{
+    let mut buckets:BTreeMap<(String,String,String,String,String),Vec<Metric>>=BTreeMap::new();
+    for e in events{buckets.entry((sources::software(e).into(),sources::launcher(e).into(),sources::environment(e).into(),sources::access(e).into(),e.model.clone())).or_default().push(e.clone());}
+    let mut rows:Vec<_>=buckets.into_iter().map(|((software,launcher,environment,access,model),events)|{let group=aggregate(&events,|_|String::new()).pop().unwrap_or_default();UsageDetail{software,launcher,environment,access,vendor:model_vendor(&model).into(),model,tokens:group.tokens,calls:group.calls,sessions:group.sessions}}).collect();rows.sort_by(|a,b|b.tokens.total.cmp(&a.tokens.total));rows
+}
 fn aggregate(events:&[Metric],key:impl Fn(&Metric)->String)->Vec<Group>{
     let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
     for e in events{let k=key(e);let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
@@ -572,6 +762,7 @@ const CHANNEL_SEPARATOR:char='\u{1f}';
 fn model_key(model:&str,channel:&str)->String{if channel.is_empty(){model.into()}else{format!("{model}{CHANNEL_SEPARATOR}{channel}")}}
 fn model_matches(filter:&str,e:&Metric)->bool{
     if filter.is_empty(){return true}
+    if let Some(model)=filter.strip_prefix("model:"){return model==e.model}
     if let Some(vendor)=filter.strip_prefix("vendor:"){return if vendor=="trae" {e.source=="trae"} else {e.source!="trae"&&vendor==model_vendor(&e.model)}}
     if let Some(channel)=filter.strip_prefix("channel:"){return e.source=="trae"&&channel==channel_id(e)}
     match filter.split_once(CHANNEL_SEPARATOR){Some((model,channel))=>model==e.model&&channel==channel_id(e),None=>e.source!="trae"&&filter==e.model}
@@ -595,12 +786,15 @@ pub fn model_vendor(key:&str)->&'static str {
     else if name.starts_with("deepseek"){"deepseek"} else if name.starts_with("glm")||["zai/","z-ai/","zhipu/"].iter().any(|p|raw.starts_with(p)){"zhipu"}
     else if name.starts_with("kimi")||name.starts_with("moonshot"){"moonshot"} else if name.starts_with("mimo")||raw.starts_with("xiaomi/"){"mimo"}
     else if name.starts_with("claude")||raw.starts_with("anthropic/"){"anthropic"} else if name.starts_with("gemini")||raw.starts_with("google/"){"google"}
-    else if name.starts_with("qwen")||raw.starts_with("alibaba/"){"alibaba"} else {"unknown"}
+    else if name.starts_with("grok")||raw.starts_with("xai/"){"xai"} else if name.starts_with("qwen")||raw.starts_with("alibaba/"){"alibaba"} else {"unknown"}
 }
 pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{
+    report_workspace(dir,device,source,days,model,from,to,Default::default())
+}
+pub fn report_workspace(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>,filters:sources::Filters)->Result<Report,String>{
     let date=|value:Option<String>|->Result<Option<chrono::NaiveDate>,String>{value.filter(|s|!s.is_empty()).map(|s|chrono::NaiveDate::parse_from_str(&s,"%Y-%m-%d").map_err(|_|"日期格式无效".to_string())).transpose()};
     let from=date(from)?;let to=date(to)?;if from.zip(to).is_some_and(|(a,b)|a>b){return Err("开始日期不能晚于结束日期".into())}
-    let db=database(dir)?;let o=options(dir);let excluded=o.excluded_devices();let mut events=Vec::new();
+    let db=database(dir)?;let o=options(dir);let excluded=sources::excluded(dir,&o)?;let mut events=Vec::new();
     // Calendar dates agree with the daily chart, including the first day in full.
     // Subtract dates rather than 24-hour durations so daylight-saving days work too.
     let today=chrono::Local::now().date_naive();
@@ -608,8 +802,10 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
     for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
         let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
+        if !e.superseded_zcode() && !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
     let devices=known_device_names(&db,&o)?;
+    let facet_choices=facets(&events);
+    events.retain(|e|filters.matches(e));
     let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
     let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
     sync_errors.extend(crate::usage_sync::errors(dir));
@@ -618,20 +814,28 @@ pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:
     events.retain(|e|model.as_deref().is_none_or(|m|model_matches(m,e)));
     let token_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tokens").cloned().collect();let tool_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tool").cloned().collect();
     let trae_events:Vec<Metric>=events.iter().filter(|e|e.source=="trae").cloned().collect();
-    Ok(Report{ options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.activity_source().into()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors })
+    let cache_events:Vec<_>=token_events.iter().filter(|e|e.origin.as_ref().is_none_or(|o|o.cache_known)).cloned().collect();
+    let context=facets(&events);let detail_rows=details(&events);let known_cache_input=token_events.iter().filter(|e|e.origin.as_ref().is_none_or(|o|o.cache_known)).map(|e|e.tokens.input).sum();let coverage=Coverage{token_records:token_events.len(),known_cache_input,all_input:token_events.iter().map(|e|e.tokens.input).sum()};
+    Ok(Report{ cache:aggregate_models(&cache_events),cache_daily:aggregate(&cache_events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),cache_hourly:aggregate(&cache_events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),softwares:context.softwares,launchers:context.launchers,environments:context.environments,accesses:context.accesses,facets:facet_choices,details:detail_rows,coverage,options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.activity_source().into()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)
 }
 fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
-    let mut o=options(dir);save_options(dir,&o)?;let mut db=database(dir)?;
+    let mut o=options_checked(dir)?;save_options(dir,&o)?;let mut db=database(dir)?;
+    let local_included=sources::local_included(dir,&o)?;
+    sources::prepare_migration(dir,&db)?;
+    sources::begin_collection(&db)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_| "保存设备失败")?;
     let mut errors=Vec::new();
-    let mut count = multica::collect(&mut db, &o, &mut errors);
+    let mut count = if local_included{multica::collect(&mut db, &o, &mut errors)}else{0};
     count+=collect_codex_sources(dir,&mut db,&mut o,&mut errors)?;
-    for path in [PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]{match collect_zcode(&mut db,&path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
-    if !o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
-    if o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
+    let zcode_paths:Vec<_>=if local_included&&!o.zcode_home.is_empty(){vec![PathBuf::from(&o.zcode_home).join("v2/tasks-index.sqlite"),PathBuf::from(&o.zcode_home).join("cli/db/db.sqlite")]}else{vec![]};
+    for path in &zcode_paths {match collect_zcode(&mut db,path,&o.device_id){Ok(n)=>count+=n,Err(e)=>errors.push(e)}}
+    match reconcile_zcode_legacy(&mut db,&zcode_paths){Ok(n)=>count+=n,Err(e)=>errors.push(e)}
+    if local_included&&!o.harness_home.is_empty() { harness::collect(&mut db, Path::new(&o.harness_home), &o.device_id, &mut count, &mut errors); }
+    if local_included&&o.trae_enabled { trae::collect(&mut db, &o.trae_home, &o.device_id, &mut count, &mut errors); }
+    count+=sources::collect(dir,&mut db,&o,&mut errors);
     let sync_errors:Vec<String>=if sync_enabled {
         sync(dir,&mut db,&o).err().into_iter().collect()
     } else {
@@ -643,20 +847,23 @@ fn collect_cycle(dir:&Path,sync_enabled:bool)->Result<usize,String>{
 }
 fn collect_codex_sources(dir:&Path,db:&mut Connection,o:&mut Options,errors:&mut Vec<String>)->Result<usize,String>{
     let mut own_errors=Vec::new();
-    let mut count=collect_codex(db,Path::new(&o.codex_home),&o.device_id,&mut own_errors);
-    let mut devices=o.ssh_devices();count+=ssh::collect_devices(db,&mut devices,&mut own_errors);
+    let mut count=if sources::local_included(dir,o)?{collect_codex(db,Path::new(&o.codex_home),&o.device_id,&mut own_errors)}else{0};
+    let original=o.ssh_devices();let mut devices=original.clone();for device in &mut devices{if !sources::ssh_source_enabled(dir,o,&device.device_id)?{device.included=false;}}
+    count+=ssh::collect_devices(db,&mut devices,&mut own_errors);
+    for device in &mut devices{if let Some(old)=original.iter().find(|old|old.device_id==device.device_id&&old.host==device.host){device.included=old.included;}}
     o.codex_ssh_devices=Some(devices);save_options(dir,o)?;
     crate::storage::write_atomic(&dir.join("output-speed-status.json"),&serde_json::json!({"collectedAt":now(),"errors":own_errors}).to_string())?;
     errors.extend(own_errors);Ok(count)
 }
 pub fn collect_output_speed(dir:&Path)->Result<usize,String>{
-    let mut o=options(dir);if !o.auto_collect{return Ok(0)}
+    let mut o=options_checked(dir)?;if !o.auto_collect{return Ok(0)}
     let mut db=database(dir)?;
+    sources::prepare_migration(dir,&db)?;
     db.execute("INSERT INTO devices(id,name) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET name=excluded.name",params![o.device_id,o.device_name]).map_err(|_|"保存设备失败")?;
     collect_codex_sources(dir,&mut db,&mut o,&mut Vec::new())
 }
 #[tauri::command]
-pub async fn get_activity(app:AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();report_range(state.store.dir(),device,source,days,model,from,to)}).await.map_err(|_|"读取统计失败")?}
+pub async fn get_activity(app:AppHandle,device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>,filters:Option<sources::Filters>)->Result<Report,String>{tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();report_workspace(state.store.dir(),device,source,days,model,from,to,filters.unwrap_or_default())}).await.map_err(|_|"读取统计失败")?}
 #[tauri::command]
 pub async fn get_sync_overview(app:AppHandle)->Result<Value,String>{
     tauri::async_runtime::spawn_blocking(move||{
@@ -687,7 +894,7 @@ pub fn get_activity_options(app:AppHandle)->Options{options(app.state::<AppState
 pub async fn save_activity_options(app:AppHandle,mut input:Options)->Result<(),String>{
     tauri::async_runtime::spawn_blocking(move||{let state=app.state::<AppState>();
     let _guard=state.activity_lock.lock().map_err(|_| "统计暂不可用")?;
-    let previous=options(state.store.dir());
+    let previous=options_checked(state.store.dir())?;
     input.device_id=previous.device_id.clone();input.device_name=label(&input.device_name);
     input.codex_ssh_host=input.codex_ssh_host.trim().to_string();input.codex_ssh_home=input.codex_ssh_home.trim().to_string();
     ssh::validate(&input.codex_ssh_host,&input.codex_ssh_home)?;

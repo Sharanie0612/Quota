@@ -24,7 +24,7 @@ function preparePreview(root,snapshot){
   for(const name of ['ai-models.json','model_catalog.json','ladder.json'])fs.copyFileSync(path.join(root,'src-tauri/data',name),path.join(preview,name));
   fs.writeFileSync(path.join(preview,'aa-task-cost.json'),JSON.stringify(snapshot));
   const [a,b,iteration]=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version.split('.');
-  const mock=fs.readFileSync(path.join(root,'scripts/mock-tauri.js'),'utf8').replaceAll('__QUOTA_VERSION__',a+'.'+b+'.'+iteration.padStart(4,'0'));
+  const mock=fs.readFileSync(path.join(root,'scripts/mock-tauri.js'),'utf8').replaceAll('__QUOTA_VERSION__',a+'.'+b+'.'+iteration.padStart(4,'0'))+'\n'+fs.readFileSync(path.join(root,'scripts/mock-activity-workspace.js'),'utf8');
   fs.writeFileSync(path.join(preview,'index.html'),fs.readFileSync(path.join(root,'dist/index.html'),'utf8').replace('<head>','<head><script>'+mock+'</script>'));
   return preview;
 }

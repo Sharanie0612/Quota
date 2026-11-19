@@ -1,0 +1,43 @@
+.activity-source-workspace { display: grid; gap: 18px; }
+.source-workspace-heading, .source-workspace-heading > div:last-child, .source-software-heading, .source-connect-actions { display: flex; align-items: center; gap: 10px; }
+.source-workspace-heading { justify-content: space-between; align-items: flex-start; }
+.source-workspace-heading > div:first-child { min-width: 0; }
+.source-workspace-heading > div:last-child { flex-shrink: 0; }
+.source-workspace-heading h2 { margin-bottom: 6px; }
+.source-workspace-heading p { margin: 0 0 10px; max-width: 570px; line-height: 1.7; }
+.source-environments { padding: 0; overflow: hidden; }
+.source-environment-nav { display: flex; gap: 8px; padding: 16px; border-bottom: 1px solid var(--border); overflow-x: auto; align-items: center; }
+.source-environment-nav > button:not(.btn) { flex-shrink: 0; text-align: left; border: 1px solid transparent; border-radius: var(--radius-control); padding: 10px 14px; background: transparent; color: var(--text-2); cursor: pointer; }
+.source-environment-nav > button.is-active { background: var(--blue-soft); border-color: var(--blue); color: var(--text); }
+.source-environment-nav small { display: block; margin-top: 5px; font-size: 10px; color: var(--text-3); }
+.source-environment-nav .is-active small { color: var(--text-2); }
+.source-environment-content, .source-add-environment { padding: 8px 22px 22px; }
+.source-add-environment { padding-top: 20px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.source-add-environment h3 { margin-bottom: 16px; }
+.source-connect-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.source-connect-fields .select { width: 100%; }
+.source-connect-notice { margin: 15px 22px 0; line-height: 1.7; }
+.source-environment-options { padding: 0 0 14px; }
+.source-environment-options summary, .source-software-options summary, .source-extra-location summary, .source-repair summary { font-size: 11px; color: var(--text-2); cursor: pointer; padding: 10px 0; }
+.source-environment-options .field { margin-top: 12px; }
+.source-software-row { border-top: 1px solid var(--border); padding: 16px 0 7px; }
+.source-software-heading { justify-content: space-between; }
+.source-software-heading > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.source-software-heading b { font-size: 13px; font-weight: 500; }
+.source-software-heading small { color: var(--text-3); font-size: 10px; }
+.source-state { font-size: 10px; color: var(--text-2); padding: 3px 7px; background: var(--surface-3); border-radius: var(--radius-inset); }
+.source-state-ready, .source-state-connected { color: var(--blue); background: var(--blue-soft); }
+.source-state-error, .source-state-partial { color: var(--text); border: 1px solid var(--border); }
+.source-path { display: flex; gap: 8px; min-width: 0; }
+.source-path .input { flex: 1; min-width: 0; }
+.source-software-options > .field { margin-top: 12px; }
+.source-software-options .hint, .source-status-message { line-height: 1.7; margin: 8px 0; }
+.source-extra-location { margin-top: 14px; border-top: 1px solid var(--border); }
+.source-repair-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; padding: 16px 0; }
+.source-repair-stats b { font-size: 23px; font-weight: 500; font-variant-numeric: tabular-nums; display: block; overflow-wrap: anywhere; }
+.source-repair-stats span { display: block; font-size: 11px; color: var(--text-2); margin-top: 6px; }
+.source-backup-path { overflow-wrap: anywhere; }
+.source-unsaved { display: flex; gap: 10px; align-items: center; position: sticky; bottom: 12px; z-index: 3; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-card); }
+.source-unsaved > span { flex: 1; font-size: 12px; }
+@media(max-width:1100px) { .source-workspace-heading { flex-wrap: wrap; } }
+@media(max-width:700px) { .source-connect-fields { grid-template-columns: 1fr; } .source-environment-content { padding-inline: 16px; } }

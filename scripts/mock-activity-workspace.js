@@ -1,0 +1,33 @@
+/* Synthetic source workspace, included only by the UI preview server. */
+(function(){
+  const api=window.__TAURI_INTERNALS__;const previous=api.invoke.bind(api);
+  const definitions=[['codex','Codex','codex-jsonl'],['claude','Claude Code','claude-jsonl'],['gemini','Gemini CLI','gemini-session'],['cursor','Cursor','cursor-csv'],['harness','DeepSeek Harness','harness'],['zcode','ZCode','zcode'],['kimi','Kimi Code','kimi-wire'],['qoder','Qoder','qoder-jsonl'],['trae','Trae','trae'],['workbuddy','WorkBuddy','codebuddy-jsonl'],['codebuddy','CodeBuddy','codebuddy-jsonl']].map(([id,name,format])=>({id,name,format,docs:'https://example.invalid/format',mode:['cursor','workbuddy'].includes(id)?'export':id==='trae'?'connect':'native'}));
+  const local='00000000-0000-4000-8000-000000000001',ssh='00000000-0000-4000-8000-000000000002';
+  const environments=[{id:local,name:'工作电脑',kind:'local',target:'',home:'C:\\Users\\demo',identityRoot:'',included:true,legacy:true},{id:ssh,name:'Ubuntu 开发机',kind:'ssh',target:'ubuntu-vm',home:'/home/demo',identityRoot:'',included:true,legacy:false}];
+  const t=(total)=>({input:total*.8,cached:total*.6,cacheWrite:0,output:total*.2,reasoning:0,total});
+  let data;
+  const records=[['codex','gpt-6.1-sol','custom',12000,'multica','unknown',local],['claude','deepseek-v4-pro','deepseek',1000,'multica','api',local],['trae','claude-sonnet-4-6','anthropic',3000,'direct','builtin',local],['workbuddy','claude-sonnet-4-6','anthropic',4000,'direct','builtin',local],['workbuddy','gpt-6.1-sol','custom',5000,'direct','api',local],['cursor','gpt-6.1-sol','custom',6000,'direct','builtin',local],['gemini','gemini-3-pro','google',7000,'direct','unknown',ssh],['kimi','未知模型','unknown',8000,'direct','unknown',ssh],['qoder','claude-sonnet-4-6','anthropic',9000,'direct','api',ssh],['harness','deepseek-v4-pro','deepseek',10000,'unknown','unknown',local],['zcode','glm-5.3','zhipu',11000,'unknown','unknown',local]].map(([software,model,vendor,total,launcher,access,environment],i)=>({software,model,vendor,launcher,access,environment,tokens:t(total),calls:10+i,sessions:1}));
+  const sum=(items,key='全部')=>({key,tokens:Object.fromEntries(Object.keys(t(0)).map(k=>[k,items.reduce((s,r)=>s+r.tokens[k],0)])),calls:items.reduce((s,r)=>s+r.calls,0),sessions:items.length});
+  const group=(rows,key)=>[...new Set(rows.map(r=>r[key]))].map(value=>sum(rows.filter(r=>r[key]===value),value));
+  const ensure=async()=>{if(!data){const options=await previous('get_activity_options');data={workspace:{schema:1,environments:structuredClone(environments),instances:definitions.map((d,i)=>({id:`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,software:d.id,environment:local,root:d.id==='harness'?'':`C:\\Users\\demo\\.${d.id}`,enabled:!['cursor','workbuddy','harness','trae'].includes(d.id),launcher:'direct',access:'unknown',format:d.format,legacy:['codex','harness','zcode','trae'].includes(d.id)}))},definitions,statuses:definitions.map((d,i)=>({instance:`10000000-0000-4000-8000-${String(i+1).padStart(12,'0')}`,state:['qoder','codebuddy'].includes(d.id)?'no-usage':d.id==='claude'?'not-found':'ready',records:['codex','zcode'].includes(d.id)?310:0,files:4,at:Date.now(),message:d.id==='qoder'?'已发现会话；本版本日志没有完整 Token 字段。':''})),repair:{changes:7,intercepted:48,feedbackBlocked:35,feedbackPending:2,removedTokens:22500,addedTokens:1025,unreviewedCodex:81,backup:'C:\\Users\\demo\\AppData\\Roaming\\Quota\\activity-backups\\before-sources-demo.sqlite'},autoCollect:options.autoCollect,collectIntervalSeconds:options.collectIntervalSeconds,multicaEnabled:options.multicaEnabled,multicaWorkspaceRoot:options.multicaWorkspaceRoot};}return data;};
+  api.invoke=async(command,args={})=>{
+    if(command==='get_activity_workspace')return structuredClone(await ensure());
+    if(command==='save_activity_workspace'){data={...await ensure(),...args.settings,workspace:structuredClone(args.input)};window.demoActivityWorkspace=structuredClone(data);const options=await previous('get_activity_options');await previous('save_activity_options',{input:{...options,...args.settings}});return null;}
+    if(command==='identify_activity_environment'){if(args.target==='offline')throw Error('环境离线，已有选择保留');return {deviceId:args.target==='ubuntu-vm'||args.target==='vm-alias'?ssh:'00000000-0000-4000-8000-000000000003',name:args.target==='ubuntu-vm'||args.target==='vm-alias'?'Ubuntu 开发机':'Ubuntu WSL'};}
+    if(command==='get_activity'&&new URLSearchParams(location.search).get('activityCase')==='workspace'){
+      const w=await ensure(),filters=args.filters??{};
+      if(window.demoWorkspaceDelayed&&filters.software==='codex')await new Promise(resolve=>setTimeout(resolve,650));
+      const base=records.filter(r=>w.workspace.environments.find(e=>e.id===r.environment)?.included!==false);
+      const facets={softwares:group(base,'software'),launchers:group(base,'launcher'),environments:group(base,'environment'),accesses:group(base,'access'),vendors:group(base,'vendor')};
+      let rows=base.filter(r=>Object.entries(filters).every(([key,v])=>!v||r[key]===v));
+      const availableModels=group(rows,'model');if(args.model)rows=rows.filter(r=>r.model===args.model.replace(/^model:/,''));
+      const today=new Date().toLocaleDateString('sv-SE');if(args.from&&today<args.from||args.to&&today>args.to)rows=[];
+      const totals=sum(rows);const options=await previous('get_activity_options');
+      return {options,devices:w.workspace.environments.map(e=>({id:e.id,name:e.name})),totals,models:group(rows,'model'),availableModels,tools:[{...totals,key:'shell'}],agents:[{...totals,key:'主 Agent'}],daily:[{...totals,key:today}],hourly:[{...totals,key:today+'T09'}],sources:group(rows,'software'),channels:[],byDevice:group(rows,'environment'),softwares:group(rows,'software'),launchers:group(rows,'launcher'),environments:group(rows,'environment'),accesses:group(rows,'access'),facets,details:rows,coverage:{tokenRecords:rows.length,knownCacheInput:totals.tokens.input,allInput:totals.tokens.input},cache:group(rows,'model'),updatedAt:Date.now(),errors:[],syncErrors:[]};
+    }
+    if(command==='get_activity'&&args.filters){args={...args,model:args.model?.replace(/^model:/,''),source:args.filters.launcher==='multica'?'multica':args.filters.software||args.source,device:args.filters.environment||args.device};}
+    const result=await previous(command,args);
+    if(command==='get_activity'&&args.filters)return {...result,facets:{softwares:result.sources.filter(r=>r.key!=='multica'),environments:result.byDevice,launchers:['direct','multica','unknown'].map(key=>({...result.totals,key})),accesses:[],vendors:[]}};
+    return result;
+  };
+})();

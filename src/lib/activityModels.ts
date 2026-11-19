@@ -5,7 +5,7 @@ const separator = "\u001f";
 const channelNames: Record<string, string> = { trae: "Trae 提供", api: "API 接入 Trae", unknown: "未鉴别" };
 
 /** Display name of a model row, without its channel suffix. */
-export function activityModelName(key: string) { return key.split(separator)[0]; }
+export function activityModelName(key: string) { return key.replace(/^model:/,'').split(separator)[0]; }
 
 /** Usage channel of a model row: "trae", "api" or "" when undetermined. */
 export function activityModelChannel(key: string) { return key.split(separator)[1] ?? ""; }
@@ -24,6 +24,7 @@ export function activityModelIdentity(key: string) {
   if (/^mimo/.test(name) || /^xiaomi\//.test(raw)) return { provider: "mimo", vendor: "小米 MiMo" };
   if (/^claude/.test(name) || /^anthropic\//.test(raw)) return { provider: "anthropic", vendor: "Anthropic" };
   if (/^gemini/.test(name) || /^google\//.test(raw)) return { provider: "google", vendor: "Google" };
+  if (/^grok/.test(name) || /^xai\//.test(raw)) return { provider: "xai", vendor: "xAI" };
   if (/^qwen/.test(name) || /^alibaba\//.test(raw)) return { provider: "alibaba", vendor: "Alibaba" };
   return { provider: "unknown", vendor: "其他 / 未识别" };
 }

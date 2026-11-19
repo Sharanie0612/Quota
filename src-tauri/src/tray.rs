@@ -55,14 +55,18 @@ fn base_icon() -> tauri::Result<tauri::image::Image<'static>> {
 
 /// 托盘图标状态角标：有余额不足的账户时，在图标右上角叠一个红点。
 /// 正常与提醒状态都从透明托盘图标绘制，清除提醒也不会恢复白色底板。
-pub fn update_alert(app: &AppHandle, low_count: usize) {
+pub(crate) fn refresh_alert(app: &AppHandle) {
     let Some(tray) = app.tray_by_id("quota-tray") else {
         return;
     };
     let Ok(base) = base_icon() else {
         return;
     };
-    let icon = if low_count > 0 {
+    let state = app.state::<crate::AppState>();
+    let config = state.config_snapshot();
+    let show_alert = config.settings.tray_alert
+        && config.accounts.iter().any(|account| crate::accounts::has_low_balance(&state, account));
+    let icon = if show_alert {
         alert_icon(base)
     } else {
         base

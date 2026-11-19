@@ -1,117 +1,19 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type {
-  TaskCostReport,
-  ActivityReport, ActivityOptions, ActivityFilters, ActivityWorkspace, ActivityWorkspaceReport, SshHostDiscovery, SshIdentity, AccountSyncCandidate, ActivityStorage, UsageRate, UsagePriceReference, UsageScope, UsageBill, MimoLoginStatus, VendorCostReport, VendorExpense, MonthlyUsageRate,
-  AccountInput,
-  AccountTrend,
-  AccountView,
-  AppInfo,
-  CustomProbe,
-  ProviderView,
-  RechargeEvent,
-  Settings,
-  ImportPreview, ImportSelection,
-  LadderSnapshot,
-  LadderPriceCheck,
-} from "./types";
+import type { RechargeEvent } from "./types";
+import { accountsApi } from "./api/accounts";
+import { activityApi } from "./api/activity";
+import { usageApi } from "./api/usage";
+import { modelsApi } from "./api/models";
+import { desktopApi } from "./api/desktop";
+import { transfersApi } from "./api/transfers";
 
 export const api = {
-  getMainWindowChrome: () => invoke<{installed:boolean;blockedFramePaints:number;blockedThemedPaints:number;safeActivationForwards:number}>('get_main_window_chrome'),
-  getTaskCost: () => invoke<TaskCostReport>('get_task_cost'),
-  checkTaskCost: () => invoke<void>('check_task_cost'),
-  refreshTaskCost: () => invoke<TaskCostReport>('refresh_task_cost'),
-  saveTaskCostKey: (key: string) => invoke<TaskCostReport>('save_task_cost_key', { key }),
-  getOutputSpeed: (device='',source='codex',days=7,model='',bucketSeconds=0,lookbackHours=0,lookbackMinutes=0) => invoke<import('./types').OutputSpeedReport>('get_output_speed',{device,source,days,model,bucketSeconds,lookbackHours,lookbackMinutes}),
-  refreshOutputSpeed: () => invoke<number>('refresh_output_speed'),
-  reportBenchmarkSmoke: (report:unknown) => invoke<void>('benchmark_smoke_report',{report}),
-  moveWidget: (dx:number,dy:number,finished:boolean) => invoke<void>('move_widget',{dx,dy,finished}),
-  syncUsageNow: () => invoke<void>('sync_usage_now'),
-  syncActivityNow: () => invoke<void>('sync_activity_now'),
-  getSyncOverview: () => invoke<{devices:{id:string;name:string}[];updatedAt:number|null;syncErrors:string[]}>('get_sync_overview'),
-  getWidgetOptions: () => invoke<{enabled:boolean;side:'left'|'right';heightPercent:number}>('get_widget_options'),
-  saveWidgetOptions: (options:{enabled:boolean;side:'left'|'right';heightPercent:number}) => invoke<typeof options>('save_widget_options',{options}),
-  getWidgetUsage: () => invoke<{today:number;total:number;date:string;updatedAt:number|null;partial:boolean}>('get_widget_usage'),
-  getWidgetSpeed: () => invoke<import('./types').LiveModelStatus>('get_widget_speed'),
-  openMainView: (view:string) => invoke<void>('show_main_window',{view}),
-  widgetReady: () => invoke<void>('widget_ready'),
-  setWidgetExpanded: (expanded:boolean) => invoke<void>('set_widget_expanded',{expanded}),
-  openMain: () => invoke<void>('show_main_window'),
-  exportReportCsv: (path:string,contents:string) => invoke<void>('export_report_csv',{path,contents}),
-  getVendorCosts: (from: string, to: string) => invoke<VendorCostReport>("get_vendor_costs", {from,to}),
-  getMonthlyUsageFx: (months: string[]) => invoke<{rates: MonthlyUsageRate[]; error: string | null}>("get_monthly_usage_fx",{months,average:true}),
-  saveMonthlyUsageFx: (month: string, rate: number | null) => invoke<void>("save_monthly_usage_fx",{month,rate}),
-  saveVendorExpense: (input: VendorExpense, previous: VendorExpense | null = null) => invoke<void>("save_vendor_expense", {input,previous}),
-  getActivityStorage: () => invoke<ActivityStorage>("get_activity_storage"),
-  getActivityReaders: () => invoke<{device:string;version:string|null;compressed:boolean|null;multiSource?:boolean|null}[]>("get_activity_readers"),
-  rebuildActivitySync: () => invoke<number>("rebuild_activity_sync"),
-  optimizeActivityStorage: () => invoke<{before: ActivityStorage; after: ActivityStorage; converted: number}>("optimize_activity_storage"),
-  getUsagePrices: () => invoke<[UsagePriceReference[], Record<string, UsageRate>]>("get_usage_prices"),
-  saveUsageCalculation: (model: string, rate: UsageRate | null, scope: UsageScope, bill: UsageBill | null) => invoke<void>("save_usage_calculation", { model, rate, scope, bill }),
-  getUsageBills: (scope: UsageScope) => invoke<Record<string, UsageBill>>("get_usage_bills", { scope }),
-  pollMimoLogin: (provider: string) => invoke<MimoLoginStatus>("poll_mimo_login", { provider }),
-  getAccountSyncStatus: () => invoke<{lastSynced:string|null;error:string|null}>("get_account_sync_status"),
-  syncAccounts: () => invoke<void>("sync_accounts"),
-  getAccountSyncCandidates: () => invoke<AccountSyncCandidate[]>("get_account_sync_candidates"),
-  resolveAccountSync: (sourceId: string, targetId: string | null) => invoke<void>("resolve_account_sync", { sourceId, targetId }),
-  exportActivitySync: (path:string) => invoke<string>("export_activity_sync",{path}),
-  importActivitySync: (path:string) => invoke<string>("import_activity_sync",{path}),
-  getActivityOptions: () => invoke<ActivityOptions>("get_activity_options"),
-  discoverSshHosts: () => invoke<SshHostDiscovery>("discover_codex_ssh_hosts"),
-  identifySshDevices: (targets:{host:string;home:string}[]) => invoke<SshIdentity[]>("identify_codex_ssh_devices",{targets}),
-  exportData: (path: string) => invoke<string>("export_data", { path }),
-  getExchangeRate: () => invoke<{ cnyPerUsd: number; date: string; checkedAt: string; source: string; error: string | null }>("get_exchange_rate"),
-  getActivity: (device = "", source = "", days = 0, model = "", from = "", to = "", filters?:ActivityFilters) => invoke<ActivityReport>("get_activity", { device, source, days, model, from, to, filters }),
-  getActivityWorkspace: () => invoke<ActivityWorkspaceReport>("get_activity_workspace"),
-  saveActivityWorkspace: (input:ActivityWorkspace, settings?:Pick<ActivityWorkspaceReport,'autoCollect'|'collectIntervalSeconds'|'multicaEnabled'|'multicaWorkspaceRoot'>) => invoke<void>("save_activity_workspace", {input,settings}),
-  identifyActivityEnvironment: (kind:string,target:string,home="") => invoke<{deviceId:string;name:string}>("identify_activity_environment",{kind,target,home}),
-  refreshActivity: () => invoke<number>("refresh_activity"),
-  saveActivityOptions: (input: ActivityOptions) => invoke<void>("save_activity_options", { input }),
-  getLadder: () => invoke<LadderSnapshot>("get_ladder"),
-  refreshLadder: (force = false) => invoke<LadderSnapshot>("refresh_ladder", { force }),
-  checkLadderPrice: (id: string) => invoke<LadderPriceCheck>("check_ladder_price", { id }),
-  adoptLadderPrice: (id: string, input: number, output: number, currency: string, cachedInput: number | null = null, cacheWrite: number | null = null, cacheWriteLong: number | null = null) =>
-    invoke<void>("adopt_ladder_price", { id, input, output, currency, cachedInput, cacheWrite, cacheWriteLong }),
-  startMimoLogin: (accountId?: string) => invoke<void>("start_mimo_login", {accountId: accountId ?? null}),
-  listMimoConnections: () => invoke<{id: string; label: string}[]>("list_mimo_connections"),
-  reuseMimoConnection: (accountId: string, provider: string) => invoke<string>("reuse_mimo_connection", {accountId, provider}),
-  finishMimoLogin: (provider: string) => invoke<string>("finish_mimo_login", { provider }),
-  cancelMimoLogin: () => invoke<void>("cancel_mimo_login"),
-  connectChatgpt: () => invoke<string>("connect_chatgpt"),
-  discardConnection: (id: string) => invoke<void>("discard_connection", { id }),
-  listProviders: () => invoke<ProviderView[]>("list_providers"),
-  listAccounts: () => invoke<AccountView[]>("list_accounts"),
-  saveAccount: (input: AccountInput) => invoke<AccountView>("save_account", { input }),
-  deleteAccount: (id: string) => invoke<void>("delete_account", { id }),
-  refreshAccount: (id: string) => invoke<AccountView>("refresh_account", { id }),
-  refreshAll: () => invoke<AccountView[]>("refresh_all"),
-  getSettings: () => invoke<Settings>("get_settings"),
-  saveSettings: (settings: Settings) => invoke<Settings>("save_settings", { settings }),
-  /** 全部账户的余额历史与趋势（本地记录，用于折线与耗尽预测） */
-  getBalanceHistory: () => invoke<Record<string, AccountTrend>>("get_balance_history"),
-  /** 导出加密备份（配置 + 模型资料 + 全部密钥）；path 来自 dialog 插件 */
-  exportBackup: (password: string, path: string) =>
-    invoke<void>("export_backup", { password, path }),
-  previewImport: (path: string, password: string) => invoke<ImportPreview>("preview_import", {path, password}),
-  importData: (path: string, password: string, fingerprint: string, selection: ImportSelection) =>
-    invoke<string>("import_data", {path, password, fingerprint, selection}),
-  /** 测试自定义余额接口，返回自动发现的金额字段 */
-  probeCustomBalance: (input: {
-    customUrl?: string | null;
-    customHeaders?: string | null;
-    customJsonPath?: string | null;
-    customCurrency?: string | null;
-    customMethod?: string | null;
-    customBody?: string | null;
-  }) => invoke<CustomProbe>("probe_custom_balance", { input }),
-  /** 生成可直接运行的 cURL 调用示例（含该账户的 API Key） */
-  apiSnippet: (accountId: string, modelId: string) =>
-    invoke<string>("api_snippet", { accountId, modelId }),
-  openExternal: (url: string) => invoke<void>("open_external", { url }),
-  appInfo: () => invoke<AppInfo>("app_info"),
-  /** 打开主面板；传 accountId 时主面板会直接定位到该账户 */
-  showMain: (account?: string | null) =>
-    invoke<void>("show_main_window", { account: account ?? null }),
+  ...accountsApi,
+  ...activityApi,
+  ...usageApi,
+  ...modelsApi,
+  ...desktopApi,
+  ...transfersApi,
 };
 
 export const events = {

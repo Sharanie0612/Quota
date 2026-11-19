@@ -1,6 +1,6 @@
 //! Lossless compressed directory packets. JSON export/import remains portable.
 use super::{options, Packet};
-use crate::commands::AppState;
+use crate::AppState;
 use std::{
     fs,
     io::{Read, Write},

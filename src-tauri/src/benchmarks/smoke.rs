@@ -1,5 +1,5 @@
 //! Opt-in verification against the actual packaged WebView, in an empty isolated profile.
-use crate::commands::AppState;
+use crate::AppState;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashSet};
 use tauri::{AppHandle, Manager, State, WebviewWindow};

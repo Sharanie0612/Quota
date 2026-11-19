@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder};
 #[cfg(not(windows))]
 use tauri::PhysicalSize;
-use crate::commands::AppState;
+use crate::AppState;
 
 pub const LABEL: &str = "usage-widget";
 pub const EXPANDED_WIDTH: f64 = 324.0;

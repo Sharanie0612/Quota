@@ -7,7 +7,7 @@ main.tsx → window.ts → App / UsageWidget / SetupView
                         ↓
                  views → components
                         ↓
-                 lib/api.ts → Tauri 命令
+                 lib/api.ts → lib/api/ → Tauri 命令
                         ↓
                  领域服务 → 存储 / 系统凭据库
 ```
@@ -20,7 +20,7 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 | `src/views/` | 六个业务页面及安装向导，组合视图和用户操作 |
 | `src/components/ui.tsx` | 按钮、开关、分段选择、弹层等公共控件 |
 | `src/components/` | 账户卡、图表、导航、任务窗等可复用界面 |
-| `src/lib/api.ts` | 业务 invoke 封装和接口类型 |
+| `src/lib/api.ts`、`src/lib/api/` | 页面从 `api.ts` 导入 `api` 和事件订阅。`api/` 中的账户、活动、费用、模型、桌面和文件传输模块各自维护调用名、参数和返回类型。 |
 | `src/lib/` | 价格坐标、统计筛选、费用分摊、速度布局等纯计算 |
 | `src/lib/appearance/` | 外观配色、偏好校验、共享状态和同步 |
 
@@ -46,14 +46,19 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 
 | 领域 | 主要模块 |
 | --- | --- |
-| 命令与共享状态 | `commands.rs`、`lib.rs` |
-| 账户与订阅 | `providers.rs`、`connections.rs`、`refresh.rs`、`mimo*`、`subscription.rs` |
+| 命令注册与应用状态 | `lib.rs` 注册桌面命令并启动任务。`app_state.rs` 构造 `AppState`，供命令和后台任务共用。 |
+| 账户、桌面、资料库与备份命令 | `commands/accounts.rs`、`commands/desktop.rs`、`commands/catalog.rs`、`commands/backup.rs` |
+| 账户与订阅 | `accounts/edit.rs` 保存配置并关联凭据，`accounts/balance.rs` 选择查询方式并处理手动余额，`accounts/mod.rs` 维护账户视图、刷新快照和历史。供应商协议由 `providers.rs`、`connections.rs`、`mimo*` 和 `subscription.rs` 处理。 |
 | 模型与官方价格 | `ladder.rs`、`benchmarks/`、`ai_models.rs`、`official_prices.rs`、`official_tables.rs` |
 | 用量与速度 | `activity.rs`、`activity_*`、`output_speed*` |
 | 支出与汇率 | `vendor_costs.rs`、`usage_costs.rs`、`usage_fx.rs`、`usage_sync.rs` |
 | 保存与迁移 | `storage.rs`、`secrets.rs`、`backup.rs`、`migration.rs`、`account_sync.rs` |
 
-命令负责参数、锁和调用边界，领域服务负责计算与持久化规则。账户查询仍以 `Balance` 为中心，供应商定义和部分请求仍集中在 `providers.rs`；本轮没有把这些历史约束描述成已完成的服务拆分。
+### 跟踪一次账户刷新
+
+页面从 `api.refreshAccount` 或 `api.refreshAll` 进入 `commands/accounts.rs`。启动、定时和托盘刷新从 `refresh.rs` 进入。两条路径均调用 `accounts::refresh_status`，由 `balance::query` 获取供应商结果，再由 `accounts::record_status` 应用手动余额、保留成功快照、采样费用并记录余额历史。账户模块返回疑似充值事件，`refresh.rs` 将事件发给窗口，整次操作结束后广播一次账户更新并刷新托盘角标。角标和账户卡共用低余额判定。
+
+新增桌面命令时，先找对应领域的已有入口，在 `lib.rs` 的 `generate_handler!` 中注册，然后更新 `src/lib/api/` 中同一业务的封装。安装向导使用 `setup.rs` 的独立注册表，窗口能力配置在 `src-tauri/capabilities/`。
 
 `catalog.rs`、旧资料格式和账务迁移仍被导入、官方资料适配与旧安装使用。删除未接入入口的旧前端页面，不代表可以删除这些数据兼容路径。模型价格来源、单位、配置与核实时间继续独立保存，未知值保持未知。
 
@@ -61,4 +66,4 @@ main.tsx → window.ts → App / UsageWidget / SetupView
 
 `npm run verify` 执行纯逻辑与组件检查，`npm run verify:ui` 在实际构建的合成预览中验证外观、账务操作、图表和任务窗。`scripts/lib/` 共用 TypeScript 加载器、合成费用和表面断言；退役的全窗合成与旧页面检查不再作为当前入口。
 
-Rust 运行逻辑使用对应 example；安装包另做覆盖升级、数据哈希、真实命令、窗口几何和任务窗检查。WebView 截图不等于桌面合成或真实鼠标拖动验收。详见 [开发指南](development.md)、[安全边界](security.md)、[统计与账务](activity-stats.md)。
+在 `src-tauri/` 运行 `cargo run --release --example account_workflow_checks`，可用合成响应、临时目录和内存凭据库验证账户保存、刷新结果处理、删除和疑似充值事件。其余 Rust 运行逻辑使用对应 example。安装包另做覆盖升级、数据哈希、真实命令、窗口几何和任务窗检查。WebView 截图不等于桌面合成或真实鼠标拖动验收。详见 [开发指南](development.md)、[安全边界](security.md)、[统计与账务](activity-stats.md)。

@@ -1049,7 +1049,7 @@ pub fn workspace_report(dir: &Path) -> Result<WorkspaceReport, String> {
 pub async fn get_activity_workspace(app: tauri::AppHandle) -> Result<WorkspaceReport, String> {
     use tauri::Manager;
     tauri::async_runtime::spawn_blocking(move || {
-        let state = app.state::<crate::commands::AppState>();
+        let state = app.state::<crate::AppState>();
         let _guard = state.activity_lock.lock().map_err(|_| "采集设置正在更新")?;
         workspace_report(state.store.dir())
     })
@@ -1064,7 +1064,7 @@ pub async fn save_activity_workspace(
 ) -> Result<(), String> {
     use tauri::{Emitter, Manager};
     tauri::async_runtime::spawn_blocking(move || {
-        let state = app.state::<crate::commands::AppState>();
+        let state = app.state::<crate::AppState>();
         let _guard = state.activity_lock.lock().map_err(|_| "采集设置正在更新")?;
         save_all(state.store.dir(), &input, settings)?;
         let _ = app.emit("activity-updated", ());

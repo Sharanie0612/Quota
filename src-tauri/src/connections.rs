@@ -1,5 +1,5 @@
 //! Xiaomi login uses a private webview. Remote pages have no Quota command permissions.
-use crate::commands::AppState;
+use crate::AppState;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 static MIMO_APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
 pub fn set_app_handle(app: AppHandle) {

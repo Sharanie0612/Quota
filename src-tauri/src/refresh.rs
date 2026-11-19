@@ -1,13 +1,42 @@
-//! 后台自动刷新循环：按设置的时间间隔查询所有账户余额，
-//! 余额低于阈值时发系统通知（同一账户 6 小时内只提醒一次）。
+//! 协调交互与定时账户刷新，发布余额更新事件并发送低余额通知。
 
-use crate::commands::{self, AppState};
+use crate::{accounts, model::{Account, AccountView}, tray, AppState};
 use chrono::Local;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 const RENOTIFY_SECONDS: i64 = 6 * 3600;
+
+async fn refresh_and_record(state: &AppState, app: &AppHandle, account: &Account) -> AccountView {
+    if let Some(event) = accounts::refresh_status(state, account).await {
+        let _ = app.emit("recharge-detected", event);
+    }
+    accounts::view(state, account)
+}
+
+pub(crate) fn accounts_updated(app: &AppHandle) {
+    let _ = app.emit("accounts-updated", ());
+    tray::refresh_alert(app);
+}
+
+pub(crate) async fn one(state: &AppState, app: &AppHandle, id: &str) -> Result<AccountView, String> {
+    let account = state.config_snapshot().accounts.into_iter().find(|a| a.id == id)
+        .ok_or_else(|| format!("账户不存在：{id}"))?;
+    let view = refresh_and_record(state, app, &account).await;
+    accounts_updated(app);
+    Ok(view)
+}
+
+pub(crate) async fn all(state: &AppState, app: &AppHandle) -> Vec<AccountView> {
+    let accounts = state.config_snapshot().accounts;
+    let mut views = Vec::with_capacity(accounts.len());
+    for account in &accounts {
+        views.push(refresh_and_record(state, app, account).await);
+    }
+    accounts_updated(app);
+    views
+}
 
 pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
@@ -37,11 +66,8 @@ pub fn spawn(app: AppHandle) {
 pub async fn run_cycle(app: &AppHandle) {
     let views = {
         let state = app.state::<AppState>();
-        commands::refresh_all_inner(&state, app).await
+        all(&state, app).await
     };
-
-    let _ = app.emit("accounts-updated", ());
-    commands::update_tray_alert(app);
 
     // 注意：这里不复用 State 局部变量持有 MutexGuard，避免守卫比 State 活得更久
     let notify_enabled = app

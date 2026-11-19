@@ -1,6 +1,6 @@
 //! Replicate billing metadata beside the existing activity packets. No Token
 //! events, source logs, account names, endpoints or credentials enter this file.
-use crate::{activity, commands::AppState, usage_fx::{self, MonthlyRate}, vendor_costs::{self, Expense, Samples}};
+use crate::{activity, AppState, usage_fx::{self, MonthlyRate}, vendor_costs::{self, Expense, Samples}};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::{BTreeMap, BTreeSet}, fs, io::Read, path::Path};
 

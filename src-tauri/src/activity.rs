@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
-use crate::commands::AppState;
+use crate::AppState;
 #[path = "activity_harness.rs"]
 mod harness;
 #[path = "activity_multica.rs"]

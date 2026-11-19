@@ -11,6 +11,8 @@ pub mod official_prices;
 pub mod official_tables;
 mod backup;
 mod catalog;
+mod app_state;
+pub mod accounts;
 mod commands;
 mod connections;
 pub mod migration;
@@ -44,8 +46,8 @@ pub use catalog::{save_entry as save_catalog_override, validate_entry as validat
 pub use mimo::{parse_balance, parse_plan_detail, parse_token_plan_usage, MimoMoney, PlanInfo, QuotaItem};
 pub use model::{Account, AccountInput, AccountStatus, AppConfig, CatalogEntry, RemoteModel};
 pub use model::{Balance, BalanceAmount};
-pub use commands::apply_manual_balance;
-pub use commands::AppState;
+pub use accounts::apply_manual_balance;
+pub use app_state::AppState;
 pub use connections::update_mimo_cookie;
 pub use storage::Store;
 pub use proxy::system_proxy_url;
@@ -82,7 +84,7 @@ pub fn run() {
             })?;
             let config = store.load_config();
             let overrides = store.load_overrides();
-            let state = commands::AppState::new(store, config, overrides);
+            let state = AppState::new(store, config, overrides);
             if let Err(error) = account_sync::repair_connections(&state) { account_sync::remember_connection_error(&state, error); }
             connections::set_app_handle(app.handle().clone());
             app.manage(state);
@@ -111,7 +113,7 @@ pub fn run() {
                 WindowEvent::CloseRequested { api, .. } => {
                     if window.label() == "main" {
                         let close_to_tray = window
-                            .state::<commands::AppState>()
+                            .state::<AppState>()
                             .config
                             .lock()
                             .map(|c| c.settings.close_to_tray)
@@ -143,7 +145,7 @@ pub fn run() {
             window_frame::get_main_window_state,
             window_frame::begin_main_window_resize,
             widget::get_widget_options,
-            commands::get_main_window_chrome,
+            commands::desktop::get_main_window_chrome,
             widget::save_widget_options,
             widget::get_widget_usage,
             widget::get_widget_speed,
@@ -189,16 +191,16 @@ pub fn run() {
             connections::cancel_mimo_login,
             connections::connect_chatgpt,
             connections::discard_connection,
-            commands::list_providers,
-            commands::list_accounts,
-            commands::save_account,
-            commands::delete_account,
-            commands::refresh_account,
-            commands::refresh_all,
-            commands::get_settings,
-            commands::save_settings,
-            commands::get_balance_history,
-            commands::export_backup,
+            commands::accounts::list_providers,
+            commands::accounts::list_accounts,
+            commands::accounts::save_account,
+            commands::accounts::delete_account,
+            commands::accounts::refresh_account,
+            commands::accounts::refresh_all,
+            commands::desktop::get_settings,
+            commands::desktop::save_settings,
+            commands::accounts::get_balance_history,
+            commands::backup::export_backup,
             data_export::export_data,
             data_export::export_activity_sync,
             account_sync::get_account_sync_status,
@@ -208,16 +210,16 @@ pub fn run() {
             data_export::import_activity_sync,
             migration::preview_import,
             migration::import_data,
-            commands::model_cards,
-            commands::save_catalog_entry,
-            commands::reset_catalog_overrides,
-            commands::set_model_hidden,
-            commands::compare_prices,
-            commands::probe_custom_balance,
-            commands::api_snippet,
-            commands::open_external,
-            commands::app_info,
-            commands::show_main_window,
+            commands::catalog::model_cards,
+            commands::catalog::save_catalog_entry,
+            commands::catalog::reset_catalog_overrides,
+            commands::catalog::set_model_hidden,
+            commands::catalog::compare_prices,
+            commands::accounts::probe_custom_balance,
+            commands::accounts::api_snippet,
+            commands::desktop::open_external,
+            commands::desktop::app_info,
+            commands::desktop::show_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("Quota 启动失败");

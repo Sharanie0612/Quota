@@ -1,5 +1,5 @@
 use super::{database, known_device_names, now, options, Metric, OptionsDevice};
-use crate::{activity::speed_live, commands::AppState};
+use crate::{activity::speed_live, AppState};
 use serde::Serialize;
 use serde_json::Value;
 use std::{collections::{BTreeMap,BTreeSet}, path::Path};

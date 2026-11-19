@@ -1,6 +1,6 @@
 //! Monthly display references. Freeze the previous month's final ECB quote;
 //! never silently replace a saved month or change original spending currencies.
-use crate::commands::AppState;
+use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::Path};
 use tauri::State;

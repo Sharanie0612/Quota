@@ -1,41 +1,37 @@
 import {save as saveDialog} from '@tauri-apps/plugin-dialog';
-import {useEffect,useMemo,useRef,useState} from 'react';
-import {listen} from '@tauri-apps/api/event';
+import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useReportQuery} from '../lib/useReportQuery';
 import {api,errText} from '../lib/api';
 import {vendorRows,vendorNames,endOfSubscription,expensePortions} from '../lib/vendorCosts';
 import {monthKey,monthRange,shiftMonth,restoreUsageRange} from '../lib/usageMonths';
 import {localDay} from '../lib/usageAnalytics';
 import {cny,convertedExpense} from '../lib/usageCny';
-import type {ActivityReport,VendorCostReport,VendorExpense,MonthlyUsageRate} from '../lib/types';
+import type {VendorExpense,MonthlyUsageRate} from '../lib/types';
 import {Button,Field,Modal,Notice,Seg} from '../components/ui';
 import {IconPlus,IconRefresh} from '../components/icons';
 import {UsageOverview} from '../components/UsageOverview';
 import {SpendingHistory} from '../components/SpendingHistory';
 import {ActualUsagePrices} from '../components/ActualUsagePrices';
 import {toast} from '../lib/store';
-import './usage-workbench.css';
 
 const initialRange=()=>{try{return restoreUsageRange(localStorage.getItem('quota-my-usage-range'));}catch{return restoreUsageRange(null);}};
-type Data={key:string;activity:ActivityReport;finance:VendorCostReport};
-export function UsageCostsView(){
+export function UsageCostsView({ title }: { title: string }){
   const [range,setRange]=useState<{mode:string;from:string;to:string}>(initialRange),[tab,setTab]=useState('overview'),[vendor,setVendor]=useState('');
-  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const [busy,setBusy]=useState(false);
   const [rates,setRates]=useState<MonthlyUsageRate[]>([]),[fxError,setFxError]=useState(''),[fxBusy,setFxBusy]=useState(false),[fxOpen,setFxOpen]=useState(false),[fxReload,setFxReload]=useState(0);
   const [custom,setCustom]=useState(false),[draftFrom,setDraftFrom]=useState(''),[draftTo,setDraftTo]=useState('');
   const [edit,setEdit]=useState<VendorExpense|null>(null),[original,setOriginal]=useState<VendorExpense|null>(null);
   const [kind,setKind]=useState('subscription'),[subscription,setSubscription]=useState(''),[usage,setUsage]=useState(''),[saving,setSaving]=useState(false);
-  const reload=useRef<()=>void>(()=>{});
   const {from,to}=range,currentMonth=monthKey(),query=`${from}|${to}|${vendor}`;
-  const ready=data?.key===query,activity=ready?data.activity:null,finance=ready?data.finance:null;
-  useEffect(()=>{
-    let live=true,inFlight=false,queued=false;setError('');
-    const load=async()=>{if(!live)return;if(inFlight){queued=true;return;}inFlight=true;
-      do{queued=false;try{const [a,f]=await Promise.all([api.getActivity('','without-trae',0,vendor?`vendor:${vendor}`:'',from,to),api.getVendorCosts(from,to)]);if(live){setData({key:query,activity:a,finance:f});setError('');}}catch(e){if(live)setError(errText(e));}}while(queued&&live);inFlight=false;
-    };
-    reload.current=()=>void load();void load();
-    const events=['activity-updated','accounts-updated'].map(name=>listen(name,()=>void load()));
-    return()=>{live=false;for(const event of events)void event.then(stop=>stop()).catch(()=>{});};
-  },[query,from,to,vendor]);
+  const read = useCallback(async () => {
+    const [activity, finance] = await Promise.all([
+      api.getActivity("", "without-trae", 0, vendor ? "vendor:" + vendor : "", from, to),
+      api.getVendorCosts(from, to),
+    ]);
+    return { activity, finance };
+  }, [from, to, vendor]);
+  const { data, error, reload } = useReportQuery(query, read, { accounts: true });
+  const ready = data !== null, activity = data?.activity ?? null, finance = data?.finance ?? null;
   const months=useMemo(()=>[...new Set([
     ...(finance?.expenses??[]).filter(e=>(!vendor||e.vendor===vendor)&&e.currency==='USD'&&e.from<=to&&e.to>=from).flatMap(e=>expensePortions(e,from,to).map(p=>p.month)),
     ...(finance?.history??[]).filter(row=>(!vendor||row.vendor===vendor)&&row.currency==='USD').map(row=>localDay(new Date(row.at*1000)).slice(0,7))
@@ -63,9 +59,9 @@ export function UsageCostsView(){
     const a=remove||kind==='usage'?null:parse(subscription),b=remove||kind==='subscription'?null:parse(usage);
     if(!remove&&a==null&&b==null){toast('请填写实付金额','error');return;}
     if([a,b].some(value=>value!=null&&(!Number.isFinite(value)||value<0||value>1e9))){toast('请输入有效的非负金额','error');return;}
-    setSaving(true);try{await api.saveVendorExpense({...(remove?original??edit:edit),subscription:a,usage:b,planId:remove?null:edit.planId},original);setEdit(null);setOriginal(null);reload.current();toast(remove?'已删除支出':'已记录支出');}catch(e){toast(errText(e),'error');}finally{setSaving(false);}
+    setSaving(true);try{await api.saveVendorExpense({...(remove?original??edit:edit),subscription:a,usage:b,planId:remove?null:edit.planId},original);setEdit(null);setOriginal(null);reload();toast(remove?'已删除支出':'已记录支出');}catch(e){toast(errText(e),'error');}finally{setSaving(false);}
   };
-  const update=async()=>{setBusy(true);try{const result=await Promise.allSettled([api.refreshActivity(),api.refreshAll()]);reload.current();const failed=result.filter(row=>row.status==='rejected');if(failed.length)toast('部分来源更新失败，请在设置中查看','error');}finally{setBusy(false);}};
+  const update=async()=>{setBusy(true);try{const result=await Promise.allSettled([api.refreshActivity(),api.refreshAll()]);reload();const failed=result.filter(row=>row.status==='rejected');if(failed.length)toast('部分来源更新失败，请在设置中查看','error');}finally{setBusy(false);}};
   const exportCsv=async(contents:string,suffix:string)=>{try{const path=await saveDialog({title:'导出当前统计',defaultPath:`Quota-${suffix}-${localDay()}.csv`,filters:[{name:'CSV 报表',extensions:['csv']}]});if(path){await api.exportReportCsv(path,contents);toast('报表已导出');}}catch(e){toast(errText(e),'error');}};
   const selectedPlan=finance?.plans.find(plan=>plan.id===edit?.planId);
   const choosePlan=(id:string)=>{const plan=finance?.plans.find(row=>row.id===id&&row.vendor===edit?.vendor);if(!edit)return;if(!plan){setEdit({...edit,planId:null});return;}setKind('subscription');setSubscription(String(plan.amount));setEdit({...edit,planId:plan.id,currency:plan.currency,to:endOfSubscription(edit.from,plan.months)});};
@@ -73,7 +69,7 @@ export function UsageCostsView(){
   const missing=finance?.expenses.some(e=>(!vendor||e.vendor===vendor)&&e.currency==='USD'&&e.from<=localDay()&&convertedExpense(e,from,to,rates).missingMonths.length);
   const vendors=Object.entries(vendorNames).filter(([id])=>['custom','deepseek','mimo','moonshot','zhipu'].includes(id)||finance?.expenses.some(e=>e.vendor===id)||rows.some(row=>row.id===id));
   return <div className="content-inner usage-costs usage-simple">
-    <header className="usage-heading"><h1>我的使用</h1><div><Button variant="quiet" aria-label="更新我的使用" disabled={busy} onClick={()=>void update()}><IconRefresh size={17} className={busy?'spin':''}/></Button><Button variant="primary" onClick={()=>openEditor()}><IconPlus size={16}/>记录支出</Button></div></header>
+    <header className="usage-heading"><h1>{title}</h1><div><Button variant="quiet" aria-label="更新我的使用" disabled={busy} onClick={()=>void update()}><IconRefresh size={17} className={busy?'spin':''}/></Button><Button variant="primary" onClick={()=>openEditor()}><IconPlus size={16}/>记录支出</Button></div></header>
     <div className="usage-toolbar">
       <div className="usage-date-control">{range.mode==='month'?<><Button variant="quiet" aria-label="上一个月" disabled={!shiftMonth(from.slice(0,7),-1)} onClick={()=>chooseMonth(shiftMonth(from.slice(0,7),-1)!)}>‹</Button><input className="input" aria-label="统计月份" type="month" value={from.slice(0,7)} onChange={event=>chooseMonth(event.target.value)}/><Button variant="quiet" aria-label="下一个月" disabled={!shiftMonth(from.slice(0,7),1)} onClick={()=>chooseMonth(shiftMonth(from.slice(0,7),1)!)}>›</Button></>:<Button variant="quiet" onClick={openCustom}>{range.mode==='all'?'全部历史':`${from} — ${to}`}</Button>}</div>
       <select className="select" aria-label="统计时间范围" value={['month','week','quarter','year','all'].includes(range.mode)?range.mode:'custom'} onChange={event=>preset(event.target.value)}><option value="month">按月查看</option><option value="week">近 7 天</option><option value="quarter">近 90 天</option><option value="year">今年</option><option value="all">全部历史</option><option value="custom">自定义日期</option></select>
@@ -81,7 +77,7 @@ export function UsageCostsView(){
       <Button size="sm" variant="quiet" onClick={()=>{setFxOpen(true);}}>{fxBusy?'汇率更新中':'人民币 · 月均汇率'}</Button>
     </div>
     <div className="usage-view-tabs"><Seg value={tab} onChange={setTab} options={[{value:'overview',label:'总览'},{value:'history',label:'消费记录'},{value:'prices',label:'实际单价'}]}/></div>
-    {error&&<Notice tone="error" actions={<Button onClick={()=>reload.current()}>重试</Button>}>{error}</Notice>}
+    {error&&<Notice tone="error" actions={<Button onClick={()=>reload()}>重试</Button>}>{error}</Notice>}
     {!ready&&!error&&<section className="card usage-cost-placeholder" role="status">正在读取记录…</section>}
     {ready&&fxError&&missing&&<Notice tone="warn" actions={<Button onClick={()=>setFxReload(n=>n+1)}>获取汇率</Button>}>部分美元支出等待月均汇率，人民币合计暂不显示。</Notice>}
     {ready&&activity&&finance&&tab==='overview'&&<UsageOverview activity={activity} finance={finance} from={from} to={to} vendor={vendor} rates={rates} onAdd={()=>openEditor()} onVendor={id=>{setVendor(id);setTab('prices');}} onExport={(contents,suffix)=>void exportCsv(contents,suffix)}/>}

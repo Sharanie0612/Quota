@@ -7,7 +7,6 @@ import { Button, Notice } from '../components/ui';
 import { IconCheck } from '../components/icons';
 import { errText } from '../lib/api';
 import appIcon from '../../src-tauri/icons/128x128.png';
-import './setup.css';
 
 type Step='welcome'|'location'|'review'|'installing'|'finish';
 interface Info {version:string;target:string;previousVersion:string|null;payloadBytes:number}

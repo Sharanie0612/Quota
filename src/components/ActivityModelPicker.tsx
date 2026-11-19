@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { ActivityGroup } from "../lib/types";
 import { activityChannelName, activityChannels, activityModelChannel, activityModelChoices, activityModelIdentity, activityModelName } from "../lib/activityModels";
 import { ModelLogo } from "./ModelLogo";
-import "./activity-model-picker.css";
 const channelHints: Record<string, string> = { trae: "Trae 提供（用 Trae 额度）", api: "API 接入 Trae（自带密钥）", unknown: "未鉴别通道" };
 const label = (key: string) => { const channel = activityChannelName(activityModelChannel(key)); return channel ? `${activityModelName(key)} · ${channel}` : activityModelName(key); };
 export function ActivityModelPicker({rows,value,onChange,loading,softwareView=false}: {rows:ActivityGroup[];value:string;onChange:(key:string)=>void;loading:boolean;softwareView?:boolean}) {

@@ -86,6 +86,8 @@ npm run preview:ui
 
 组件从 `src/lib/api.ts` 导入 `api`。`src/lib/api/` 按业务封装 invoke，`src-tauri/src/lib.rs` 将命令注册到 `commands/` 或各领域已有入口。共享状态在 `app_state.rs` 构造。
 
+主窗导航定义在 `src/lib/workspacePages.ts`，页面与设置分类由 `App.tsx` 选取，业务样式统一在 `src/styles.css` 登记。工具栏和报表页面使用 `useReportQuery` 协调事件与轮询。活动查询及分组在 `src-tauri/src/activity/report.rs` 和 `activity/report/groups.rs`，变更后运行 `activity_report_checks` 与既有活动回归。
+
 - 加一个业务命令时，在对应 Rust 领域的命令模块实现，在 `lib.rs` 的 `generate_handler!` 注册，在 `src/lib/api/` 对应模块加封装。账户增删查与刷新逻辑在 `accounts/`，改动后运行 `account_workflow_checks`。
 - 加一个供应商：`providers.rs` 的 `provider_defs()` 加定义（含余额探测与模型列表能力）；如默认隐藏，把 id 加进 `HIDDEN`。
 - 供应商接口挂了怎么办：查询失败要显示可读错误 + 三个动作（重试 / 打开官网 / 改手动余额）。任何供应商都要能退化到「手动余额」参与低余额通知。

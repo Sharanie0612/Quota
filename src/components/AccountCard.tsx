@@ -17,7 +17,6 @@ import {
   IconWallet,
 } from "./icons";
 import { Badge, Button, Notice } from "./ui";
-import "./account-cards.css";
 
 /** 余额迷你折线：最近 30 天的本地历史记录，不足两个点不画 */
 function Sparkline({ points, low }: { points: HistoryPoint[]; low?: boolean }) {

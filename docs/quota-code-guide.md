@@ -167,19 +167,17 @@ src-tauri/src/              后端（Rust 层）
 
 ### 4.1 App.tsx —— 总壳
 
-`src/App.tsx` 一共干三件事：
+`src/App.tsx` 负责主窗口的页面和账户操作。
 
-1. **记住当前在哪个页面**：`const [view, setView] = useState("accounts")`，点侧边栏按钮时调用相应的 `setView`，例如 `setView("ai-models")`。
-2. **按 view 渲染对应页面**（React 的条件渲染写法 `{view === "x" ? <页面/> : null}`）。
-3. **接收账户事件**：`focus-account`（从托盘点进某个账户时，打开它的编辑面板）和 `recharge-detected`（后端检测到「疑似充值」时，弹一条提示）。
-
-侧栏和 `navigate-main` 事件都通过 `view` 选择当前页面。
+1. `src/lib/workspacePages.ts` 登记页面名称、图标与布局。点击侧栏或从另一个窗口收到 `navigate-main` 后，`App` 更新当前页面。
+2. `renderPage()` 选择要展示的页面。首次打开模型、活动等页面时才加载所需代码。跳转设置时还可以指定分类，例如从输出速度页直接进入「采集来源」。
+3. 收到 `focus-account` 时打开对应账户的编辑面板。收到 `recharge-detected` 时展示余额上涨提示。
 
 ### 4.2 store.ts —— 手写的迷你状态管理
 
 - `useAccounts()`：封装「拉账户列表 + 听 accounts-updated 广播自动重拉 + 手动刷新单个/全部」。
 - `useToasts()`：订阅全局操作提示，自动关闭时间由 `motion.feedback` 统一控制。
-- `useSettings()`：读/存设置。
+- `useSettings()` 先显示刚修改的字段，再依次保存。每一次写入都以上次确认保存的设置为基础。
 
 没有引入 redux/zustand 之类的库，因为数据流足够简单：**所有数据都以后端为准，前端只做「问 + 听」**。
 
@@ -449,9 +447,9 @@ node scripts/verify-logic.cjs  # 纯逻辑自检 7 项（含阿里云官方签�
 **建议的练习路径**（由易到难，每步都只碰一个概念）：
 
 1. 把某个隐藏平台加回界面：从 `HIDDEN` 数组删掉一个 id（如 `siliconflow`），跑 `npm run tauri dev` 看下拉框变化。——练「改登记表」
-2. 改一句界面文案：`App.tsx` 里侧边栏的副标题。——练「改前端」
+2. 在 `src/lib/workspacePages.ts` 调整一个页面的名称，核对侧栏和页面标题。
 3. 给低余额通知改个措辞：`refresh.rs` 的 `body(format!(...))`。——练「改 Rust」
-4. 加一个设置项：`model.rs` 的 `Settings` 结构 + `types.ts` 同步 + `SettingsView.tsx` 加控件。——练「两边同步」
+4. 添加一个设置项时，在 `model.rs` 和 `types.ts` 的 `Settings` 中定义字段，再在 `views/settings/` 对应分类中添加控件。
 
 ---
 

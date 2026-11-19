@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ActivityGroup } from "../lib/types";
 import { metricValue, periodLabel, emptyTokens, smoothUsagePath, bucketUsage, heatLevel, parseDay, usageCalendar, periodRange, type ActivityMetric, type ActivityRange, type TimeScale } from "../lib/activityCharts";
-import "./activity-charts.css";
 import { activityFilterLabel } from "../lib/activityModels";
 
 const number = (n: number) => new Intl.NumberFormat("zh-CN").format(n);

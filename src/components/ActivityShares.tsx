@@ -3,7 +3,6 @@ import { useState } from 'react';
 import type { ActivityReport } from '../lib/types';
 import { cacheShares, shares, type Share } from '../lib/activityShares';
 import { activityFilterLabel } from '../lib/activityModels';
-import './activity-shares.css';
 
 const colors=['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-4)','var(--chart-5)','var(--chart-rest)'];
 function Donut({title,rows,format,onChoose,cache=false}:{title:string;rows:Share[];format:(n:number)=>string;onChoose?:(key:string)=>void;cache?:boolean}){

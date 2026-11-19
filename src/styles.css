@@ -1,3 +1,17 @@
+/* Preserve a single cascade across windows, independent of the order pages are opened. */
+@import './components/account-cards.css';
+@import './views/output-speed.css';
+@import './components/activity-sources.css';
+@import './views/settings-sections.css';
+@import './components/activity-charts.css';
+@import './components/activity-shares.css';
+@import './components/activity-model-picker.css';
+@import './views/activity-controls.css';
+@import './views/usage-workbench.css';
+@import './views/model-ladder.css';
+@import './components/usage-widget.css';
+@import './views/setup.css';
+
 @import './styles/base.css';
 @import './styles/layout.css';
 @import './styles/controls.css';

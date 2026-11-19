@@ -17,6 +17,7 @@ export const api = {
 };
 
 export const events = {
+  onNavigateMain: (cb: (view: string) => void) => listen<string>("navigate-main", e => cb(e.payload)),
   onActivityUpdated: (cb: () => void) => listen("activity-updated", cb),
   onAccountsUpdated: (cb: () => void) => listen("accounts-updated", cb),
   /** 刷新时检测到余额明显上涨（疑似充值） */

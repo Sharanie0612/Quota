@@ -1,7 +1,7 @@
 //! Local metadata tailing. There is no per-token stream in Codex rollout files.
 //! A heartbeat means the source was checked, never that a speed was measured.
 use super::{collect_codex_file, cursor, database, files, now, options, LOCAL_CODEX_LOCK};
-use crate::commands::AppState;
+use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::{Path, PathBuf}, time::{Duration, Instant, SystemTime}};
 use tauri::{Emitter, Manager};

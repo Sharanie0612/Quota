@@ -3,7 +3,7 @@ import { api, errText, events } from "../lib/api";
 import type { AccountSyncCandidate, AccountView } from "../lib/types";
 import { Button, Notice } from "./ui";
 
-export function AccountSyncPanel() {
+export function AccountSyncPanel({active = true}: {active?: boolean}) {
   const [rows, setRows] = useState<AccountSyncCandidate[]>([]);
   const [accounts, setAccounts] = useState<AccountView[]>([]);
   const [targets, setTargets] = useState<Record<string,string>>({});
@@ -14,8 +14,12 @@ export function AccountSyncPanel() {
       setRows(candidates); setAccounts(local); setError(""); }
     catch (e) { setError(errText(e)); }
   }, []);
-  useEffect(() => { void reload(); const un = events.onAccountsUpdated(() => void reload());
-    return () => { void un.then(f => f()).catch(() => undefined); }; }, [reload]);
+  useEffect(() => {
+    if (!active) return;
+    void reload();
+    const un = events.onAccountsUpdated(() => void reload());
+    return () => { void un.then(f => f()).catch(() => undefined); };
+  }, [active, reload]);
   const resolve = async (id: string, target: string | null) => {
     if (busy) return; setBusy(true);
     try { await api.resolveAccountSync(id,target); await reload(); }

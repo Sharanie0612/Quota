@@ -13,7 +13,6 @@ import {
   selectedComparison, selectedConfiguration, type ModelFamily,
 } from "../lib/modelComparison";
 import type { TaskCostModel, TaskCostReport } from "../lib/types";
-import "./model-ladder.css";
 
 const aaChart = "https://artificialanalysis.ai/models?cost=intelligence-vs-cost-per-task";
 const aaKeys = "https://artificialanalysis.ai/api-key-management-redirect";
@@ -188,7 +187,7 @@ function ModelDetail({ row, onChooseConfiguration, onClose }: {
   </Modal>;
 }
 
-export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
+export function AiModelsHub({ title, autoUpdate }: { title: string; autoUpdate: boolean }) {
   const [report, setReport] = useState<TaskCostReport | null>(null);
   const [selection, setSelection] = useState(readSelection);
   const [view, setView] = useState<ModelView>("chart");
@@ -331,7 +330,7 @@ export function AiModelsHub({ autoUpdate }: { autoUpdate: boolean }) {
   const placeholder = !report && !error ? "正在读取模型" : emptyChart;
   return <div className="content-inner visual-model-page" data-task-cost-origin={snapshot?.origin}>
     <header className="task-page-heading">
-      <h1>AI 模型</h1>
+      <h1>{title}</h1>
       <div className="task-model-actions task-source-status">
         {snapshot && <span data-checked-at={snapshot.checkedAt} role="status">
           {snapshot.origin === "api" && connected && !failure ? "AA 已连接" : snapshot.origin === "api" ? "缓存数据" : "历史快照"}

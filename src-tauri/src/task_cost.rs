@@ -1,5 +1,5 @@
 //! Local view of Artificial Analysis's published Intelligence Index and task cost.
-use crate::{benchmarks, commands::AppState, secrets, storage};
+use crate::{benchmarks, AppState, secrets, storage};
 use chrono::{DateTime, NaiveDate, Utc};
 use reqwest::{header::HeaderValue, StatusCode};
 use serde::{Deserialize, Serialize};

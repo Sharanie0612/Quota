@@ -7,7 +7,7 @@ import { ActivityStoragePanel } from './ActivityStoragePanel';
 import { AccountSyncPanel } from './AccountSyncPanel';
 import { splitSyncDevices } from '../lib/syncDevices';
 
-export function CrossDeviceSyncPanel(){
+export function CrossDeviceSyncPanel({active = true}: {active?: boolean}){
   const [options,setOptions]=useState<ActivityOptions|null>(null);
   const [report,setReport]=useState<Awaited<ReturnType<typeof api.getSyncOverview>>|null>(null);
   const [account,setAccount]=useState<{lastSynced:string|null;error:string|null}|null>(null);
@@ -26,7 +26,14 @@ export function CrossDeviceSyncPanel(){
     if(ps.status==='rejected')r.syncErrors=[...r.syncErrors,errText(ps.reason)];
     setOptions(o);setReport(r);setAccount(a);setReaders(p);setError('');return {o,r,a};
   },[]);
-  useEffect(()=>{let live=true;void reload().catch(e=>{if(live)setError(errText(e));});const refresh=()=>{if(live)void reload().catch(()=>undefined);};const un=events.onAccountsUpdated(refresh);const activity=events.onActivityUpdated(refresh);return()=>{live=false;void un.then(f=>f());void activity.then(f=>f());};},[reload]);
+  useEffect(()=>{
+    if(!active)return;
+    let live=true;
+    const refresh=()=>{if(live)void reload().catch(e=>{if(live)setError(errText(e));});};
+    refresh();
+    const subscriptions=[events.onAccountsUpdated(refresh),events.onActivityUpdated(refresh)];
+    return()=>{live=false;for(const subscription of subscriptions)void subscription.then(stop=>stop()).catch(()=>undefined);};
+  },[active,reload]);
   const sync=async(o=options)=>{
     if(!o?.syncDir)return;
     setBusy(true);setError('');setMessage('');setAttempt(value=>value+1);
@@ -66,7 +73,7 @@ export function CrossDeviceSyncPanel(){
     {message&&<Notice autoDismiss dismissKey={attempt}>{message}</Notice>}
     {errorSummary&&<Notice autoDismiss dismissKey={`${attempt}:${errorSummary}`} tone="warn">部分同步未完成，已保存的数据仍保留。</Notice>}
     {errorSummary&&<details className="sync-devices sync-error-details"><summary>查看未完成的同步</summary><p>{errorSummary}</p></details>}
-    {enabled&&options?.syncAccounts&&<AccountSyncPanel/>}
+    {enabled&&options?.syncAccounts&&<AccountSyncPanel active={active}/>}
     {enabled&&<details className="sync-advanced"><summary>高级选项与故障处理</summary>
       <div className="setting-row"><div className="txt"><b>同时同步账户信息</b><span>同步账户名称、余额与额度；不会同步密钥和登录信息。</span></div><Switch checked={options?.syncAccounts??true} label="同时同步账户信息" disabled={busy} onChange={value=>{setBusy(true);void update({syncAccounts:value}).catch(e=>setError(errText(e))).finally(()=>setBusy(false));}}/></div>
       <p className="hint sync-folder">{options?.syncDir}</p><div className="tag-row"><Button size="sm" disabled={busy} onClick={()=>void choose()}>更换文件夹</Button><Button size="sm" disabled={busy} onClick={()=>{setBusy(true);void update({syncDir:''}).then(()=>{setMessage('已停止跨设备同步，本机账户和用量仍保留。');setError('');return reload();}).catch(e=>setError(errText(e))).finally(()=>setBusy(false));}}>停止同步</Button></div>

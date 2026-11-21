@@ -1,7 +1,7 @@
 //! Actual vendor spending. Never derive spending from public API token rates.
 use crate::{
     activity::Metric,
-    commands::AppState,
+    AppState,
     model::{Account, AccountStatus},
 };
 use serde::{Deserialize, Serialize};

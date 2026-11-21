@@ -22,7 +22,7 @@
 | 一 · 打地基 | 第 3 部分 | 文件地图 + 一次调用的完整旅程 |
 | 二 · 走主线 | 第 4 部分 | 前端骨架（App.tsx） |
 | 二 · 走主线 | 第 5 部分 | 传话筒（api.ts / types.ts） |
-| 二 · 走主线 | 第 6 部分 | 后端大门（lib.rs / commands.rs） |
+| 二 · 走主线 | 第 6 部分 | 后端大门（lib.rs / commands/） |
 | 二 · 走主线 | 第 7 部分 | 供应商登记表（providers.rs） |
 | 二 · 走主线 | 第 8 部分 | 密钥保险箱（secrets.rs / connections.rs） |
 | 二 · 走主线 | 第 9 部分 | 账本（storage.rs / history.rs） |
@@ -50,7 +50,7 @@ Quota 是一个 Windows 桌面软件，技术栈叫 **Tauri 2**。用一家餐�
 
 **为什么界面是「网页」？** Tauri 的做法是：Rust 负责开一个系统自带的浏览器内核（WebView2，Windows 自带，不用额外安装），里面跑一个本地网页。所以 `src/` 目录下全是网页代码，`src-tauri/` 目录下全是 Rust 代码。
 
-**为什么要分成两半？** 最主要的原因是**安全**：API Key 这类秘密只放在 Rust 这边，永远不传给网页层。网页就算被注入恶意代码，也拿不到密钥。
+账户列表交给前端的是凭据是否存在的标记。Rust 负责写入系统凭据库和调用供应商。`api_snippet` 生成的调用示例会将该账户的 API Key 返回给调用方。自定义余额请求头和请求体随 `config.json` 保存。
 
 **前后端只有两条对话通道**，记住它们，整个工程就通了：
 
@@ -113,18 +113,20 @@ const [view, setView] = useState<View>("accounts");
 
 ```
 src/                        前端（网页层）
-├── App.tsx                 总壳：左侧导航 + 4 个页面切换
-├── views/                  4 个页面：账户总览 / 模型库 / AI 天梯 / 设置
+├── App.tsx                 主窗口导航与页面切换
+├── views/                  账户总览 / 我的使用 / AI 模型 / Token 活动 / 输出速度 / 设置
 ├── components/             可复用积木：账户卡片、编辑表单、弹窗、图标…
 └── lib/
-    ├── api.ts              传话筒：所有 invoke 命令的集中封装（唯一前后端边界）
+    ├── api.ts              传话筒：页面使用的调用入口，按业务组合 lib/api/ 下的封装
     ├── types.ts            数据说明书：与 Rust 端字段一一对应
     └── store.ts            小型状态管理：toast 提示 + 账户数据自动刷新
 
 src-tauri/src/              后端（Rust 层）
-├── lib.rs                  启动入口：装插件、建共享状态、启动后台任务、注册 30 个命令
-├── commands.rs             前端命令的「前台接待」（最大的文件）
-├── providers.rs            供应商登记表 + 各平台余额查询实现（第二大的文件）
+├── lib.rs                  启动入口：装插件、建共享状态、启动后台任务、注册桌面命令
+├── commands/               账户、设置和窗口、资料库、备份的命令入口
+├── app_state.rs            初始化共享状态和 HTTP 客户端
+├── accounts/               保存账户、刷新余额、生成视图与记录历史
+├── providers.rs            供应商登记表 + 各平台余额查询实现
 ├── secrets.rs              密钥保险箱（Windows 凭据管理器）
 ├── connections.rs          小米登录隔离窗口 / ChatGPT 连接
 ├── subscription.rs         ChatGPT 订阅额度读取
@@ -143,13 +145,13 @@ src-tauri/src/              后端（Rust 层）
 
 这条旅程是**全文的主线**，后面第 4~9 部分就是把它一段一段拆开讲：
 
-1. 你点击按钮 → `AccountsView` 里绑定的 `refreshAll()` 被执行（`src/lib/store.ts:66`）。
-2. `refreshAll` 调 `api.refreshAll()`，它就是一行 `invoke<AccountView[]>("refresh_all")`（`src/lib/api.ts:35`）——递菜窗口喊：「refresh_all！」
-3. Rust 侧收到，找到贴了 `#[tauri::command]` 标签的 `refresh_all` 函数（`src-tauri/src/commands.rs`）。
-4. 它遍历每个账户，按账户的「余额策略」调 `providers.rs::fetch_balance`：DeepSeek 走官方余额接口、小米走 Cookie、阿里云走 AccessKey 签名……
+1. 你点击按钮 → `AccountsView` 里绑定的 `refreshAll()` 被执行（`src/lib/store.ts`）。
+2. `refreshAll` 调 `api.refreshAll()`，它就是一行 `invoke<AccountView[]>("refresh_all")`（`src/lib/api/accounts.ts`）——递菜窗口喊：「refresh_all！」
+3. Rust 侧收到，找到贴了 `#[tauri::command]` 标签的 `refresh_all` 函数（`src-tauri/src/commands/accounts.rs`）。
+4. `refresh::all` 遍历账户，`accounts/balance.rs` 按账户配置选择对应的查询方式。DeepSeek 走官方余额接口、小米走 Cookie、阿里云走 AccessKey 签名……
 5. 结果写进共享状态 `AppState.statuses`（一把锁保护的白板），再追加一条余额历史。
 6. 后端喊一嗓子 `emit("accounts-updated")`。
-7. 前端 `useAccounts`（`src/lib/store.ts:57`）一直在听这个广播，听到后重新拉最新数据 → 界面自动重画。
+7. 前端 `useAccounts`（`src/lib/store.ts`）一直在听这个广播，听到后重新拉最新数据 → 界面自动重画。
 
 **一句话总结数据流：后端是状态源，前端靠事件同步。** 前端自己不保存「真相」，每次都是问后端要。
 
@@ -161,23 +163,21 @@ src-tauri/src/              后端（Rust 层）
 
 ## 第 4 部分 前端骨架：App.tsx 与状态管理
 
-**这节回答：界面怎么组织？四个页面怎么切换？**
+**主窗口如何组织页面和账户状态？**
 
 ### 4.1 App.tsx —— 总壳
 
-`src/App.tsx` 一共干三件事：
+`src/App.tsx` 负责主窗口的页面和账户操作。
 
-1. **记住当前在哪个页面**：`const [view, setView] = useState("accounts")`，点侧边栏按钮就 `setView("models")`。
-2. **按 view 渲染对应页面**（React 的条件渲染写法 `{view === "x" ? <页面/> : null}`）。
-3. **订阅两个事件**：`focus-account`（从托盘点进某个账户时，打开它的编辑面板）和 `recharge-detected`（后端检测到「疑似充值」时，弹一条提示）。
-
-没有任何路由库——**四个页面就是一个字符串变量的切换**，这是它极简的原因。
+1. `src/lib/workspacePages.ts` 登记页面名称、图标与布局。点击侧栏或从另一个窗口收到 `navigate-main` 后，`App` 更新当前页面。
+2. `renderPage()` 选择要展示的页面。首次打开模型、活动等页面时才加载所需代码。跳转设置时还可以指定分类，例如从输出速度页直接进入「采集来源」。
+3. 收到 `focus-account` 时打开对应账户的编辑面板。收到 `recharge-detected` 时展示余额上涨提示。
 
 ### 4.2 store.ts —— 手写的迷你状态管理
 
 - `useAccounts()`：封装「拉账户列表 + 听 accounts-updated 广播自动重拉 + 手动刷新单个/全部」。
-- `useToasts()`：全局小通知（右上角弹的提示条），3 秒自动消失、错误 6 秒。
-- `useSettings()`：读/存设置。
+- `useToasts()`：订阅全局操作提示，自动关闭时间由 `motion.feedback` 统一控制。
+- `useSettings()` 先显示刚修改的字段，再依次保存。每一次写入都以上次确认保存的设置为基础。
 
 没有引入 redux/zustand 之类的库，因为数据流足够简单：**所有数据都以后端为准，前端只做「问 + 听」**。
 
@@ -187,9 +187,9 @@ src-tauri/src/              后端（Rust 层）
 
 **这节回答：前端的一句 invoke 是怎么变成后端的一次执行的？两边怎么对齐字段？**
 
-### 5.1 api.ts —— 唯一的前后端边界
+### 5.1 页面通过 api.ts 调用业务命令
 
-前端任何地方需要后端，都必须经过 `src/lib/api.ts`。它就是 30 个命令的名字清单：
+页面使用 `src/lib/api.ts` 导出的 `api`。例如，下面三个方法定义在 `src/lib/api/accounts.ts`。
 
 ```ts
 listAccounts: () => invoke<AccountView[]>("list_accounts"),
@@ -197,9 +197,9 @@ refreshAll:   () => invoke<AccountView[]>("refresh_all"),
 saveAccount:  (input: AccountInput) => invoke<AccountView>("save_account", { input }),
 ```
 
-读法：「调后端的 list_accounts 命令，返回值是一组 AccountView」。**想找「前端能干什么」，看这一个文件就够了。**
+读法：「调后端的 list_accounts 命令，返回值是一组 AccountView」。具体命令按业务放在 `src/lib/api/` 中。
 
-另外 `events` 对象集中了 3 个广播：`accounts-updated`（账户变了）、`recharge-detected`（疑似充值）、`focus-account`（托盘定位到某账户）。
+`events` 封装了账户更新、疑似充值、定位账户和 Token 活动更新四种事件的订阅。
 
 ### 5.2 types.ts —— 两边的「合同」
 
@@ -207,24 +207,24 @@ saveAccount:  (input: AccountInput) => invoke<AccountView>("save_account", { inp
 
 → 下一步：传话筒的另一头是什么？看后端大门，见第 6 部分。
 
-## 第 6 部分 后端大门：lib.rs 与 commands.rs
+## 第 6 部分 后端命令与共享状态
 
 **这节回答：Rust 侧怎么接收命令？所有模块共享的数据放在哪？**
 
-### 6.1 lib.rs —— 启动流程（105 行，建议第一个读）
+### 6.1 lib.rs —— 启动流程
 
 启动时按顺序做四件事：
 
 1. 建共享状态 `AppState`（下面细讲）；
 2. 装系统托盘（`tray::setup`）；
 3. 启动**后台值班员**（`refresh::spawn` 定时刷新余额、`ladder::spawn` 每小时更新天梯）；
-4. `generate_handler![...]` 注册全部 30 个命令——**没注册的函数前端调不到**。
+4. `generate_handler![...]` 注册桌面命令——**没注册的函数前端调不到**。
 
 另外有一处窗口行为：点关闭按钮时如果设置里开了「关闭到托盘」，就隐藏窗口而不是退出。
 
 ### 6.2 AppState —— 后厨的公告板
 
-`commands.rs:22` 定义的 `AppState` 是整个后端的公共白板，所有模块共享：
+`app_state.rs` 定义的 `AppState` 是整个后端的公共白板，所有模块共享：
 
 ```rust
 pub struct AppState {
@@ -240,7 +240,7 @@ pub struct AppState {
 
 为什么都包 `Mutex`？因为 Rust 是多线程的，后台刷新任务和前端命令可能**同时**读改同一份数据。`Mutex` 就是「板擦只有一块，谁拿到锁谁才能写」，防止写花。
 
-一个值得注意的细节（`commands.rs:51`）：创建 http 客户端时会**探测 Windows 系统代理**并挂上。因为网络库默认不读系统代理，挂了 Clash 的用户会直连失败——这是国内软件的必修课。
+一个值得注意的细节（`app_state.rs` 中的 `AppState::new`）：创建 http 客户端时会**探测 Windows 系统代理**并挂上。因为网络库默认不读系统代理，挂了 Clash 的用户会直连失败——这是国内软件的必修课。
 
 → 下一步：命令收到后，最常打交道的就是那批 AI 平台——看它们怎么被统一管理，见第 7 部分。
 
@@ -295,7 +295,7 @@ const HIDDEN: [&str; 5] = ["dashscope", "siliconflow", "openai", "anthropic", "g
 
 ## 第 8 部分 密钥保险箱：secrets.rs 与 connections.rs
 
-**这节回答：API Key、Cookie 这些秘密存在哪？为什么连前端都拿不到？**
+**这节介绍账户 API Key 和 Cookie 的存储以及连接流程。**
 
 ### 8.1 保险柜模型
 
@@ -370,7 +370,7 @@ ChatGPT 订阅没有 API，但有官方的额度端点。本项目**不复制、
 通知有两个克制的设计：
 
 - **同一账户 6 小时内只提醒一次**（`low_notified` 时间戳表去重），不轰炸；
-- 刷新**失败时保留上一次的成功数据**（`preserve_snapshot`，`commands.rs:479`），界面只标错误不清空——不会闪空白。
+- 刷新**失败时保留上一次的成功数据**（`preserve_snapshot`，`accounts/mod.rs`），界面只标错误不清空——不会闪空白。
 
 ### 10.2 tray.rs —— 红点是代码画出来的
 
@@ -447,9 +447,9 @@ node scripts/verify-logic.cjs  # 纯逻辑自检 7 项（含阿里云官方签�
 **建议的练习路径**（由易到难，每步都只碰一个概念）：
 
 1. 把某个隐藏平台加回界面：从 `HIDDEN` 数组删掉一个 id（如 `siliconflow`），跑 `npm run tauri dev` 看下拉框变化。——练「改登记表」
-2. 改一句界面文案：`App.tsx` 里侧边栏的副标题。——练「改前端」
+2. 在 `src/lib/workspacePages.ts` 调整一个页面的名称，核对侧栏和页面标题。
 3. 给低余额通知改个措辞：`refresh.rs` 的 `body(format!(...))`。——练「改 Rust」
-4. 加一个设置项：`model.rs` 的 `Settings` 结构 + `types.ts` 同步 + `SettingsView.tsx` 加控件。——练「两边同步」
+4. 添加一个设置项时，在 `model.rs` 和 `types.ts` 的 `Settings` 中定义字段，再在 `views/settings/` 对应分类中添加控件。
 
 ---
 

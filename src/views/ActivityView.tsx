@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { api, errText } from "../lib/api";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useActivityReport, type ActivitySelection } from "../lib/useActivityReport";
 import { activityFilterLabel, activityModelName } from "../lib/activityModels";
 import { toast } from "../lib/store";
 import { newActivityIssues } from "../lib/activityIssues";
@@ -11,9 +10,8 @@ import { ActivityShares } from '../components/ActivityShares';
 import { ActivityModelPicker } from "../components/ActivityModelPicker";
 import { ActivityAttribution } from "../components/ActivityAttribution";
 import { IconChart, IconGear, IconRefresh } from "../components/icons";
-import type { ActivityFilters, ActivityGroup, ActivityReport } from "../lib/types";
-import type { ActivityMetric, ActivityRange } from "../lib/activityCharts";
-import "./activity-controls.css";
+import type { ActivityFilters, ActivityGroup } from "../lib/types";
+import type { ActivityMetric } from "../lib/activityCharts";
 const number = (n: number) => new Intl.NumberFormat("zh-CN").format(n);
 function ActivityNumber({value,compact}:{value:number|undefined;compact:boolean}) {
   const element=useRef<HTMLElement>(null);
@@ -43,7 +41,7 @@ function ActivityNumber({value,compact}:{value:number|undefined;compact:boolean}
   return <b ref={element} title={value==null?"":number(value)}><span className="activity-number-content">{value==null?"—":compact?new Intl.NumberFormat("zh-CN",{notation:"compact",maximumFractionDigits:2}).formatToParts(value).map((part,index)=><span key={index} className={part.type==="compact"?"activity-summary-unit":undefined}>{part.value}</span>):number(value)}</span></b>;
 }
 
-export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}) {
+export function ActivityView({onOpenSources}:{onOpenSources?:()=>void}) {
   const [initial]=useState(loadActivityFilters);
   const [filters,setFilters]=useState(initial.filters);
   const [days,setDays]=useState(initial.days);
@@ -51,34 +49,17 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   const [compactNumbers,setCompactNumbers]=useState(true);
   const format=(n:number)=>compactNumbers?new Intl.NumberFormat("zh-CN",{notation:"compact",maximumFractionDigits:2}).format(n):number(n);
   const [metric,setMetric]=useState<ActivityMetric>("total");
-  const [selection,setSelection]=useState<{query:string;range:ActivityRange}|null>(null);
+  const [selection,setSelection]=useState<ActivitySelection|null>(null);
   const [more,setMore]=useState(false);
-  const modelScope=JSON.stringify([filters,days]);const query=JSON.stringify([filters,days,model]);
-  const range=selection?.query===query?selection.range:null;const detailQuery=JSON.stringify([query,range]);
-  const [rangeReport,setRangeReport]=useState<{query:string;value:ActivityReport}|null>(null);
-  const [report,setReport]=useState<{query:string;scope:string;value:ActivityReport}|null>(null);
-  const data=report?.query===query?report.value:null;
-  const [loading,setLoading]=useState(true);const [busy,setBusy]=useState(false);
-  const [readError,setReadError]=useState("");const [rangeError,setRangeError]=useState("");const [syncError,setSyncError]=useState("");
-  const [reloadKey,setReloadKey]=useState(0);const requestId=useRef(0);
+  const { modelScope, query, range, data, detailData, choices, availableModels, loading, busy, readError, rangeError, syncError, load, refresh } = useActivityReport(filters, days, model, selection);
   useEffect(()=>{saveActivityFilters(filters,days,model);setSelection(null);},[query]);
   useEffect(()=>{if(newActivityIssues([...(data?.errors??[]),...(syncError?[syncError]:[])]))toast("部分来源尚未采集完整，可在采集来源中查看详情。");},[data?.errors,syncError]);
-  const load=useCallback(async()=>{const id=++requestId.current;setLoading(true);setReadError("");
-    try{const value=await api.getActivity("","",Number(days),model,"","",filters);if(id===requestId.current)setReport({query,scope:modelScope,value});}
-    catch(e){if(id===requestId.current)setReadError(errText(e));}finally{if(id===requestId.current)setLoading(false);}
-  },[filters,days,model,query,modelScope]);
-  useEffect(()=>{let disposed=false;let timer:number;const poll=async()=>{await load();if(!disposed)timer=window.setTimeout(()=>void poll(),15000);};void poll();return()=>{disposed=true;clearTimeout(timer);++requestId.current;};},[load,reloadKey]);
-  useEffect(()=>{let disposed=false;let cleanup:(()=>void)|undefined;void listen("activity-updated",()=>setReloadKey(k=>k+1)).then(un=>{if(disposed)un();else cleanup=un;}).catch(()=>undefined);return()=>{disposed=true;cleanup?.();};},[]);
-  useEffect(()=>{let live=true;setRangeError("");if(!range)return;void api.getActivity("","",Number(days),model,range.from,range.to,filters).then(value=>{if(live)setRangeReport({query:detailQuery,value});}).catch(e=>{if(live)setRangeError(errText(e));});return()=>{live=false;};},[detailQuery,reloadKey,report]);
-  const refresh=async()=>{if(busy)return;setBusy(true);try{await api.refreshActivity();setSyncError("");setReloadKey(k=>k+1);}catch(e){setSyncError(errText(e));}finally{setBusy(false);}};
   const patchFilters=(patch:Partial<ActivityFilters>)=>setFilters(value=>({...value,...patch}));
   const clearFilters=()=>{setFilters({...emptyActivityFilters});setModel("");setSelection(null);};
   const totals=data?.totals;
   const unavailableTokens=data?.coverage?.tokenRecords===0&&!!totals?.calls;
-  const choices=data??report?.value;const facets=choices?.facets;
-  const availableModels=data?.availableModels??(report?.scope===modelScope?report.value.availableModels:[])??[];
+  const facets=choices?.facets;
   const hasActivity=!!totals&&(totals.tokens.total>0||totals.calls>0||totals.sessions>0);
-  const detailData=range?rangeReport?.query===detailQuery?rangeReport.value:null:data;
   const devices=choices?.devices??[];
   const environmentLabel=(id:string)=>{const found=devices.find(d=>d.id===id);return found?`${found.name}${devices.some(d=>d.id!==id&&d.name===found.name)?` · ${id.slice(0,8)}`:""}`:`环境 ${id.slice(0,8)}`;};
   const label=(key:keyof ActivityFilters,value:string)=>(key==='software'?softwareNames[value]:key==='launcher'?launcherNames[value]:key==='access'?accessNames[value]:key==='vendor'?vendorNames[value]:environmentLabel(value))??value;
@@ -88,7 +69,7 @@ export function ActivityView({onOpenSyncSettings}:{onOpenSyncSettings?:()=>void}
   return <div className="content-inner activity-page">
     {rangeError&&<Notice tone="error">{rangeError}</Notice>}
     <section className="card activity-controls activity-workspace-controls" aria-label="活动筛选与采集">
-      <div className="activity-controls-main"><Seg value={days} onChange={setDays} options={[{value:'0',label:'全部历史'},{value:'7',label:'7 天'},{value:'30',label:'30 天'},{value:'90',label:'90 天'},{value:'365',label:'1 年'}]}/><div className="activity-controls-actions"><Button variant="primary" disabled={busy} onClick={()=>void refresh()}><IconRefresh size={14} className={busy?'spin':''}/>{busy?'更新中…':'更新用量'}</Button><Button variant="quiet" onClick={onOpenSyncSettings}><IconGear size={15}/>采集来源</Button></div></div>
+      <div className="activity-controls-main"><Seg value={days} onChange={setDays} options={[{value:'0',label:'全部历史'},{value:'7',label:'7 天'},{value:'30',label:'30 天'},{value:'90',label:'90 天'},{value:'365',label:'1 年'}]}/><div className="activity-controls-actions"><Button variant="primary" disabled={busy} onClick={()=>void refresh()}><IconRefresh size={14} className={busy?'spin':''}/>{busy?'更新中…':'更新用量'}</Button><Button variant="quiet" onClick={onOpenSources}><IconGear size={15}/>采集来源</Button></div></div>
       <div className="activity-visible-filters">
         {choose('软件','software',facets?.softwares??choices?.sources,softwareNames,'全部软件')}
         {choose('环境','environment',facets?.environments??choices?.byDevice,{},'全部环境')}

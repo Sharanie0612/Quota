@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
-use crate::{commands::AppState, model::ModelPrice};
+use crate::{AppState, model::ModelPrice};
 
 const SOURCE: &str = "https://aitier.net/zh";
 const TTL: i64 = 86400;

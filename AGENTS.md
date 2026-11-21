@@ -84,9 +84,11 @@ npm run preview:ui
 
 ## 5. 代码结构速查
 
-前端调用链：组件 → `src/lib/api.ts`（invoke 封装）→ `src-tauri/src/commands.rs`（命令层）→ `providers.rs` / `pricing.rs` / `storage.rs` / `secrets.rs` 等。
+组件从 `src/lib/api.ts` 导入 `api`。`src/lib/api/` 按业务封装 invoke，`src-tauri/src/lib.rs` 将命令注册到 `commands/` 或各领域已有入口。共享状态在 `app_state.rs` 构造。
 
-- 加一个 invoke 命令：`commands.rs` 写函数 → `lib.rs` 的 `generate_handler!` 注册 → `api.ts` 加封装 → 组件里调。
+主窗导航定义在 `src/lib/workspacePages.ts`，页面与设置分类由 `App.tsx` 选取，业务样式统一在 `src/styles.css` 登记。工具栏和报表页面使用 `useReportQuery` 协调事件与轮询。活动查询及分组在 `src-tauri/src/activity/report.rs` 和 `activity/report/groups.rs`，变更后运行 `activity_report_checks` 与既有活动回归。
+
+- 加一个业务命令时，在对应 Rust 领域的命令模块实现，在 `lib.rs` 的 `generate_handler!` 注册，在 `src/lib/api/` 对应模块加封装。账户增删查与刷新逻辑在 `accounts/`，改动后运行 `account_workflow_checks`。
 - 加一个供应商：`providers.rs` 的 `provider_defs()` 加定义（含余额探测与模型列表能力）；如默认隐藏，把 id 加进 `HIDDEN`。
 - 供应商接口挂了怎么办：查询失败要显示可读错误 + 三个动作（重试 / 打开官网 / 改手动余额）。任何供应商都要能退化到「手动余额」参与低余额通知。
 - 前端 `src/main.tsx` 统一渲染 `App`。小米官方登录窗口 `mimo-login` 不授予 Quota IPC 权限。
@@ -231,7 +233,7 @@ npm run preview:ui
 
 1. 确定发布级别和展示号，更新「版本映射」表，写明本次实际发布的展示号与包版本。
 2. 同步 `package.json`、`package-lock.json` 中根包版本、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 中 Quota 自身包版本，以及 `src-tauri/tauri.conf.json`；不要改动依赖包版本。
-3. 产品界面从统一版本来源获取完整展示号。`commands.rs` 的 `app_info` 调用 `version::display_version()`，由 `CARGO_PKG_VERSION` 生成完整展示号，避免界面显示 `1.0.100`。
+3. 产品界面从统一版本来源获取完整展示号。`commands/desktop.rs` 的 `app_info` 调用 `version::display_version()`，由 `CARGO_PKG_VERSION` 生成完整展示号，避免界面显示 `1.0.100`。
 4. 核对展示号与包版本可相互映射、各配置一致，Git 标签和发布说明使用完整展示号；执行第 6 节适用的验收项目。变更 Tauri 打包版本时实际打包并验证安装器升级与安装版启动。
 
 ### 订阅与天梯维护

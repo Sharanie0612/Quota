@@ -196,6 +196,7 @@ async function main(){
      await page.locator(`[data-checked-at="${manual.checkedAt}"]`).waitFor();
      assert.equal(await page.getByText(/已保留上次数据/).count(),0);
      await go('设置');
+     await page.getByRole('navigation',{name:'设置分类'}).getByRole('button',{name:'提醒与更新',exact:true}).click();
      const auto=page.getByRole('button',{name:'模型资料自动更新',exact:true});
      await auto.click();
      await page.waitForFunction(()=>document.querySelector('[aria-label="模型资料自动更新"]')?.getAttribute('aria-pressed')==='false');
@@ -211,7 +212,9 @@ async function main(){
    }
    await go('输出速度');await page.waitForFunction(()=>Number(document.querySelector('.speed-plot')?.dataset.callCount)>0);assert.equal(await page.locator('.speed-plot path').count(),0);await page.getByLabel('输出速度模型').selectOption('gpt-6.1-sol');await page.waitForFunction(()=>document.querySelectorAll('.speed-legend button').length===1);
    await page.locator('.speed-plot svg').focus();await page.keyboard.press('ArrowLeft');await page.getByRole('tooltip').waitFor();assert.match(await page.getByRole('tooltip').textContent(),/gpt-6.1-sol/);await page.getByRole('tab',{name:'记录',exact:true}).click();assert(await page.locator('.speed-records tr').count()>1);await overflow(page);
-   await go('设置');await page.locator('.appearance-settings').waitFor();await overflow(page);assert.deepEqual(errors,[]);checks.push({mode,width,configurations:snapshot.models.length,plotted:rows.length,passed:true});await page.close();
+   await go('设置');
+   await page.getByRole('navigation',{name:'设置分类'}).getByRole('button',{name:'外观与窗口',exact:true}).click();
+   await page.locator('.appearance-settings').waitFor();await overflow(page);assert.deepEqual(errors,[]);checks.push({mode,width,configurations:snapshot.models.length,plotted:rows.length,passed:true});await page.close();
   }
   for(const scenario of ['empty','untimed','paused','waiting']){const page=await browser.newPage({viewport:{width:1024,height:768}});await page.goto(base+'?speedCase='+scenario);await page.getByRole('navigation').getByRole('button',{name:'输出速度',exact:true}).click();if(['empty','untimed'].includes(scenario)){await page.getByText('这个范围还没有速度记录',{exact:true}).waitFor();assert.equal(await page.locator('.speed-plot').count(),0);}else await page.locator('.speed-plot').waitFor();await overflow(page);await page.close();}
   const live=await browser.newPage();await live.goto(base);await live.getByRole('navigation').getByRole('button',{name:'输出速度',exact:true}).click();await live.locator('.speed-plot').waitFor();

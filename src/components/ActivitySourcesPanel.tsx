@@ -6,7 +6,6 @@ import type { ActivityEnvironment, ActivityInstance, ActivityWorkspaceReport } f
 import { accessNames, environmentNames, launcherNames } from '../lib/activityWorkspace';
 import { Button, Field, Notice, Switch } from './ui';
 import { IconRefresh } from './icons';
-import './activity-sources.css';
 
 const states:Record<string,string>={disabled:'未启用',configured:'已配置',connected:'已连接',ready:'已读取',error:'读取失败',partial:'部分待补采','needs-path':'待选择位置','not-found':'未发现记录','no-usage':'日志缺少用量'};
 type CollectionSettings=Pick<ActivityWorkspaceReport,'autoCollect'|'collectIntervalSeconds'|'multicaEnabled'|'multicaWorkspaceRoot'>;

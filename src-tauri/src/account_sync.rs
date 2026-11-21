@@ -1,6 +1,6 @@
 //! Shared exchange serializes display fields only. Local connection recovery is separate from exchange.
 use crate::{
-    commands::AppState,
+    AppState,
     model::{Account, AccountStatus, Balance, BalanceAmount},
 };
 use serde::{Deserialize, Serialize};

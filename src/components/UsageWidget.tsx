@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { api, errText } from '../lib/api';
 import { IconArrowUpRight, IconChart } from './icons';
-import './usage-widget.css';
 import {LiveModelPanel} from './LiveModelPanel';
 import type {LiveModelStatus} from '../lib/types';
 import appIcon from '../../src-tauri/icons/128x128.png';

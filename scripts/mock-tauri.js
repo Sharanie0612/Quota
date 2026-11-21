@@ -1054,6 +1054,7 @@
             configDir: "C:\\Users\\demo\\AppData\\Roaming\\Quota",
           };
         case "plugin:event|listen": { const id = seq++; eventHandlers[id] = args; return id; }
+        case "plugin:event|emit": emit(args.event, args.payload); return null;
         case "plugin:dialog|message":
           return new URLSearchParams(location.search).get("traeConnect") === "cancel" ? "Cancel" : "Ok";
         case "plugin:dialog|open":

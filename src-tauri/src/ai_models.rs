@@ -1,7 +1,7 @@
 //! Quota's model registry. Official identities/prices are primary; benchmarks are
 //! optional adapters and never determine which models can be discovered or priced.
 use crate::{
-    commands::AppState,
+    AppState,
     model::{CatalogEntry, ModelPrice},
     official_prices::{self, CacheWrite, Check, PriceOption},
 };

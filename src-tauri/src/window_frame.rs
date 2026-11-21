@@ -363,7 +363,7 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
     {
         return;
     }
-    let state = app.state::<crate::commands::AppState>();
+    let state = app.state::<crate::AppState>();
     let isolated = std::env::var_os("QUOTA_DATA_DIR").map(std::path::PathBuf::from);
     let Ok(config) = state.config.lock() else {
         return;
@@ -485,7 +485,7 @@ pub fn smoke_if_requested(app: &tauri::AppHandle) {
         })();
         let evidence = serde_json::json!({"passed":result.is_ok(),"error":result.err(),"samples":samples,"chrome":chrome});
         let dir = app
-            .state::<crate::commands::AppState>()
+            .state::<crate::AppState>()
             .store
             .dir()
             .to_path_buf();

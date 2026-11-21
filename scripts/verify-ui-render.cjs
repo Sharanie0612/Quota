@@ -117,9 +117,16 @@ assert.equal(families.find(g=>g.vendor==='OpenAI').variants.map(e=>e.id).join(',
 console.log('PASS exact vendor/model grouping, reasoning variants, release-date inheritance and seven-calendar-day boundaries');
 
 const {SettingsView}=load(path.resolve(__dirname,'../src/views/SettingsView.tsx'));
-const settingsHtml=render(SettingsView,{settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},info:null});
+const settingsProps={settings:{autoRefresh:true,refreshIntervalMinutes:30,notifyLowBalance:true,closeToTray:true,defaultLowThreshold:5,notifyRecharge:true,trayAlert:true,ladderAutoUpdate:true},onUpdate:()=>{},onSectionChange:()=>{},info:null};
+const renderSection=section=>render(SettingsView,{...settingsProps,section});
+const settingsHtml=renderSection('sync');
+const appearanceHtml=renderSection('appearance');
+assert.match(appearanceHtml,/窗口与托盘/);assert.ok(!appearanceHtml.includes('导入数据 / 迁移账户'));
+assert.match(renderSection('sources'),/<h2>采集来源<\/h2>/);
+assert.match(renderSection('updates'),/余额刷新/);
+assert.match(renderSection('about'),/macOS/);
 assert.match(settingsHtml,/>导出<\/button>/);assert.match(settingsHtml,/采集来源/);assert.match(settingsHtml,/导出备份/);assert.ok(!settingsHtml.includes('飞书'));assert.ok(!settingsHtml.includes('导出数据</button>'));
-assert.match(settingsHtml,/导入数据 \/ 迁移账户/);assert.match(settingsHtml,/未选内容保留/);assert.match(settingsHtml,/macOS/);
+assert.match(settingsHtml,/导入数据 \/ 迁移账户/);assert.match(settingsHtml,/未选内容保留/);
 assert.match(settingsHtml,/跨设备同步/);assert.match(settingsHtml,/iCloud Drive/);assert.match(settingsHtml,/密钥和登录信息留在本机/);
 console.log('PASS unified backup export/import, configurable collection frequency, shared account privacy boundary and no Feishu sync entry');
 

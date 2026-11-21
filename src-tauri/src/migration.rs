@@ -1,5 +1,5 @@
 //! Cross-platform migration. Plain exports never restore credentials or custom requests.
-use crate::{backup, commands::AppState, history::HistoryPoint, model::{Account, AppConfig, CatalogEntry, Settings}, secrets::{self, SecretBlob}};
+use crate::{backup, AppState, history::HistoryPoint, model::{Account, AppConfig, CatalogEntry, Settings}, secrets::{self, SecretBlob}};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};

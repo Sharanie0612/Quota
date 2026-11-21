@@ -1,5 +1,5 @@
 //! Portable data export. Never reads keyring, raw provider responses or source logs.
-use crate::{activity::Metric, commands::AppState, model::{Account, AccountStatus}};
+use crate::{activity::Metric, AppState, model::{Account, AccountStatus}};
 use rusqlite::{Connection, OpenFlags};
 use serde_json::{json, Value};
 use std::{collections::HashMap, fs, io::Write, path::Path};

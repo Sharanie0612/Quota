@@ -1,7 +1,7 @@
 //! Public reference FX only; never changes official model prices.
 use serde::{Deserialize, Serialize};
 use tauri::State;
-use crate::commands::AppState;
+use crate::AppState;
 const SOURCE: &str = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

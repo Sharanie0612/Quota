@@ -1,6 +1,6 @@
 /** 极简 toast + 账户数据 hook */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errText, events } from "./api";
 import type { AccountView, Settings } from "./types";
 import { motion } from './motion';
@@ -119,26 +119,37 @@ export function useAccounts() {
 
 export function useSettings() {
   const [settings, setSettings] = useState<Settings | null>(null);
+  const committed = useRef<Settings | null>(null);
+  const pending = useRef<Partial<Settings>[]>([]);
 
   useEffect(() => {
     let disposed = false;
     api
       .getSettings()
-      .then((s) => !disposed && setSettings(s))
+      .then(s => { if (!disposed) { committed.current = s; setSettings(s); } })
       .catch((e) => toast(`读取设置失败：${errText(e)}`, "error"));
     return () => {
       disposed = true;
     };
   }, []);
 
-  const update = useCallback(async (next: Settings) => {
-    try {
-      const saved = await api.saveSettings(next);
-      setSettings(saved);
-      return saved;
-    } catch (e) {
-      toast(`保存设置失败：${errText(e)}`, "error");
-      return null;
+  const update = useCallback(async (patch: Partial<Settings>) => {
+    if (!committed.current) return;
+    const queue = pending.current;
+    queue.push(patch);
+    const showPending = () => setSettings(Object.assign({}, committed.current, ...queue));
+    showPending();
+    if (queue.length > 1) return;
+    // The native command saves a full snapshot. Apply each edit to the last
+    // confirmed result so a slow or failed write cannot undo a later edit.
+    while (queue.length) {
+      try {
+        committed.current = await api.saveSettings({ ...committed.current, ...queue[0] });
+      } catch (error) {
+        toast(`保存设置失败：${errText(error)}`, "error");
+      }
+      queue.shift();
+      showPending();
     }
   }, []);
 

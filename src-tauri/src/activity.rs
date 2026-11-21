@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
-use crate::commands::AppState;
+use crate::AppState;
+mod report;
+pub use report::{model_vendor, report, report_filtered, report_range, report_workspace, Coverage, Facets, Group, Report, UsageDetail};
 #[path = "activity_harness.rs"]
 mod harness;
 #[path = "activity_multica.rs"]
@@ -715,9 +717,6 @@ fn sync(dir:&Path,db:&mut Connection,o:&Options) -> Result<(),String> {
     if errors.is_empty(){Ok(())}else{errors.sort();errors.dedup();Err(format!("其他有效文件已合并，异常包保留并将在下次重试：{}",errors.into_iter().take(4).collect::<Vec<_>>().join("；")))}
 }
 
-#[derive(Default,Serialize)]
-#[serde(rename_all="camelCase")]
-pub struct Group { pub key:String, pub tokens:Tokens, pub calls:u64, pub sessions:u64 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 pub struct UsageSummary { pub today:u64, pub total:u64, pub date:String, pub updated_at:Option<i64>, pub partial:bool }
@@ -732,91 +731,6 @@ pub fn usage_summary(dir:&Path)->Result<UsageSummary,String>{
     result.updated_at=status.get("at").and_then(Value::as_i64);
     result.partial=status.get("errors").and_then(Value::as_array).is_some_and(|e|!e.is_empty())||status.get("syncErrors").and_then(Value::as_array).is_some_and(|e|!e.is_empty());
     Ok(result)
-}
-#[derive(Serialize)]
-#[serde(rename_all="camelCase")]
-pub struct Report { pub options:Options, pub devices:Vec<OptionsDevice>, pub totals:Group, pub models:Vec<Group>, pub available_models:Vec<Group>, pub tools:Vec<Group>, pub agents:Vec<Group>,pub daily:Vec<Group>,pub hourly:Vec<Group>,pub sources:Vec<Group>,pub channels:Vec<Group>,pub by_device:Vec<Group>,pub updated_at:Option<i64>,pub errors:Vec<String>,pub sync_errors:Vec<String>,pub softwares:Vec<Group>,pub launchers:Vec<Group>,pub environments:Vec<Group>,pub accesses:Vec<Group>,pub facets:Facets,pub details:Vec<UsageDetail>,pub coverage:Coverage,pub cache:Vec<Group>,pub cache_daily:Vec<Group>,pub cache_hourly:Vec<Group> }
-#[derive(Serialize)]
-pub struct Facets{pub softwares:Vec<Group>,pub launchers:Vec<Group>,pub environments:Vec<Group>,pub accesses:Vec<Group>,pub vendors:Vec<Group>}
-#[derive(Serialize)]
-#[serde(rename_all="camelCase")]
-pub struct Coverage{pub token_records:usize,pub known_cache_input:u64,pub all_input:u64}
-#[derive(Serialize)]
-#[serde(rename_all="camelCase")]
-pub struct UsageDetail{pub software:String,pub launcher:String,pub environment:String,pub access:String,pub model:String,pub vendor:String,pub tokens:Tokens,pub calls:u64,pub sessions:u64}
-fn facets(events:&[Metric])->Facets{Facets{softwares:aggregate(events,|e|sources::software(e).into()),launchers:aggregate(events,|e|sources::launcher(e).into()),environments:aggregate(events,|e|sources::environment(e).into()),accesses:aggregate(events,|e|sources::access(e).into()),vendors:aggregate(events,|e|model_vendor(&e.model).into())}}
-fn details(events:&[Metric])->Vec<UsageDetail>{
-    let mut buckets:BTreeMap<(String,String,String,String,String),Vec<Metric>>=BTreeMap::new();
-    for e in events{buckets.entry((sources::software(e).into(),sources::launcher(e).into(),sources::environment(e).into(),sources::access(e).into(),e.model.clone())).or_default().push(e.clone());}
-    let mut rows:Vec<_>=buckets.into_iter().map(|((software,launcher,environment,access,model),events)|{let group=aggregate(&events,|_|String::new()).pop().unwrap_or_default();UsageDetail{software,launcher,environment,access,vendor:model_vendor(&model).into(),model,tokens:group.tokens,calls:group.calls,sessions:group.sessions}}).collect();rows.sort_by(|a,b|b.tokens.total.cmp(&a.tokens.total));rows
-}
-fn aggregate(events:&[Metric],key:impl Fn(&Metric)->String)->Vec<Group>{
-    let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
-    for e in events{let k=key(e);let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
-    result.into_values().map(|(mut g,s)|{g.sessions=s.len() as u64;g}).collect()
-}
-// A model used through Trae's own quota and through the user's own API key is two
-// separate rows, so the two never share a total. The filter key carries the channel
-// after a unit separator, which model names cannot contain.
-const CHANNEL_SEPARATOR:char='\u{1f}';
-fn model_key(model:&str,channel:&str)->String{if channel.is_empty(){model.into()}else{format!("{model}{CHANNEL_SEPARATOR}{channel}")}}
-fn model_matches(filter:&str,e:&Metric)->bool{
-    if filter.is_empty(){return true}
-    if let Some(model)=filter.strip_prefix("model:"){return model==e.model}
-    if let Some(vendor)=filter.strip_prefix("vendor:"){return if vendor=="trae" {e.source=="trae"} else {e.source!="trae"&&vendor==model_vendor(&e.model)}}
-    if let Some(channel)=filter.strip_prefix("channel:"){return e.source=="trae"&&channel==channel_id(e)}
-    match filter.split_once(CHANNEL_SEPARATOR){Some((model,channel))=>model==e.model&&channel==channel_id(e),None=>e.source!="trae"&&filter==e.model}
-}
-fn aggregate_models(events:&[Metric])->Vec<Group>{
-    let mut result:BTreeMap<String,(Group,std::collections::BTreeSet<String>)>=BTreeMap::new();
-    for e in events{let k=model_key(&e.model,if e.source=="trae"&&e.channel.is_empty(){"unknown"}else{&e.channel});let (g,s)=result.entry(k.clone()).or_insert_with(||(Group{key:k,..Default::default()},Default::default()));g.tokens.add(&e.tokens);g.calls+=u64::from(e.kind=="tool");s.insert(format!("{}:{}",e.source,e.session));}
-    result.into_values().map(|(mut g,s)|{g.sessions=s.len() as u64;g}).collect()
-}
-// Only Trae distinguishes how usage was obtained; "unknown" keeps the sum complete.
-fn channel_id(e:&Metric)->String{if e.channel.is_empty(){"unknown".into()}else{e.channel.clone()}}
-pub fn report(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>)->Result<Report,String>{
-    report_filtered(dir,device,source,days,None)
-}
-pub fn report_filtered(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>)->Result<Report,String>{
-    report_range(dir,device,source,days,model,None,None)
-}
-pub fn model_vendor(key:&str)->&'static str {
-    let raw=key.to_lowercase();let name=raw.rsplit('/').next().unwrap_or(&raw);
-    if name.starts_with("gpt")||["o1","o3","o4"].iter().any(|p|name==*p||name.starts_with(&format!("{p}-")))||name.starts_with("codex")||raw.starts_with("openai/"){"custom"}
-    else if name.starts_with("deepseek"){"deepseek"} else if name.starts_with("glm")||["zai/","z-ai/","zhipu/"].iter().any(|p|raw.starts_with(p)){"zhipu"}
-    else if name.starts_with("kimi")||name.starts_with("moonshot"){"moonshot"} else if name.starts_with("mimo")||raw.starts_with("xiaomi/"){"mimo"}
-    else if name.starts_with("claude")||raw.starts_with("anthropic/"){"anthropic"} else if name.starts_with("gemini")||raw.starts_with("google/"){"google"}
-    else if name.starts_with("grok")||raw.starts_with("xai/"){"xai"} else if name.starts_with("qwen")||raw.starts_with("alibaba/"){"alibaba"} else {"unknown"}
-}
-pub fn report_range(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>)->Result<Report,String>{
-    report_workspace(dir,device,source,days,model,from,to,Default::default())
-}
-pub fn report_workspace(dir:&Path, device:Option<String>,source:Option<String>,days:Option<u32>,model:Option<String>,from:Option<String>,to:Option<String>,filters:sources::Filters)->Result<Report,String>{
-    let date=|value:Option<String>|->Result<Option<chrono::NaiveDate>,String>{value.filter(|s|!s.is_empty()).map(|s|chrono::NaiveDate::parse_from_str(&s,"%Y-%m-%d").map_err(|_|"日期格式无效".to_string())).transpose()};
-    let from=date(from)?;let to=date(to)?;if from.zip(to).is_some_and(|(a,b)|a>b){return Err("开始日期不能晚于结束日期".into())}
-    let db=database(dir)?;let o=options(dir);let excluded=sources::excluded(dir,&o)?;let mut events=Vec::new();
-    // Calendar dates agree with the daily chart, including the first day in full.
-    // Subtract dates rather than 24-hour durations so daylight-saving days work too.
-    let today=chrono::Local::now().date_naive();
-    let first_day=days.filter(|d|*d>0).map(|d|today.checked_sub_days(chrono::Days::new(u64::from(d-1))).unwrap_or(chrono::NaiveDate::MIN));
-    let mut stmt=db.prepare("SELECT body FROM metrics").map_err(|_| "读取统计失败")?;let rows=stmt.query_map([],|r|r.get::<_,String>(0)).map_err(|_| "读取统计失败")?;
-    for r in rows{let e:Metric=serde_json::from_str(&r.map_err(|_| "读取统计失败")?).map_err(|_| "统计资料库损坏")?;
-        let in_range=chrono::DateTime::from_timestamp_millis(e.timestamp).is_some_and(|t|{let date=t.with_timezone(&chrono::Local).date_naive();date<=today&&first_day.is_none_or(|first|date>=first)&&from.is_none_or(|d|date>=d)&&to.is_none_or(|d|date<=d)});
-        if !e.superseded_zcode() && !excluded.contains(&e.device) && in_range && device.as_ref().is_none_or(|d|d.is_empty()||d==&e.device) && source.as_ref().is_none_or(|s|s.is_empty()||s==e.activity_source()||(s=="without-trae"&&e.source!="trae")){events.push(e)}}
-    let devices=known_device_names(&db,&o)?;
-    let facet_choices=facets(&events);
-    events.retain(|e|filters.matches(e));
-    let status:Value=fs::read(dir.join("activity-status.json")).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
-    let mut sync_errors: Vec<String> = status.get("syncErrors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    sync_errors.extend(crate::usage_sync::errors(dir));
-    // Keep model choices scoped to device/source/dates while viewing one model.
-    let available_models=aggregate_models(&events.iter().filter(|e|e.kind=="tokens").cloned().collect::<Vec<_>>());
-    events.retain(|e|model.as_deref().is_none_or(|m|model_matches(m,e)));
-    let token_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tokens").cloned().collect();let tool_events:Vec<Metric>=events.iter().filter(|e|e.kind=="tool").cloned().collect();
-    let trae_events:Vec<Metric>=events.iter().filter(|e|e.source=="trae").cloned().collect();
-    let cache_events:Vec<_>=token_events.iter().filter(|e|e.origin.as_ref().is_none_or(|o|o.cache_known)).cloned().collect();
-    let context=facets(&events);let detail_rows=details(&events);let known_cache_input=token_events.iter().filter(|e|e.origin.as_ref().is_none_or(|o|o.cache_known)).map(|e|e.tokens.input).sum();let coverage=Coverage{token_records:token_events.len(),known_cache_input,all_input:token_events.iter().map(|e|e.tokens.input).sum()};
-    Ok(Report{ cache:aggregate_models(&cache_events),cache_daily:aggregate(&cache_events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),cache_hourly:aggregate(&cache_events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),softwares:context.softwares,launchers:context.launchers,environments:context.environments,accesses:context.accesses,facets:facet_choices,details:detail_rows,coverage,options:o,devices,totals:aggregate(&events,|_|"全部".into()).pop().unwrap_or_default(),models:aggregate_models(&token_events),available_models,tools:aggregate(&tool_events,|e|e.tool.clone()),agents:aggregate(&events,|e|e.agent.clone()),daily:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string()).unwrap_or_default()),hourly:aggregate(&events,|e|chrono::DateTime::from_timestamp_millis(e.timestamp).map(|t|t.with_timezone(&chrono::Local).format("%Y-%m-%dT%H").to_string()).unwrap_or_default()),sources:aggregate(&events,|e|e.activity_source().into()),channels:aggregate(&trae_events,channel_id),by_device:aggregate(&events,|e|e.device.clone()),updated_at:status.get("at").and_then(Value::as_i64),errors:status.get("errors").and_then(|v|serde_json::from_value(v.clone()).ok()).unwrap_or_default(),sync_errors })
 }
 pub fn collect(dir:&Path)->Result<usize,String>{
     collect_cycle(dir, true)

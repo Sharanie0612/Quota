@@ -299,13 +299,13 @@ const HIDDEN: [&str; 5] = ["dashscope", "siliconflow", "openai", "anthropic", "g
 
 ### 8.1 保险柜模型
 
-`secrets.rs` 是**唯一**允许接触密钥的模块。它把密钥存进 Windows 系统自带的「凭据管理器」（控制面板里能看到的那个）：
+`secrets.rs` 封装账户凭据的读写。在 Windows 上使用系统自带的「凭据管理器」。
 
 - 服务名 `Quota` = 柜子编号；账户 UUID = 保险箱编号；
-- 一个账户的所有秘密（API Key、管理员密钥、AccessKey 对、小米 Cookie、订阅账户）打包成**一个 JSON 字符串**存进同一个箱子（`SecretBlob` 结构）；
+- 账户的 API Key、管理员密钥、AccessKey 对、控制台 Cookie 等保存在 `SecretBlob`。小米完整登录会话在系统凭据库中分片保存，由账户保存引用。
 - 兼容旧版：旧服务名 `AgentPrice` 只读不删，读到就复印到新柜子（`secrets.rs:46`）；旧格式存的裸 Key 会自动当作 API Key 解析。
 
-密钥**永不**写进 `config.json`、日志或前端——这是全项目最重要的纪律。
+自定义请求头和请求体会写入 `config.json`，密钥应使用专用凭据字段。账户列表仅显示连接状态，`api_snippet` 生成的调用示例可能包含账户密钥，示例内容应排除在日志和测试材料之外。[安全边界](security.md)
 
 ### 8.2 小米登录：隔离窗口（connections.rs）
 
@@ -332,7 +332,7 @@ ChatGPT 订阅没有 API，但有官方的额度端点。本项目**不复制、
 
 | 文件 | 内容 |
 |---|---|
-| `config.json` | 账户列表 + 设置（无密钥） |
+| `config.json` | 账户列表与设置，包括自定义接口的请求头和请求体 |
 | `catalog_overrides.json` | 用户在模型库里「采用」的价格覆盖 |
 | `hidden_models.json` | 手动隐藏的模型 id |
 | `balance_history.json` | 余额历史 |
@@ -423,7 +423,7 @@ AITier 是个 Next.js 网站，没有公开 API。`parse_rankings`（`ladder.rs:
 
 - **钥匙从密码「搅」出来**：PBKDF2-HMAC-SHA256 迭代 **60 万次**（OWASP 2023 建议下限）。类比：把你的密码和一撮随机盐放进搅拌机搅 60 万圈，出来的才是真钥匙；密码本身不存档、不进日志。
 - AES-256-GCM 自带完整性校验：密码错一位或文件被篡改，解密直接失败，报「密码错误或文件已损坏」。
-- 备份内容包含配置 + 模型资料 + **全部密钥**（从凭据管理器里读出来加密打包），所以备份文件本身等同于密码保护的全部身家。
+- 普通导出省略登录信息。用户选择包含登录信息时，账户凭据仅随加密备份导出，Codex 登录令牌和小米完整 SSO 会话保留在原设备。[备份与迁移](data-migration.md)
 
 ---
 
@@ -433,16 +433,7 @@ AITier 是个 Next.js 网站，没有公开 API。`parse_rankings`（`ladder.rs:
 
 **这节回答：改完代码怎么自证没改坏？第一个练手改什么？**
 
-改代码后的固定验收（详见 AGENTS.md）：
-
-```bash
-npm run typecheck              # 前端类型检查
-npm run build                  # 前端构建
-cd src-tauri && cargo check    # Rust 类型检查
-node scripts/verify-logic.cjs  # 纯逻辑自检 7 项（含阿里云官方签名基准）
-```
-
-本机跑不了 `cargo test`（Windows GNU 工具链的已知问题），要真跑 Rust 逻辑就写 / 跑 `src-tauri/examples/` 下的例子，如 `cargo run --release --example zhipu_parse`。
+改完前端，在仓库根目录运行 `npm run typecheck` 和 `npm run build`。例如调整账户刷新逻辑时，在 `src-tauri/` 运行 `cargo check --locked` 和 `cargo run --release --locked --example account_workflow_checks`，后者会用合成响应实际执行一次账户工作流。不同类型的改动有各自的验证入口。[仓库编码规则](../AGENTS.md#按改动选择验收) · [开发与验证](development.md)
 
 **建议的练习路径**（由易到难，每步都只碰一个概念）：
 

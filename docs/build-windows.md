@@ -1,6 +1,17 @@
 # Windows 一键打包
 
-准备好 Node.js（含 npm）、rustup 的 `stable-x86_64-pc-windows-gnu` 工具链、可用的 MinGW C 构建工具 / binutils（PATH 中含 dlltool）与 WebView2 后，在项目根目录双击 **build-installer.cmd**。也可以在终端运行：
+## 维护者本机的构建位置
+
+这台 Windows 机器默认使用 `D:\AgentProjects\Quota`。重新克隆、Codex 工作树、开发预览和会生成文件的测试都遵守同一盘位要求。若只有 C 盘源码，先将任务所需的提交及未提交改动带到非 C 盘副本，再核对分支和差异。
+
+1. 用 `git rev-parse --show-toplevel` 确认源码目录。对已有目录可用 `node -p "require('node:fs').realpathSync.native(process.argv[1])" .` 查看穿过联接后的路径，将最后的 `.` 换成各个输出目录逐项检查。尚不存在的目录检查最近已存在的父目录。用 `Get-PSDrive -Name D` 查看可用空间。任一目标落在 C 盘时先改用非 C 盘路径，空间不足时停止构建。
+2. 在运行命令的同一终端把 `TEMP`、`TMP`、`TMPDIR` 指到已存在的非 C 盘临时目录。核对 npm 缓存（`npm_config_cache`）、Cargo 依赖缓存（`CARGO_HOME`）及本次需下载的打包工具的位置。依赖安装在非 C 盘副本的 `node_modules/`。目录检查覆盖 `dist/`、`dist-mock/`、`src-tauri/gen/`、根目录与 `src-tauri/` 下的两个 `target/`，以及其中现有的 bundle 和归档目录。
+3. 检查 Cargo 实际生效的 `target_directory`（`cargo metadata --locked --no-deps --format-version 1 --manifest-path src-tauri/Cargo.toml`）。一键打包要求使用当前副本的 `src-tauri/target/`，并拒绝已设置的 `CARGO_TARGET_DIR`。`scripts/tauri.cjs` 在标准 Windows 构建使用外部 target 时还会把 NSIS 安装包复制回源码目录。
+4. 运行预览或安装测试前，核对浏览器临时资料、截图、测试脚本的 `-DataDir` / `-TestRoot` 和测试安装目录。在适用入口显式指定非 C 盘的 `QUOTA_UI_OUTPUT` 与隔离的绝对路径 `QUOTA_DATA_DIR`。临时设置仅用于本次进程。
+
+## 一键打包
+
+准备好 Node.js（含 npm）、rustup 的 `stable-x86_64-pc-windows-gnu` 工具链、可用的 MinGW C 构建工具 / binutils（PATH 中含 dlltool）与 WebView2 后，在完成路径检查的终端运行下面的命令。`build-installer.cmd` 调用同一入口。
 
 ```powershell
 npm run package:windows
@@ -52,7 +63,7 @@ Windows 构建目录可能继承 Low Mandatory Level。EXE 继承此标签后启
 
 一键打包仍通过 scripts/tauri.cjs 执行标准 build。它核对 npm / Cargo / Tauri 根包版本，以完整展示号命名唯一安装包，生成后仅对最终安装 EXE 执行 icacls /setintegritylevel M，恢复普通发布文件的中完整性标签。此步骤失败时归档失败产物并使构建失败。直接运行 npx tauri 会绕过这些检查。
 
-此步骤不修改工作区或安装目录 ACL、系统 TEMP、SmartScreen/Defender 或安装包内容，沿用原 NSIS 升级与卸载逻辑。安装器验收应直接启动最终 EXE，使用原系统 TEMP，核对真实安装文件、实际版本、DLL 和隔离启动；不能只根据安装器退出码判定成功。
+安装器完整性处理仅作用于生成的 EXE，沿用原 NSIS 升级与卸载逻辑。验收时直接启动最终 EXE，核对实际安装文件、版本、DLL 和隔离启动结果，记录本次进程使用的临时目录。维护者本机使用上文已核对的非 C 盘目录，保留系统级 TEMP 设置。
 
 原理参见 [微软 Mandatory Integrity Control](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control)。
 

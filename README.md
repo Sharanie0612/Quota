@@ -1,5 +1,7 @@
 # Quota
 
+**简体中文** · [English](README.en.md)
+
 把 AI 账户余额、订阅额度、实际支出、Token 活动和模型能力放进同一个桌面窗口。
 
 本地优先 · Windows / macOS · 浅色与深色模式 · Tauri 2 + Rust + React
@@ -21,9 +23,7 @@
 
 macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；首次打开可能需要在「系统设置 → 隐私与安全性」中允许。Intel / Universal 包暂无验收记录。iPhone / iPad 暂不支持。
 
-更新前可在「设置 → 备份与迁移」导出数据。源码支持某个平台，不代表该平台的当前安装包已经发布；验证范围见发布说明。
-
-**当前开发版本为 1.0.4100**。AI 模型页复刻 Artificial Analysis 单任务成本图的布局，默认对比最新 30 个型号，可手选型号或切换列表。连接 AA 后可立即更新，并按配额定期更新。[模型评测与单任务成本](docs/model-benchmarks.md)
+更新前可在「设置 → 同步与备份」的「备份与迁移」中导出数据。已发布的平台和实际验收范围见对应版本说明。当前源码的包版本见 [package.json](package.json)。
 
 ## 开始使用
 
@@ -40,7 +40,7 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 | **账户总览** | 余额、订阅余量、查询状态与低余额提醒；累计充值和消费分别记录 |
 | **我的使用** | 人民币总支出、使用 Token、实际单价；记录与编辑费用，按月份、厂商查询及导出 |
 | **AI 模型** | Intelligence Index vs. Cost per Task 散点图，默认选最新 30 个型号，可搜索、按厂商加选和切换评测档位 |
-| **Token 活动** | Codex、ZCode、Harness、可选 Multica 和 Trae 的趋势与环形占比，按来源、模型和设备筛选 |
+| **Token 活动** | 按软件、模型和运行环境筛选用量趋势与占比，可进一步查看调度入口、接入方式和模型厂商 |
 | **输出速度** | 每次调用的速度散点，按时间、模型、设备筛选；悬浮窗显示运行任务 |
 | **设置** | 配色、明暗、视觉效果、采集频率、通知、悬浮窗、备份和跨设备同步 |
 
@@ -58,11 +58,11 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 ### AI 模型
 
-- 综合榜按 Artificial Analysis 发布的指数排序。可切换知识工作、编程、科学和通用四个领域，按厂商、型号和评测范围筛选。
-- 能力对比最多选三个推理配置。四轴图下方逐项展示九项测评的原始成绩、权重和样本规模。
-- 价格图采用厂商官方标准 Token 单价，按人民币比较。点击散点可查看具体型号、配置和定价来源。
+- 横轴为 Artificial Analysis（AA）给出的加权单任务成本（美元，对数刻度），纵轴为同一评测配置的 Intelligence Index。点击散点可查看型号和档位。
+- 默认选取已知发布日期最近的 30 个型号，可按型号或厂商搜索、添加和移除，也可切换评测档位。缺少可比成本的型号仍列在表中，选择保存在本机。
+- 连接 AA 后可手动刷新或启用自动更新。完整分页成功后才替换本地快照，限流或断网时仍可查看上次结果。当前选择可导出 CSV。
 
-[计算与来源](docs/model-benchmarks.md)。公开评测和官方价格分别更新，失败保留上次有效资料。
+单任务成本反映 AA 评测的支出。厂商按 Token 收费的官方价格另有来源与核实时间。[计算与来源](docs/model-benchmarks.md)
 
 ### 输出速度
 
@@ -70,17 +70,19 @@ macOS 包采用临时签名，尚未进行 Apple Developer ID 签名和公证；
 
 贴边悬浮窗专注显示正在工作的任务、型号、开始时间与经过时长，保留今日 / 累计 Token；不再放置缺少实时计量依据的速度数字。
 
-**速度只在响应用量完整后更新。** Codex 能提供文本流事件，但当前本机采集通道没有可靠的逐 Token 计数；文本片段数量与 Token 数不同。有效输出至少 64 Token、0.5 秒，均值按输出时长加权。[能力核实与统计口径](docs/output-speed.md)。
+**速度只在响应用量完整后更新。** Codex 能提供文本流事件，但当前本机采集通道没有可靠的逐 Token 计数。有效样本至少包含 64 个非推理输出 Token 和 0.5 秒输出时间。[能力核实与统计口径](docs/output-speed.md)
 
 ### Token 活动
 
-- 时间、更新和采集设置集中在顶部；设备、来源、模型 / 厂商筛选按需展开。筛选只限定当前统计视图，不改变采集配置。
+- 直接按软件、运行环境和原始型号筛选，更多条件包含调度入口（如 Multica）、接入方式和模型厂商。筛选只影响当前报表。采集在「设置 → 采集来源」中配置。
 - 来源、模型与输入缓存占比使用环形图，移除图下冗余数据，悬停查看比例、点击扇区筛选。
 - Trae 分开显示「Trae 提供」和「API 接入 Trae」，各通道可筛选具体模型并查看用量趋势。历史记录无法识别时保留未知。
 - SSH 设备逐台显示名称、连接别名和独立用量。同一设备的多个别名按设备身份去重；新设备默认不选，取消勾选保留历史，重新勾选后恢复统计。
 - SSH 使用已有连接配置，在远端只读提取指标，无需安装 Quota 或配置共享目录。SSH 用量来源与 Quota 同步客户端分列；连接失败和补采进度可见。
 
-缓存和推理是输入 / 输出的子项，不重复加入总量。「我的使用」排除 Trae，Token 活动保留其原始指标。详见 [统计口径与同步](docs/activity-stats.md)、[1.0.2500 更新说明](docs/release-1.0.2500.md)。
+采集器可读取 Codex、Claude Code、Gemini CLI、Kimi Code、ZCode 和 DeepSeek Harness 等来源。Cursor 需要含完整 Token 明细的 CSV，Qoder 需要日志中的用量字段，WorkBuddy 目前读取用户指定的兼容用量文件。新识别的 SSH / WSL 环境由用户选择纳入，各来源的格式与实测范围见[多软件用量工作区](docs/activity-workspace.md)。
+
+缓存和推理是输入 / 输出的子项，不重复加入总量。「我的使用」排除 Trae，Token 活动保留其原始指标。[统计口径与同步](docs/activity-stats.md) · [1.0.2500 更新说明](docs/release-1.0.2500.md)
 
 ### 外观与桌面
 
@@ -114,7 +116,7 @@ ChatGPT 显示的是订阅内 **Codex 额度**，Quota 不复制或刷新 Codex 
 
 ## 界面预览
 
-材质与侧栏来自 1.0.3501 隔离安装版的真实 WebView，费用与图表来自同一构建的合成预览。所有示例均使用合成资料，不叠加桌面背景。
+以下为 1.0.3501 的历史界面。材质与侧栏来自隔离安装版的真实 WebView，费用与图表来自同一构建的合成预览。所有示例均使用合成资料，不叠加桌面背景。
 
 ![液态玻璃与导航层次](assets/readme/liquid-light-3501.png)
 
@@ -148,7 +150,7 @@ macOS 真实凭据读写和跨设备云端传输仍需实机验收。完整边�
 
 ## 开发
 
-准备 Node.js、Rust stable 和对应平台的 Tauri 构建依赖。
+准备 Node.js、Rust stable 和对应平台的 Tauri 构建依赖。在维护者的 Windows 机器上，安装依赖前先完成[非 C 盘路径检查](docs/build-windows.md#维护者本机的构建位置)。
 
 ```bash
 git clone https://github.com/Sharanie0612/Quota.git
@@ -157,7 +159,7 @@ npm ci
 npm run tauri dev
 ```
 
-开发端口为 `1420`。本轮本地工作分支为 `codex/feat/apple-materials-sidebar`，尚未推送；不要假定远程仓库已有当前开发版。
+开发端口为 `1420`。开始修改前核对当前工作树和任务分支，按改动范围选择验收。[仓库编码规则](AGENTS.md)
 
 | 平台 | 构建入口 | 说明 |
 | --- | --- | --- |
@@ -184,17 +186,17 @@ scripts/lib/             验收共用的加载器、合成数据与表面检查
 npm run typecheck
 npm run build
 npm run verify
-cargo check --examples --locked --manifest-path src-tauri/Cargo.toml
+cargo check --locked --manifest-path src-tauri/Cargo.toml
 ```
 
 界面检查先运行 `npm run preview:ui`，再在另一终端运行 `npm run verify:ui`。需要可用的 Playwright / Edge；可通过 `QUOTA_PLAYWRIGHT_MODULE`、`QUOTA_BROWSER_PATH`、`QUOTA_PREVIEW_URL` 指定环境。检查覆盖外观组合、1024px 布局、账务交互、模型图、速度与任务窗，安装版仍需单独验收。
 
-本机 Windows GNU 的 `cargo test` 存在 WinRT DLL 加载限制，运行逻辑使用对应的 Rust example。账户、账务、统计和同步兼容代码及有效回归继续保留，已移除的旧页面与液态效果检查不再作为当前验收入口。分层边界、扩展方式与验证命令见 [架构](docs/architecture.md)、[开发指南](docs/development.md) 和 [AGENTS.md](AGENTS.md)。
+维护者本机 Windows GNU 的 `cargo test` 存在 WinRT DLL 加载限制。在 `src-tauri/` 运行对应的 Rust example，验证账户、账务、统计和同步格式的兼容行为。各类改动的检查入口见[架构](docs/architecture.md)、[开发指南](docs/development.md) 和[仓库编码规则](AGENTS.md)。
 
 ## 文档与贡献
 
 [活动统计](docs/activity-stats.md) · [模型资料库](docs/model-catalog.md) · [架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [Git 流程](docs/git-workflow.md)
 
-提交请说明用户可见变化、验证结果与限制，不包含凭据、个人配置、真实账单或未经核实的价格。历史交付文档记录当时的验收范围。
+提交和 PR 标题使用英文 `type(scope): summary`。PR 正文用英文填写 Summary、Changes、Version impact 和 Testing，包括源码基线、目标展示号和实际验证结果。安装、功能和开发说明有变化时同步更新两种语言。示例、截图和日志使用合成资料，价格注明经核实的官方来源。[PR 模板](.github/pull_request_template.md)
 
 项目尚未选择开源许可证，公开可读不代表已授予修改或再分发许可。品牌资源见 [图标说明](src/assets/brands/README.md)。

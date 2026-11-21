@@ -1,11 +1,21 @@
-## 背景与改动
+<!-- Write the title and description in English. Use type(scope): summary for the title. -->
 
-<!-- 谁会遇到什么问题？合并后会看到什么变化？文档或工具变更可从读者或维护者的角度说明。有关联议题时附链接。 -->
+## Summary
 
-## 验证
+<!-- Describe the problem, who encounters it, and what this PR changes for them. Link a related issue if available. -->
 
-<!-- 每项写出实际命令或操作及结果。需要时说明平台、数据或安装方式。列出相关但失败或尚未执行的检查及原因。 -->
+## Changes
 
-## 兼容与升级
+<!-- List the changes a reviewer should examine. For data, sync, or installer changes, explain compatibility, migration, and recovery where relevant. -->
 
-<!-- 涉及旧配置、同步协议、安装器或人工迁移时，说明已有用户受何影响、如何升级或恢复。无相关影响时删除本节。 -->
+## Version impact
+
+| Impact | Base | Target |
+| --- | --- | --- |
+| <!-- none / fix / feature / major / system --> | <!-- A.B.FFBB --> | <!-- A.B.FFBB --> |
+
+<!-- Use full display versions. Explain the choice in one sentence. For documentation, use none and repeat the base. If this PR shares an assigned target, link the iteration record. -->
+
+## Testing
+
+<!-- List each command or manual check you ran, its environment, and the result. Identify relevant checks you skipped or that failed, with the reason. -->

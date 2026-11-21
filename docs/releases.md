@@ -18,15 +18,35 @@
 
 ## 版本换算
 
-展示号为 `A.B.FFBB`。A、B 为非负整数，FF、BB 各占两位。功能版递增 FF 并将 BB 归零，纯修复版只递增 BB，同时包含功能与修复时按功能版。提升 A 时 B、FF、BB 归零，提升 B 时 FF、BB 归零。FF 或 BB 到 99 时须先确定下一次发布级别。
+展示号为 `A.B.FFBB`。A 和 B 均为非负整数，分别表示系统级重构和大版本。FF 和 BB 分别是两位功能号和修复号。界面、Git 标签、安装包名和发布说明使用完整展示号。npm、Cargo、Tauri 的包版本为 `A.B.(100 × FF + BB)`。例如展示号 `1.0.0101` 对应包版本 `1.0.101`。比较版本时按各段数值排序。
 
-每次发布从最近已发布版本递增一次。纯文档、测试或构建维护本身不触发产品升版。界面、Git 标签和发布说明使用完整展示号。npm、Cargo、Tauri 的包版本将 FFBB 转成十进制整数，例如展示号 `1.0.0101` 对应包版本 `1.0.101`。
+升版时同步 `package.json`、`package-lock.json` 顶层及 `packages[""]`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 中 Quota 自身条目和 `src-tauri/tauri.conf.json`。`app_info` 通过 `version::display_version()` 生成界面展示号。从仓库根目录运行以下只读检查，可核对这五个文件中的六处版本并查看换算结果。
 
-同步 `package.json`、`package-lock.json` 的顶层和 `packages[""]`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock` 中 Quota 自身条目，以及 `src-tauri/tauri.conf.json`。`app_info` 调用 `version::display_version()` 从 Cargo 包版本生成展示号。打包脚本核对各处版本。改变打包版本时验证安装版启动与覆盖升级，并在本文末尾追加映射及实际交付状态。
+```powershell
+node -p "JSON.stringify(require('./scripts/release.cjs').versionInfo())"
+```
+
+## 迭代基线与递增
+
+1. **读取源码基线。** 运行 `git fetch origin --tags`，从 PR 目标分支读取包版本，换算为 Base。常规迭代使用 `origin/main`，可通过 `git show origin/main:package.json` 查看。另核对 GitHub Releases 的公开状态和实际交付记录。源码可能领先于最新正式版，升级验收需记录实际使用的旧安装包。
+2. **为每个独立产品迭代分配一次目标。** 根据下表选择级别，核对同一发布线的源码、标签、迭代记录和已交付安装包。从本轮所基于的最新版本向前递增。并行迭代若碰号，后合入的 PR 更新目标分支基线，再按其改动级别计算可用号。属于同一未交付候选版的多个 PR 沿用已登记的级别和目标号，并引用同一迭代记录。已交付安装包发生内容变化时为新包分配新号。
+3. **按实际影响填写 PR。** 在英文 `Version impact` 表中写级别、Base 和 Target。数据迁移、接口或安装方式有不兼容变化时，在 `Changes` 中说明影响和升级路径。发布已验收的候选版时沿用其展示号。在[版本映射记录](#版本映射记录)登记基线、目标、包版本、关联 PR 或提交和实际交付状态。同轮后续验收更新同一记录，区分源码合入、本地交付、预发布和正式发布。
+
+以下示例从同一个源码基线独立计算。PR 类型用于描述改动内容，版本级别由本次交付给用户的实际变化决定。
+
+| PR 中的 Impact | 适用改动 | Base → Target（展示号） | 目标包版本 |
+| --- | --- | --- | --- |
+| `none` | 纯文档、仅测试或不改变交付行为的构建维护，沿用源码版本 | `1.0.4200` → `1.0.4200` | `1.0.4200` |
+| `fix` | 独立修复，BB 加一 | `1.0.4200` → `1.0.4201` | `1.0.4201` |
+| `feature` | 新功能或功能与修复同批交付，FF 加一，BB 归零 | `1.0.4200` → `1.0.4300` | `1.0.4300` |
+| `major` | 产品大版本，B 加一，FF、BB 归零 | `1.0.4200` → `1.1.0000` | `1.1.0` |
+| `system` | 系统级重构，A 加一，B、FF、BB 归零 | `1.0.4200` → `2.0.0000` | `2.0.0` |
+
+功能版会清零修复号，例如从 `1.0.4201` 增加功能后为 `1.0.4300`。FF 和 BB 的范围均为 `00`–`99`。待递增的字段已经是 `99` 时，由维护者确定更高一级迭代后再分配号码。旧版本的紧急修复沿用受影响标签的功能线，回补到较新的开发线时只带入适用修复。[紧急修复流程](git-workflow.md#发布紧急修复与清理)
 
 ## 发布步骤
 
-1. 按上节同步版本，完成[仓库编码规则](../AGENTS.md)中适用于本次产品变更的检查，通过 PR 合入 `main`。
+1. 核对已分配的目标号和所有包版本，完成[仓库编码规则](../AGENTS.md)中适用于本次产品变更的检查。改变打包版本时验证安装版启动和覆盖升级，记录实际结果，通过 PR 合入 `main`。
 2. 创建名为 `Quota A.B.FFBB` 的 Release **草稿**，目标填写已合入 main 的确切提交 SHA，写清更新内容、平台和实际验收范围。暂不公开，也不改写历史标签。
 3. 上传同版本的 `Quota_A.B.FFBB_x64-setup.exe` 和 `Quota_A.B.FFBB_aarch64.dmg`。Windows 使用 `npm run package:windows`；Mac 使用 [macOS 构建工作流](../.github/workflows/macos-package.yml) 或本机 Mac 构建并验收。
 4. 在 [Actions → Publish installers](https://github.com/Sharanie0612/Quota/actions/workflows/release.yml) 选择 **Run workflow**，分支选择 `main`，填写完整展示版本。选择 `draft` 仅整理草稿；`preview` 公开测试版；`release` 公开并设为最新版。

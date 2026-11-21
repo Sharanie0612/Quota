@@ -197,6 +197,6 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml
 
 [活动统计](docs/activity-stats.md) · [模型资料库](docs/model-catalog.md) · [架构](docs/architecture.md) · [贡献指南](CONTRIBUTING.md) · [Git 流程](docs/git-workflow.md)
 
-提交标题用中文说明对象和结果。PR 写清原问题、改后行为、实际验证与限制。安装、功能和开发说明有变化时同步更新两种语言。示例、截图和日志使用合成资料，价格注明经核实的官方来源。[PR 模板](.github/pull_request_template.md)
+提交和 PR 标题使用英文 `type(scope): summary`。PR 正文用英文填写 Summary、Changes、Version impact 和 Testing，包括源码基线、目标展示号和实际验证结果。安装、功能和开发说明有变化时同步更新两种语言。示例、截图和日志使用合成资料，价格注明经核实的官方来源。[PR 模板](.github/pull_request_template.md)
 
 项目尚未选择开源许可证，公开可读不代表已授予修改或再分发许可。品牌资源见 [图标说明](src/assets/brands/README.md)。

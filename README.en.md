@@ -197,6 +197,6 @@ The project guides linked below are in Chinese.
 
 [Activity statistics](docs/activity-stats.md) · [Model catalog](docs/model-catalog.md) · [Architecture](docs/architecture.md) · [Contributing](CONTRIBUTING.md) · [Git workflow](docs/git-workflow.md)
 
-Use a Chinese commit title that names the change and its result. In a pull request, explain the original problem, the resulting behavior, what you verified, and any remaining limitations. Update both READMEs when installation, features, or development instructions change. Use synthetic data in examples, screenshots, and logs, and cite verified official sources for prices. [Pull request template](.github/pull_request_template.md)
+Write commit and PR titles in English using `type(scope): summary`. Use the four English PR sections Summary, Changes, Version impact, and Testing. Include the base and target display versions and report the checks you ran. Update both READMEs when installation, features, or development instructions change. Use synthetic data in examples, screenshots, and logs, and cite verified official sources for prices. [Pull request template](.github/pull_request_template.md)
 
 The project has no repository-wide open-source license granting permission to modify or redistribute it. The brand asset guide records artwork attribution and notices. [Brand assets](src/assets/brands/README.md)

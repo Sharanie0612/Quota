@@ -1,6 +1,6 @@
 # Git 分支规范
 
-Quota 使用短期任务分支，从 `main` 开始，一个可独立验收的任务通过 PR 集成回 `main`。验收范围与版本递增分别见[按改动选择验收](../AGENTS.md#按改动选择验收)和[版本换算](releases.md#版本换算)。
+Quota 使用短期任务分支，从 `main` 开始，一个可独立验收的任务通过 PR 集成回 `main`。验收范围与版本递增分别见[按改动选择验收](../AGENTS.md#按改动选择验收)和[迭代基线与递增](releases.md#迭代基线与递增)。
 
 ## 分支命名与职责
 
@@ -64,17 +64,18 @@ Codex 的托管工作树可能使用 detached HEAD；需要提交、推送和 PR
 ## 提交说明
 
 - 一个提交表达一个可独立理解的改动。先看 `git status --short` 和 `git diff`，按文件暂存。同一文件混有其他任务的修改时，用 `git add -p` 选择代码块。提交前读完整的 `git diff --cached` 并运行 `git diff --cached --check`。已有的暂存内容也会进入普通提交，须核对归属。
-- 标题用一句中文写清动词、对象和具体结果，让只读 `git log --oneline` 的人也能判断影响。保留 API、命令和文件名的原文。修复可以写「修复小米余额解析，避免缺失字段显示为零」，文档可以写「补全英文 README 的安装与开发说明」。
-- 标题足以说明的小改可省略正文。涉及多条路径、迁移或非显然的取舍时，空一行写明触发条件、做法及对已有用户或调用方的影响。提交说明与暂存差异对应，PR 再汇总跨提交的结果。
+- 新提交和 PR 使用同一种英文标题 `type(scope): summary`。类型用 `feat`、`fix`、`docs`、`perf`、`refactor`、`test`、`build`、`ci`、`chore` 或 `revert`。范围用小写英文点出主要模块，如 `activity`、`sync`、`installer`、`repo`。摘要用小写英文动词原形开头，写清作用对象和结果，末尾省略句号。破坏兼容时写成 `type(scope)!: summary`。
+- 标题足以说明的小改可省略提交正文。需要正文时，标题后空一行，用英文先交代原因，再说明对已有用户或调用方的影响。破坏兼容时另起一段，以 `BREAKING CHANGE:` 写明迁移方式。提交说明对应暂存差异，PR 概括整条分支的最终结果。
 - 验证随改动选择。检查差异中是否混入凭据、个人配置、对话、账单或构建产物，保留仓库要求跟踪的 `WebView2Loader.dll`。[按改动选择验收](../AGENTS.md#按改动选择验收)
 
 例如，下面的提交正文解释了保留原首页的原因。
 
 ```text
-新增英文 README，保留中文首页的既有链接
+docs(readme): add an English installation and development guide
 
-已有文档直接链接到 README.md 的中文章节。英文版放在 README.en.md，
-两版从页首互链，并共用安装包、校验文件和截图。
+Existing links point to Chinese section headings in README.md. Put the
+translation in README.en.md and link both editions at the top so readers
+can switch languages and existing bookmarks still work.
 ```
 
 ## 推送与结果说明
@@ -102,22 +103,38 @@ git diff --check origin/main...HEAD
 
 ## PR 标题与正文
 
-1. 默认以 `main` 为目标。先确认目标仓库、目标分支（base）、来源分支（head）及两者之间已有的开放 PR。后续提交推到原分支并更新原 PR。写描述前看 `git diff origin/main...HEAD`，覆盖整条分支最终带来的变化。
-2. 标题用中文概括合并后的主要效果，可直接作为 squash 提交标题。例如「补全 Quota 英文使用指南，统一两种语言的下载入口」。纯文档和工具改动写清读者或维护者获得的变化。只在确有对应发布或议题时带上版本号或关联 issue。
-3. 正文先写原来的问题、受影响的人或场景，再写改后的行为。验证逐项给出实际命令或操作、结果及必要的平台信息。涉及界面时可附合成数据截图。涉及存储、同步或安装时说明旧数据兼容、升级路径及实际验收范围。适用检查失败或未完成时使用草稿 PR，写明剩余事项。[PR 正文模板](../.github/pull_request_template.md)
-4. 发布前预览 Markdown，删除空小节和示例占位，核对截图、日志与链接。用 GitHub CLI 时，多段正文写入 UTF-8 Markdown 文件，通过 `--body-file` 传给 `gh pr create` 或 `gh pr edit`。区分本地结果和 GitHub 上实际触发的检查，创建后交付 PR 链接及草稿或待审状态。
+默认以 `main` 为目标。先确认仓库、目标分支、来源分支及已有的开放 PR。后续提交推到原分支并更新原 PR。写标题和正文前，用 `git diff origin/main...HEAD` 查看整条分支的差异。
+
+标题选择一个最能代表合并结果的类型和范围。普通 PR 将版本写在正文。准备发布时，标题也写明完整目标展示号。以下是三种常见写法。[提交说明](#提交说明)
+
+- `docs(repo): add an English README and define PR and versioning rules`
+- `fix(sync): prevent duplicate events when replaying a backup`
+- `chore(release): prepare 1.0.4300`
+
+正文使用英文，按以下顺序保留四个二级标题。网页和 CLI 使用同一份 [PR 模板](../.github/pull_request_template.md)。
+
+| 小节 | 审阅人需要的信息 |
+| --- | --- |
+| `Summary` | 谁遇到了什么问题，合并后会有什么变化。有对应 issue 时附链接。 |
+| `Changes` | 列出实现上述结果的关键改动。涉及数据、同步、安装或破坏兼容时，写清旧版本的行为、升级方式和恢复路径。 |
+| `Version impact` | 填写 `Impact / Base / Target` 表。Base 是目标分支源码的展示号，Target 是此次变更采用的展示号。用一句话说明递增或沿用的依据。沿用已有候选版时附迭代记录。[级别与示例](releases.md#迭代基线与递增) |
+| `Testing` | 逐项写出实际运行的命令或操作、环境和观察结果。说明相关但未执行或失败的检查及原因。涉及 UI 时可附使用合成资料的截图。 |
+
+发布前预览 Markdown，替换占位内容，核对链接与截图。使用 GitHub CLI 时将正文写入 UTF-8 Markdown 文件，通过 `--body-file` 传给 `gh pr create` 或 `gh pr edit`。区分本地结果和 GitHub 已执行的检查。适用检查尚未通过时使用草稿 PR，交付时附 PR 链接与审阅状态。
+
+标题借鉴 Nuxt UI 将 Conventional Commits 用于 PR 和 squash 提交的做法。正文参考 GitHub CLI 模板对变更背景和实测结果的要求，并按 Quota 的发布流程加入版本表。[Nuxt UI 贡献指南](https://ui2.nuxt.com/getting-started/contributing) · [GitHub CLI PR 模板](https://github.com/cli/cli/blob/trunk/.github/PULL_REQUEST_TEMPLATE.md)
 
 ## 合并与分支保护
 
-分支更新后重跑受影响的检查。默认 squash 合并，检查合并标题与正文仍准确概括最终差异。多人共享的分支通过 merge 整合更新，仅未共享的本地提交可以整理或 rebase。
+分支更新后重跑受影响的检查。默认 squash 合并，使用最终英文 PR 标题作为合并提交标题，并核对正文与最终差异一致。多人共享的分支通过 merge 整合更新，仅未共享的本地提交可以整理或 rebase。
 
 维护者应在 GitHub 为 `main` 配置保护：要求 PR、禁止强推和删除，并将已配置的自动检查设为必需；有独立审阅人时要求至少一位审批。未配置 CI 时，PR 必须附本地验收结果，不能宣称远程检查已通过。这些是维护要求，本文件不表示 GitHub 设置已经生效。
 
 ## 发布、紧急修复与清理
 
-release 分支仅处理版本同步、发布说明、验收和阻塞发布的修复。以最近已发布版本为基线，同步 npm、Cargo、Tauri 与展示号。release 分支验证通过后先集成到 `main`，在已验收的实际发布提交上打完整展示号标签，安装包须对应该提交。公开发布以实际 Release 为准，保留已发布标签。[版本换算](releases.md#版本换算)
+release 分支处理版本同步、发布说明、验收和阻塞发布的修复。冻结时沿用本轮已分配的目标号，核对 npm、Cargo、Tauri 与展示号。验证通过后先集成到 `main`，在已验收的实际发布提交上打完整展示号标签，安装包须对应该提交。公开发布以实际 Release 为准。[迭代基线与递增](releases.md#迭代基线与递增)
 
-hotfix 从已确认的发布标签开始，按 Bug 修复规则确定完整展示号；修复验收后将对应提交回补到 `main`，避免后续版本重新引入问题。如有活动 release 分支，也需评估并回补。没有可确认的发布标签时按普通 fix 流程处理，不猜测发布基线。
+hotfix 从受影响的发布标签开始，在该功能线上选下一个可用修复号。验收后将修复回补到 `main` 及受影响的活动 release 分支，保留各分支自己的版本进度。无法确认发布标签时走普通 fix 流程。
 
 任务合并后再清理分支。确认 PR 已合并、提交已保留、工作树无人使用且无未保存改动后，按授权删除远程分支和本地分支。squash 合并可能导致 `git branch -d` 拒绝删除，先核对 PR 与提交，不直接使用 `-D` 强删。
 
